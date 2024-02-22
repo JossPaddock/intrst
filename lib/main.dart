@@ -52,16 +52,40 @@ class _MyHomePageState extends State<MyHomePage> {
       style: optionStyle,
     ),
   ];
-  static const List<Widget> _signedOutWidgetOptions = <Widget>[
+  static List<Widget> _signedOutWidgetOptions = <Widget>[
     Text(
       'Index 0: Replace this text widget with the google map widget',
       style: optionStyle,
     ),
-    Text(
-      'Index 1: Replace this text widget with the sign-in page widget',
-      style: optionStyle,
+    Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+          constraints: BoxConstraints(minWidth: 300, maxWidth: 800),
+          child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+          constraints: BoxConstraints(minWidth: 200, maxWidth: 800),
+          child: TextField(
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Email',
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+          constraints: BoxConstraints(minWidth: 50, maxWidth: 800),
+          child: TextField(
+            decoration: InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Password',
+            ),
+          ),
+        ),
+      ],
     ),
-
+        ),
   ];
 
   void _onItemTapped(int index) {
