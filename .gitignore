@@ -7,6 +7,11 @@ build/
 # If you're building an application, you may want to check-in your pubspec.lock
 pubspec.lock
 
+# additional observed files to ignore in git commits (use caution here)
+linux/flutter/generated*
+macos/Flutter/Generated*
+windows/flutter/generated*
+
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.
 doc/api/
