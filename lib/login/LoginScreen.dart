@@ -29,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
     return Future.delayed(loginTime).then((_) {
       if (!users.containsKey(data.name)) {
-        return 'User not exists';
+        return 'User does not exist';
       }
       if (users[data.name] != data.password) {
         return 'Password does not match';
@@ -58,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return FlutterLogin(
-      title: 'ECORP',
+      title: 'intrst',
       //if you want a log above the login widget, add the path to a png, eg below:
       //logo: const AssetImage('assets/images/ecorp-lightblue.png'),
       onLogin: _authUser,

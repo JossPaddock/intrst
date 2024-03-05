@@ -150,10 +150,11 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             ListTile(
               title: const Text('Sign Out'),
-              selected: _selectedIndex == 4,
+              selected: _selectedIndex == 0,
               onTap: () {
                 // Update the state of the app
-                _onItemTapped(4);
+                _onItemTapped(0);
+                _handleSignInChanged(false);
                 // Then close the drawer
                 Navigator.pop(context);
               },
