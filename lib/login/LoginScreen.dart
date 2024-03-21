@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
-
+//this is for Firebase
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:name_app/utility/FirebaseUtility.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 const users =  {
   'test@test.com': 'password',
 };
@@ -22,46 +25,113 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
+  final FirebaseUtility fu = FirebaseUtility();
+  final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   Duration get loginTime => const Duration(milliseconds: 2250);
 
-  Future<String?> _authUser(LoginData data) {
+  Future<String?> _signInUser(LoginData data) {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
-    return Future.delayed(loginTime).then((_) {
-      if (!users.containsKey(data.name)) {
-        return 'User does not exist';
-      }
-      if (users[data.name] != data.password) {
-        return 'Password does not match';
+    return Future.delayed(loginTime).then((_) async {
+      String email = data.name??"";
+      String password = data.password??"";
+      bool result = await _signIn(email, password);
+      if (result == false) {
+        if (!users.containsKey(data.name) && users[data.name] != data.password) {
+          return 'User does not exist or password does not match';
+        }
       }
       return null;
     });
   }
 
-  Future<String?> _signupUser(SignupData data) {
+  Future<bool> _signIn(String email, String password) async {
+    var result = false;
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password
+      );
+      result = true;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        print('No user found for that email.');
+      } else if (e.code == 'wrong-password') {
+        print('Wrong password provided for that user.');
+      }
+      result = false;
+    }
+    return result;
+  }
+
+  Future<String?> _signupUser(SignupData data) async {
     debugPrint('Signup Name: ${data.name}, Password: ${data.password}');
-    return Future.delayed(loginTime).then((_) {
-      return null;
-    });
-  }
-
-  Future<String?> _recoverPassword(String name) {
-    debugPrint('Name: $name');
-    return Future.delayed(loginTime).then((_) {
-      if (!users.containsKey(name)) {
-        return 'User not exists';
+    if(data.name is String && data.password is String) {
+      String email = data.name??"";
+      String password = data.password??"";
+      await _createNewUser(email, password);
+      CollectionReference users = FirebaseFirestore.instance.collection('users');
+      User? user_snapshot;
+      if (FirebaseAuth.instance.currentUser != null) {
+        print(FirebaseAuth.instance.currentUser?.uid);
+        user_snapshot = FirebaseAuth.instance.currentUser;
       }
+      fu.addUserToFirestore(users, user_snapshot!.uid, 'John', 'Doe', GeoPoint(0,0) );
+    }
+    return Future.delayed(loginTime).then((_) {
       return null;
     });
   }
 
+  Future<UserCredential?> _createNewUser(String email, String password) async {
+    var credential = null;
+    try {
+      credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'weak-password') {
+        print('The password provided is too weak.');
+      } else if (e.code == 'email-already-in-use') {
+        print('The account already exists for that email.');
+      }
+    } catch (e) {
+      print(e);
+    }
+    return credential;
+  }
+  Future<String?> _recoverPassword(String email) async {
+    debugPrint('Email: $email');
+    bool result = await _sendPasswordResetEmail(email);
+    return Future.delayed(loginTime).then((_) {
+      return "sent reset email to $email";
+    });
+  }
+
+  Future<bool> _sendPasswordResetEmail(String email) async {
+    var result = false;
+    try {
+      final credential = await FirebaseAuth.instance.sendPasswordResetEmail(
+          email: email,
+      );
+      result = true;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        print('No user found for that email.');
+      } else if (e.code == 'invalid-email') {
+        print('This is not a valid email');
+      }
+      result = false;
+    }
+    return result;
+  }
   @override
   Widget build(BuildContext context) {
     return FlutterLogin(
       title: 'intrst',
       //if you want a log above the login widget, add the path to a png, eg below:
       //logo: const AssetImage('assets/images/ecorp-lightblue.png'),
-      onLogin: _authUser,
+      onLogin: _signInUser,
       onSignup: _signupUser,
       onSubmitAnimationCompleted: () {
         debugPrint("onSubmitAnimationCompleted: User logged in");

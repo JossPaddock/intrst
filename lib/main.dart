@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'login/LoginScreen.dart';
+import 'widgets/ButtonWidget.dart';
+//these are for Firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() => runApp(const MyApp());
 
@@ -32,9 +36,15 @@ class _MyHomePageState extends State<MyHomePage> {
   int _selectedIndex = 0;
 
   late List<Widget> _signedOutWidgetOptions;
-
+  late List<Widget> _signedInWidgetOptions;
+  Future<void> initializeFirebase() async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   @override
   void initState() {
+    initializeFirebase();
     _signedOutWidgetOptions = <Widget>[
     Text(
       'Index 0: Replace this text widget with the google map widget',
@@ -47,6 +57,25 @@ class _MyHomePageState extends State<MyHomePage> {
       onSelectedIndexChanged: _onItemTapped,
     ),
   ];
+    _signedInWidgetOptions = <Widget>[
+      Text(
+        'Index 0: Replace this text widget with the google map widget',
+        style: optionStyle,
+      ),
+      Text(
+        'Index 1: Replace this text widget with the My Interests widget',
+        style: optionStyle,
+      ),
+      ButtonWidget(),
+      Text(
+        'Index 3: Replace this text widget with the Messages widget',
+        style: optionStyle,
+      ),
+      Text(
+        'Index 4: Replace this text widget with the Sign Out widget',
+        style: optionStyle,
+      ),
+    ];
     super.initState();
   }
 
@@ -64,28 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   static const TextStyle optionStyle =
       TextStyle(fontSize: 30, fontWeight: FontWeight.bold);
-  static const List<Widget> _signedInWidgetOptions = <Widget>[
-    Text(
-      'Index 0: Replace this text widget with the google map widget',
-      style: optionStyle,
-    ),
-    Text(
-      'Index 1: Replace this text widget with the My Interests widget',
-      style: optionStyle,
-    ),
-    Text(
-      'Index 2: Replace this text widget with the Account widget',
-      style: optionStyle,
-    ),
-    Text(
-      'Index 3: Replace this text widget with the Messages widget',
-      style: optionStyle,
-    ),
-    Text(
-      'Index 4: Replace this text widget with the Sign Out widget',
-      style: optionStyle,
-    ),
-  ];
+
 
   @override
   Widget build(BuildContext context) {
