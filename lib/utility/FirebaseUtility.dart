@@ -2,14 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 class FirebaseUtility {
-  void addUserToFirestore(CollectionReference users, String user_uid, String first_name, String last_name, GeoPoint geo_point){
+  void addUserToFirestore(CollectionReference users, String userUid, String firstName, String lastName, GeoPoint geoPoint){
 
     Map<String, dynamic> userData = {
-      'user_uid': user_uid,
-      'first_name': first_name,
-      'last_name': last_name,
+      'user_uid': userUid,
+      'first_name': firstName,
+      'last_name': lastName,
       'interests': [],
-      'location': geo_point,
+      'location': geoPoint,
     };
     users.add(userData)
         .then((value) => print("User added to Firestore"))

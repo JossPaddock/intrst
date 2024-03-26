@@ -70,12 +70,12 @@ class _LoginScreenState extends State<LoginScreen> {
       String password = data.password??"";
       await _createNewUser(email, password);
       CollectionReference users = FirebaseFirestore.instance.collection('users');
-      User? user_snapshot;
+      User? userSnapshot;
       if (FirebaseAuth.instance.currentUser != null) {
         print(FirebaseAuth.instance.currentUser?.uid);
-        user_snapshot = FirebaseAuth.instance.currentUser;
+        userSnapshot = FirebaseAuth.instance.currentUser;
       }
-      fu.addUserToFirestore(users, user_snapshot!.uid, 'John', 'Doe', GeoPoint(0,0) );
+      fu.addUserToFirestore(users, userSnapshot!.uid, 'John', 'Doe', GeoPoint(0,0) );
     }
     return Future.delayed(loginTime).then((_) {
       return null;
