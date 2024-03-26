@@ -75,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
         print(FirebaseAuth.instance.currentUser?.uid);
         userSnapshot = FirebaseAuth.instance.currentUser;
       }
-      fu.addUserToFirestore(users, userSnapshot!.uid, 'John', 'Doe', GeoPoint(0,0) );
+      fu.addUserToFirestore(users, userSnapshot!.uid, data.additionalSignupData?.entries.firstWhere((element) => element.key == 'firstname').value ?? 'Bob', data.additionalSignupData?.entries.firstWhere((element) => element.key == 'lastname').value ?? 'Watkins', GeoPoint(0,0) );
     }
     return Future.delayed(loginTime).then((_) {
       return null;
@@ -144,11 +144,33 @@ class _LoginScreenState extends State<LoginScreen> {
               keyName: 'firstname',
               displayName: 'First Name',
               userType: LoginUserType.firstName,
+              fieldValidator: (value) {
+                if(value == null) {
+                  return "Value was null!";
+                } else {
+                  if(value.isEmpty) {
+                    return "Please enter a First Name";
+                  } else {
+                    return null;
+                  }
+                }
+              },
             ),
         UserFormField(
               keyName: 'lastname',
               displayName: 'Last Name',
               userType: LoginUserType.lastName,
+              fieldValidator: (value) {
+                if(value == null) {
+                  return "Value was null!";
+                } else {
+                  if(value.isEmpty) {
+                    return "Please enter a Last Name";
+                  } else {
+                    return null;
+                  }
+                }
+              },
             ),
       ],
     );
