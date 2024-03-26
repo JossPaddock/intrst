@@ -139,6 +139,18 @@ class _LoginScreenState extends State<LoginScreen> {
         widget.onSelectedIndexChanged(0);
       },
       onRecoverPassword: _recoverPassword,
+      additionalSignupFields: [
+        UserFormField(
+              keyName: 'firstname',
+              displayName: 'First Name',
+              userType: LoginUserType.firstName,
+            ),
+        UserFormField(
+              keyName: 'lastname',
+              displayName: 'Last Name',
+              userType: LoginUserType.lastName,
+            ),
+      ],
     );
   }
 }
