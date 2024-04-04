@@ -33,6 +33,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   
   bool _signedIn = false;
+  String _name = '';
   int _selectedIndex = 0;
 
   late List<Widget> _signedOutWidgetOptions;
@@ -55,6 +56,7 @@ class _MyHomePageState extends State<MyHomePage> {
       signedIn : _signedIn,
       onSignInChanged : _handleSignInChanged,
       onSelectedIndexChanged: _onItemTapped,
+      onNameChanged: _handleNameChanged,
     ),
   ];
     _signedInWidgetOptions = <Widget>[
@@ -85,6 +87,11 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _handleNameChanged(String newValue) {
+    setState(() {
+      _name = newValue;
+    });
+  }
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -110,11 +117,11 @@ class _MyHomePageState extends State<MyHomePage> {
           // Important: Remove any padding from the ListView.
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
+            DrawerHeader(
               decoration: BoxDecoration(
                 color: Colors.blue,
               ),
-              child: Text('Drawer Header'),
+              child: Text(_name),
             ),
             ListTile(
               title: const Text('Map'),
@@ -163,6 +170,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 // Update the state of the app
                 _onItemTapped(0);
                 _handleSignInChanged(false);
+                _handleNameChanged('');
                 // Then close the drawer
                 Navigator.pop(context);
               },
@@ -172,11 +180,11 @@ class _MyHomePageState extends State<MyHomePage> {
           // Important: Remove any padding from the ListView.
           padding: EdgeInsets.zero,
           children: [
-            const DrawerHeader(
+            DrawerHeader(
               decoration: BoxDecoration(
                 color: Colors.blue,
               ),
-              child: Text('Drawer Header'),
+              child: Text(_name),
             ),
             ListTile(
               title: const Text('Map'),

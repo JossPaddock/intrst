@@ -4,7 +4,8 @@ import 'package:flutter_login/flutter_login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:name_app/utility/FirebaseUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-const users =  {
+
+const users = {
   'test@test.com': 'password',
 };
 
@@ -12,12 +13,16 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.signedIn = false,
+    this.name = '',
     required this.onSignInChanged,
+    required this.onNameChanged,
     required this.onSelectedIndexChanged,
   });
 
   final bool signedIn;
+  final String name;
   final ValueChanged<bool> onSignInChanged;
+  final ValueChanged<String> onNameChanged;
   final ValueChanged<int> onSelectedIndexChanged;
 
   @override
@@ -32,11 +37,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<String?> _signInUser(LoginData data) {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
     return Future.delayed(loginTime).then((_) async {
-      String email = data.name??"";
-      String password = data.password??"";
+      String email = data.name ?? "";
+      String password = data.password ?? "";
       bool result = await _signIn(email, password);
       if (result == false) {
-        if (!users.containsKey(data.name) && users[data.name] != data.password) {
+        if (!users.containsKey(data.name) &&
+            users[data.name] != data.password) {
           return 'User does not exist or password does not match';
         }
       }
@@ -47,11 +53,15 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<bool> _signIn(String email, String password) async {
     var result = false;
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: password
-      );
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
       result = true;
+      print(FirebaseAuth.instance.currentUser?.uid);
+      CollectionReference users =
+      FirebaseFirestore.instance.collection('users');
+      String name = await fu.lookUpNameByUserUid(users, FirebaseAuth.instance.currentUser!.uid) ;
+      print(name);
+      widget.onNameChanged(name);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         print('No user found for that email.');
@@ -65,17 +75,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<String?> _signupUser(SignupData data) async {
     debugPrint('Signup Name: ${data.name}, Password: ${data.password}');
-    if(data.name is String && data.password is String) {
-      String email = data.name??"";
-      String password = data.password??"";
+    if (data.name is String && data.password is String) {
+      String email = data.name ?? "";
+      String password = data.password ?? "";
       await _createNewUser(email, password);
-      CollectionReference users = FirebaseFirestore.instance.collection('users');
+      CollectionReference users =
+          FirebaseFirestore.instance.collection('users');
       User? userSnapshot;
       if (FirebaseAuth.instance.currentUser != null) {
         print(FirebaseAuth.instance.currentUser?.uid);
         userSnapshot = FirebaseAuth.instance.currentUser;
       }
-      fu.addUserToFirestore(users, userSnapshot!.uid, data.additionalSignupData?.entries.firstWhere((element) => element.key == 'firstname').value ?? 'Bob', data.additionalSignupData?.entries.firstWhere((element) => element.key == 'lastname').value ?? 'Watkins', GeoPoint(0,0) );
+      var firstname = data.additionalSignupData?.entries
+          .firstWhere((element) => element.key == 'firstname')
+          .value ??
+          'Bob';
+      var lastname = data.additionalSignupData?.entries
+          .firstWhere((element) => element.key == 'lastname')
+          .value ??
+          'Watkins';
+      fu.addUserToFirestore(
+          users,
+          userSnapshot!.uid,
+          firstname,
+          lastname,
+          GeoPoint(0, 0));
+      widget.onNameChanged('$firstname $lastname');
     }
     return Future.delayed(loginTime).then((_) {
       return null;
@@ -100,6 +125,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     return credential;
   }
+
   Future<String?> _recoverPassword(String email) async {
     debugPrint('Email: $email');
     bool result = await _sendPasswordResetEmail(email);
@@ -112,7 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
     var result = false;
     try {
       final credential = await FirebaseAuth.instance.sendPasswordResetEmail(
-          email: email,
+        email: email,
       );
       result = true;
     } on FirebaseAuthException catch (e) {
@@ -125,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     return result;
   }
+
   @override
   Widget build(BuildContext context) {
     return FlutterLogin(
@@ -133,6 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
       //logo: const AssetImage('assets/images/ecorp-lightblue.png'),
       onLogin: _signInUser,
       onSignup: _signupUser,
+      messages: LoginMessages(signUpSuccess: 'You have signed up'),
       onSubmitAnimationCompleted: () {
         debugPrint("onSubmitAnimationCompleted: User logged in");
         widget.onSignInChanged(true);
@@ -141,37 +169,37 @@ class _LoginScreenState extends State<LoginScreen> {
       onRecoverPassword: _recoverPassword,
       additionalSignupFields: [
         UserFormField(
-              keyName: 'firstname',
-              displayName: 'First Name',
-              userType: LoginUserType.firstName,
-              fieldValidator: (value) {
-                if(value == null) {
-                  return "Value was null!";
-                } else {
-                  if(value.isEmpty) {
-                    return "Please enter a First Name";
-                  } else {
-                    return null;
-                  }
-                }
-              },
-            ),
+          keyName: 'firstname',
+          displayName: 'First Name',
+          userType: LoginUserType.firstName,
+          fieldValidator: (value) {
+            if (value == null) {
+              return "Value was null!";
+            } else {
+              if (value.isEmpty) {
+                return "Please enter a First Name";
+              } else {
+                return null;
+              }
+            }
+          },
+        ),
         UserFormField(
-              keyName: 'lastname',
-              displayName: 'Last Name',
-              userType: LoginUserType.lastName,
-              fieldValidator: (value) {
-                if(value == null) {
-                  return "Value was null!";
-                } else {
-                  if(value.isEmpty) {
-                    return "Please enter a Last Name";
-                  } else {
-                    return null;
-                  }
-                }
-              },
-            ),
+          keyName: 'lastname',
+          displayName: 'Last Name',
+          userType: LoginUserType.lastName,
+          fieldValidator: (value) {
+            if (value == null) {
+              return "Value was null!";
+            } else {
+              if (value.isEmpty) {
+                return "Please enter a Last Name";
+              } else {
+                return null;
+              }
+            }
+          },
+        ),
       ],
     );
   }
