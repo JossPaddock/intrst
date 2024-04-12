@@ -13,16 +13,16 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.signedIn = false,
-    this.name = '',
     required this.onSignInChanged,
     required this.onNameChanged,
+    required this.onUidChanged,
     required this.onSelectedIndexChanged,
   });
 
   final bool signedIn;
-  final String name;
   final ValueChanged<bool> onSignInChanged;
   final ValueChanged<String> onNameChanged;
+  final ValueChanged<String> onUidChanged;
   final ValueChanged<int> onSelectedIndexChanged;
 
   @override
@@ -59,9 +59,11 @@ class _LoginScreenState extends State<LoginScreen> {
       print(FirebaseAuth.instance.currentUser?.uid);
       CollectionReference users =
       FirebaseFirestore.instance.collection('users');
-      String name = await fu.lookUpNameByUserUid(users, FirebaseAuth.instance.currentUser!.uid) ;
+      String localUid = FirebaseAuth.instance.currentUser!.uid;
+      String name = await fu.lookUpNameByUserUid(users, localUid) ;
       print(name);
       widget.onNameChanged(name);
+      widget.onUidChanged(localUid);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         print('No user found for that email.');
@@ -101,6 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
           lastname,
           GeoPoint(0, 0));
       widget.onNameChanged('$firstname $lastname');
+      widget.onUidChanged(userSnapshot.uid);
     }
     return Future.delayed(loginTime).then((_) {
       return null;

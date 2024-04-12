@@ -1,12 +1,12 @@
 class Interest {
   String name = '';
   String description = '';
-  String link = '';
+  String? link = '';
   DateTime created_timestamp = DateTime.now();
   DateTime updated_timestamp = DateTime.now();
 
-  Interest(String name){
-    this.name = name;
+  Interest(){
+    this.name = '';
     this.description = '';
     this.link = '';
     this.created_timestamp = DateTime.now();

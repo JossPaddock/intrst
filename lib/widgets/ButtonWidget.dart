@@ -8,7 +8,7 @@ class ButtonWidget extends StatelessWidget{
   void addUserToFirestore(){
    print("user clicked 'click me' button");
    CollectionReference users = FirebaseFirestore.instance.collection('users');
-   Interest interest = Interest('soccer');
+   Interest interest = Interest();
    fu.addInterestForUser(users, interest, "RGKsufgcDWRaEqyYBh4aLjV8TV32");
   }
   @override

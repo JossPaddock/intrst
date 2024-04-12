@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:name_app/models/UserModel.dart';
+import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/ButtonWidget.dart';
+import 'widgets/InterestInputForm.dart';
 //these are for Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-void main() => runApp(const MyApp());
+//void main() => runApp(const MyApp());
+
+void main() {
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => UserModel(),
+      child: const MyApp(),
+    ),
+  );
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -34,6 +46,7 @@ class _MyHomePageState extends State<MyHomePage> {
   
   bool _signedIn = false;
   String _name = '';
+  String _uid = '';
   int _selectedIndex = 0;
 
   late List<Widget> _signedOutWidgetOptions;
@@ -46,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     initializeFirebase();
+
     _signedOutWidgetOptions = <Widget>[
     Text(
       'Index 0: Replace this text widget with the google map widget',
@@ -57,6 +71,7 @@ class _MyHomePageState extends State<MyHomePage> {
       onSignInChanged : _handleSignInChanged,
       onSelectedIndexChanged: _onItemTapped,
       onNameChanged: _handleNameChanged,
+      onUidChanged: _handleUidChanged,
     ),
   ];
     _signedInWidgetOptions = <Widget>[
@@ -64,10 +79,7 @@ class _MyHomePageState extends State<MyHomePage> {
         'Index 0: Replace this text widget with the google map widget',
         style: optionStyle,
       ),
-      Text(
-        'Index 1: Replace this text widget with the My Interests widget',
-        style: optionStyle,
-      ),
+      InterestInputForm(),
       ButtonWidget(),
       Text(
         'Index 3: Replace this text widget with the Messages widget',
@@ -92,6 +104,19 @@ class _MyHomePageState extends State<MyHomePage> {
       _name = newValue;
     });
   }
+
+  void _handleUidChanged(String newValue) {
+    setState(() {
+      _uid = newValue;
+    });
+    print("IN THE _handleUidChanged METHOD INSIDE OF MAIN.DART");
+    // Need to call changeUid given that we do this at the top of main.dart: create: (context) => UserModel(),
+    // This will make it so the correct instance of usermodel has the new uid
+    // just unsure how to access the changeUid() method inside of that instance of UserModel()
+    // below is what intuitively felt right but doesn't work.
+    //context.changeUid();
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -121,7 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
               decoration: BoxDecoration(
                 color: Colors.blue,
               ),
-              child: Text(_name),
+              child: Text("$_name : $_uid"),
             ),
             ListTile(
               title: const Text('Map'),
@@ -184,7 +209,7 @@ class _MyHomePageState extends State<MyHomePage> {
               decoration: BoxDecoration(
                 color: Colors.blue,
               ),
-              child: Text(_name),
+              child: Text("$_name : $_uid"),
             ),
             ListTile(
               title: const Text('Map'),
