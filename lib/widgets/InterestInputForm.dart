@@ -87,12 +87,10 @@ class InterestInputFormState extends State<InterestInputForm> {
                   onPressed: () {
                     // Validate returns true if the form is valid, or false otherwise.
                     if (_formKey.currentState!.validate()) {
-                      // If the form is valid, display a snackbar. In the real world,
-                      // you'd often call a server or save the information in a database.
+                      // If the form is valid, display a snackbar for confirmation
+                      // Also make call to add interest for the given user uid (logged in user)
                       CollectionReference users =
                           FirebaseFirestore.instance.collection('users');
-
-                      print("UID we are adding interest for: ${user.currentUid}");
                       fu.addInterestForUser(users, interest, user.currentUid);
 
                       ScaffoldMessenger.of(context).showSnackBar(

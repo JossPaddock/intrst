@@ -4,11 +4,8 @@ import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/ButtonWidget.dart';
 import 'widgets/InterestInputForm.dart';
-//these are for Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-
-//void main() => runApp(const MyApp());
 
 void main() {
   runApp(
@@ -65,7 +62,6 @@ class _MyHomePageState extends State<MyHomePage> {
       'Index 0: Replace this text widget with the google map widget',
       style: optionStyle,
     ),
-    //sign in widget AKA the LoginScreen will go here
     LoginScreen(
       signedIn : _signedIn,
       onSignInChanged : _handleSignInChanged,
@@ -109,12 +105,9 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _uid = newValue;
     });
-    print("IN THE _handleUidChanged METHOD INSIDE OF MAIN.DART");
-    // Need to call changeUid given that we do this at the top of main.dart: create: (context) => UserModel(),
-    // This will make it so the correct instance of usermodel has the new uid
-    // just unsure how to access the changeUid() method inside of that instance of UserModel()
-    // below is what intuitively felt right but doesn't work.
-    //context.changeUid();
+    // this gets the global instance of usermodel and allows us to access methods
+    UserModel userModel = Provider.of<UserModel>(context, listen: false);
+    userModel.changeUid(newValue);
   }
 
   void _onItemTapped(int index) {

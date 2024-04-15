@@ -159,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return FlutterLogin(
       title: 'intrst',
-      //if you want a log above the login widget, add the path to a png, eg below:
+      //if you want a logo above the login widget, add the path to a png, eg below:
       //logo: const AssetImage('assets/images/ecorp-lightblue.png'),
       onLogin: _signInUser,
       onSignup: _signupUser,
