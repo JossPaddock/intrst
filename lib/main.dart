@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:name_app/models/UserModel.dart';
+import 'package:name_app/widgets/InterestCard.dart';
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/ButtonWidget.dart';
@@ -71,10 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
     ),
   ];
     _signedInWidgetOptions = <Widget>[
-      Text(
-        'Index 0: Replace this text widget with the google map widget',
-        style: optionStyle,
-      ),
+      InterestCard(name: '', interests: [],),
       InterestInputForm(),
       ButtonWidget(),
       Text(
