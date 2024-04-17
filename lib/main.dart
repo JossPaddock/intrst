@@ -187,6 +187,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 _onItemTapped(0);
                 _handleSignInChanged(false);
                 _handleNameChanged('');
+                _handleUidChanged('');
                 // Then close the drawer
                 Navigator.pop(context);
               },
