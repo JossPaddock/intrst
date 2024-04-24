@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:name_app/models/UserModel.dart';
-import 'package:name_app/widgets/InterestCard.dart';
+import 'package:name_app/widgets/Interests.dart';
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/ButtonWidget.dart';
@@ -72,7 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
     ),
   ];
     _signedInWidgetOptions = <Widget>[
-      InterestCard(name: '', interests: [],),
+      Interests(name: '', interests: [],),
       InterestInputForm(),
       ButtonWidget(),
       Text(
