@@ -72,7 +72,7 @@ class _MyHomePageState extends State<MyHomePage> {
     ),
   ];
     _signedInWidgetOptions = <Widget>[
-      Interests(name: '', interests: [],),
+      Interests(name: _name, interests: [],),
       InterestInputForm(),
       ButtonWidget(),
       Text(

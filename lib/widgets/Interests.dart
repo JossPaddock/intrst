@@ -9,19 +9,15 @@ class Interests extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Card Sample')),
-        body: CardExample(),
-      ),
-    );
+    return CardExample();
   }
 }
 
+// ignore: must_be_immutable
 class CardExample extends StatelessWidget {
   CardExample({super.key});
 
-  List<Widget> _cardList = <Widget>[
+  List<Widget> _cardExampleList = <Widget>[
     Card(
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -32,8 +28,45 @@ class CardExample extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             ListTile(
-              title: Text('soccer'),
-              subtitle: Text('pickup'),
+              title: Text('Soccer'),
+              subtitle: Text('Pickup'),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: <Widget>[
+                TextButton(
+                  child: const Icon(Icons.link),
+                  onPressed: () {/* ... */},
+                ),
+                const SizedBox(width: 0),
+                TextButton(
+                  child: const Icon(Icons.edit),
+                  onPressed: () {/* ... */},
+                ),
+                const SizedBox(width: 0),
+                TextButton(
+                  child: const Icon(Icons.star),
+                  onPressed: () {/* ... */},
+                ),
+                const SizedBox(width: 0),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+    Card(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 600,
+          maxHeight: 1200,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              title: Text('Tennis'),
+              subtitle: Text('tennis just for fun'),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -63,8 +96,9 @@ class CardExample extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: _cardList[0],
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(200, 50, 200, 50),
+      children: _cardExampleList,
     );
   }
 }
