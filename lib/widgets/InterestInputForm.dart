@@ -19,7 +19,7 @@ class InterestInputForm extends StatefulWidget {
 class InterestInputFormState extends State<InterestInputForm> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseUtility fu = FirebaseUtility();
-  Interest interest = Interest();
+  Interest interest = Interest(name: '', description: '', link: '', created_timestamp: DateTime.now(), updated_timestamp: DateTime.now());
 
   bool hasValidUrl(String value) {
     String pattern =
@@ -37,71 +37,73 @@ class InterestInputFormState extends State<InterestInputForm> {
       builder: (context, user, child) {
         return Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter some text';
-                  }
-                  interest.name = value;
-                  return null;
-                },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Enter the name of the interest.',
-                ),
-              ),
-              TextFormField(
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter some text';
-                  }
-                  interest.description = value;
-                  return null;
-                },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Enter a description of the interest.',
-                ),
-              ),
-              TextFormField(
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    if (!hasValidUrl(value)) {
-                      return 'Please make sure this is a valid link';
+          child: Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter some text';
                     }
-                  }
-                  interest.link = value;
-                  return null;
-                },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: '(Optional) Enter a link for the interest.',
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Validate returns true if the form is valid, or false otherwise.
-                    if (_formKey.currentState!.validate()) {
-                      // If the form is valid, display a snackbar for confirmation
-                      // Also make call to add interest for the given user uid (logged in user)
-                      CollectionReference users =
-                          FirebaseFirestore.instance.collection('users');
-                      fu.addInterestForUser(users, interest, user.currentUid);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Adding new interest')),
-                      );
-                    }
+                    interest.name = value;
+                    return null;
                   },
-                  child: const Text('Submit'),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter the name of the interest.',
+                  ),
                 ),
-              ),
-            ],
+                TextFormField(
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter some text';
+                    }
+                    interest.description = value;
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter a description of the interest.',
+                  ),
+                ),
+                TextFormField(
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      if (!hasValidUrl(value)) {
+                        return 'Please make sure this is a valid link';
+                      }
+                    }
+                    interest.link = value;
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: '(Optional) Enter a link for the interest.',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // Validate returns true if the form is valid, or false otherwise.
+                      if (_formKey.currentState!.validate()) {
+                        // If the form is valid, display a snackbar for confirmation
+                        // Also make call to add interest for the given user uid (logged in user)
+                        CollectionReference users =
+                            FirebaseFirestore.instance.collection('users');
+                        fu.addInterestForUser(users, interest, user.currentUid);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Adding new interest')),
+                        );
+                      }
+                    },
+                    child: const Text('Submit'),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
         ;

@@ -25,6 +25,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: appTitle,
       home: MyHomePage(title: appTitle),
     );
@@ -41,7 +42,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  
   bool _signedIn = false;
   String _name = '';
   String _uid = '';
@@ -54,25 +54,29 @@ class _MyHomePageState extends State<MyHomePage> {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
+
   @override
   void initState() {
     initializeFirebase();
 
     _signedOutWidgetOptions = <Widget>[
-    Text(
-      'Index 0: Replace this text widget with the google map widget',
-      style: optionStyle,
-    ),
-    LoginScreen(
-      signedIn : _signedIn,
-      onSignInChanged : _handleSignInChanged,
-      onSelectedIndexChanged: _onItemTapped,
-      onNameChanged: _handleNameChanged,
-      onUidChanged: _handleUidChanged,
-    ),
-  ];
+      Text(
+        'Index 0: Replace this text widget with the google map widget',
+        style: optionStyle,
+      ),
+      LoginScreen(
+        signedIn: _signedIn,
+        onSignInChanged: _handleSignInChanged,
+        onSelectedIndexChanged: _onItemTapped,
+        onNameChanged: _handleNameChanged,
+        onUidChanged: _handleUidChanged,
+      ),
+    ];
     _signedInWidgetOptions = <Widget>[
-      Interests(name: _name, interests: [],),
+      Text(
+        'Index 0: Replace this text widget with the google map widget',
+        style: optionStyle,
+      ),
       InterestInputForm(),
       ButtonWidget(),
       Text(
@@ -117,115 +121,160 @@ class _MyHomePageState extends State<MyHomePage> {
   static const TextStyle optionStyle =
       TextStyle(fontSize: 30, fontWeight: FontWeight.bold);
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: Center(
-        child: _signedIn ? _signedInWidgetOptions[_selectedIndex] : _signedOutWidgetOptions[_selectedIndex],
-      ),
-      drawer: Drawer(
-        // Add a ListView to the drawer. This ensures the user can scroll
-        // through the options in the drawer if there isn't enough vertical
-        // space to fit everything.
-        child: _signedIn ? ListView(
-          // Important: Remove any padding from the ListView.
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
+        appBar: AppBar(
+          leading: Builder(
+            builder: (BuildContext context) {
+              return IconButton(
+                icon: const Icon(Icons.menu),
+                color: Colors.white,
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+                tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+              );
+            },
+          ),
+          //title: Text(widget.title),
+          backgroundColor: Color(0xFF082D38),
+          actions: [
+            // Add the TextField wrapped in a StatefulBuilder
+            Spacer(),
+            StatefulBuilder(
+              builder: (context, setState) => SizedBox(
+                height: 48.0,
+                width: 400.0,
+                child: TextField(
+                  decoration: InputDecoration(
+                    fillColor: Colors.white,
+                    filled: true,
+                    hintText: 'find interests and people',
+                    border: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(12.0), // Adjust as needed
+                    ),
+                  ),
+                  onChanged: (value) {
+                    // Perform search based on the value
+                    setState(() {
+                      // Update search results based on the value
+                    });
+                  },
+                ),
               ),
-              child: Text("$_name : $_uid"),
             ),
-            ListTile(
-              title: const Text('Map'),
-              selected: _selectedIndex == 0,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(0);
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('My Interests'),
-              selected: _selectedIndex == 1,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(1);
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Account'),
-              selected: _selectedIndex == 2,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(2);
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Messages'),
-              selected: _selectedIndex == 3,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(3);
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Sign Out'),
-              selected: _selectedIndex == 0,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(0);
-                _handleSignInChanged(false);
-                _handleNameChanged('');
-                _handleUidChanged('');
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ) : ListView(
-          // Important: Remove any padding from the ListView.
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
+            Spacer(),
+            Builder(
+              builder: (context) => IconButton(
+                icon: Image.asset('assets/poi.png'),
+                color: Colors.white,
+                onPressed: () => Scaffold.of(context).openEndDrawer(),
+                tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
               ),
-              child: Text("$_name : $_uid"),
-            ),
-            ListTile(
-              title: const Text('Map'),
-              selected: _selectedIndex == 0,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(0);
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('Sign In'),
-              selected: _selectedIndex == 1,
-              onTap: () {
-                // Update the state of the app
-                _onItemTapped(1);
-                // Then close the drawer
-                Navigator.pop(context);
-              },
             ),
           ],
         ),
-      ),
-    );
+        body: Center(
+          child: _signedIn
+              ? _signedInWidgetOptions[_selectedIndex]
+              : _signedOutWidgetOptions[_selectedIndex],
+        ),
+        drawer: Drawer(
+          child: _signedIn
+              ? ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    DrawerHeader(
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                      ),
+                      child: Text("$_name : $_uid"),
+                    ),
+                    ListTile(
+                      title: const Text('Map'),
+                      selected: _selectedIndex == 0,
+                      onTap: () {
+                        _onItemTapped(0);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('My Interests'),
+                      selected: _selectedIndex == 1,
+                      onTap: () {
+                        _onItemTapped(1);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('Account'),
+                      selected: _selectedIndex == 2,
+                      onTap: () {
+                        _onItemTapped(2);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('Messages'),
+                      selected: _selectedIndex == 3,
+                      onTap: () {
+                        _onItemTapped(3);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('Sign Out'),
+                      selected: _selectedIndex == 0,
+                      onTap: () {
+                        _onItemTapped(0);
+                        _handleSignInChanged(false);
+                        _handleNameChanged('');
+                        _handleUidChanged('');
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                )
+              : ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    SizedBox(
+                      height: 75,
+                      child: DrawerHeader(
+                        decoration: BoxDecoration(
+                          color: Color(0xFF082D38),
+                        ),
+                        child: Text(
+                          "$_name : $_uid",
+                          style: TextStyle(
+                              color: Colors.white), // Set your desired color),
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      title: const Text('Map'),
+                      selected: _selectedIndex == 0,
+                      onTap: () {
+                        _onItemTapped(0);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    ListTile(
+                      title: const Text('Sign In'),
+                      selected: _selectedIndex == 1,
+                      onTap: () {
+                        _onItemTapped(1);
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
+        ),
+        endDrawer: SizedBox(
+          width: MediaQuery.of(context).size.width * 1, //<-- SEE HERE
+          child: Interests(name: _name, signedIn: _signedIn),
+        ));
   }
 }
