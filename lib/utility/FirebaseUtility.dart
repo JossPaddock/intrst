@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:name_app/widgets/Interests.dart';
+import 'package:name_app/utility/FirebaseMappers.dart';
 import '../models/Interest.dart';
 
 class FirebaseUtility {
+
+  FirebaseMappers fm = FirebaseMappers();
   void addUserToFirestore(CollectionReference users, String userUid,
       String firstName, String lastName, GeoPoint geoPoint) {
     Map<String, dynamic> userData = {
@@ -53,55 +55,30 @@ class FirebaseUtility {
     });
   }
 
-  Future<List<Interest>> pullInterestsForUser(CollectionReference users, String uid) async {
+  Future<List<Interest>> pullInterestsForUser(
+      CollectionReference users, String uid) async {
     List<Interest> interests = [];
-    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: uid).get();
 
     List<Future<void>> futures = [];
 
-    for (QueryDocumentSnapshot doc in querySnapshot.docs) {
-      futures.add(FirebaseFirestore.instance.collection('users').doc(doc.id).get().then((documentSnapshot) {
-        Map<String, dynamic>? data = documentSnapshot.data() as Map<String, dynamic>?;
+    for (QueryDocumentSnapshot doc in querySnapshot.docs)  {
+      futures.add(FirebaseFirestore.instance
+          .collection('users')
+          .doc(doc.id)
+          .get()
+          .then((documentSnapshot) {
+        Map<String, dynamic>? data =
+            documentSnapshot.data() as Map<String, dynamic>?;
         if (data != null) {
-          interests.addAll(mapInterests(data['interests']));
+          print(data);
+          interests.addAll(fm.mapInterests(data['interests']));
         }
       }));
     }
-
     // FORCE waiting for the forEach completion
     await Future.wait(futures);
     return interests;
-  }
-  List<Interest> mapInterests(List<dynamic> data) {
-    List<Map<String, dynamic>> localInterests = convertList(data);
-    List<Interest> localList = [];
-    localInterests.forEach((interest) {
-      localList.add(Interest(
-          name: interest['name'],
-          description: interest['description'],
-          link: interest['link'],
-          created_timestamp: DateTime.now(),
-          updated_timestamp: DateTime.now(),
-      ));
-    });
-    return localList;
-  }
-  List<Map<String, dynamic>> convertList(List<dynamic> data) {
-    return data.map((item) {
-      Map<String, dynamic> map = Map<String, dynamic>.from(item);
-      if (map.containsKey('created_timestamp')) {
-        map['created_timestamp'] = {
-          'seconds': map['created_timestamp'].seconds,
-          'nanoseconds': map['created_timestamp'].nanoseconds,
-        };
-      }
-      if (map.containsKey('updated_timestamp')) {
-        map['updated_timestamp'] = {
-          'seconds': map['updated_timestamp'].seconds,
-          'nanoseconds': map['updated_timestamp'].nanoseconds,
-        };
-      }
-      return map;
-    }).toList();
   }
 }

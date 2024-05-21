@@ -94,6 +94,8 @@ class CardList extends StatelessWidget {
                         ListTile(
                           title: Text(interest.name),
                           subtitle: Text(interest.description),
+                          trailing: Text(interest.created_timestamp.toString()),
+
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,

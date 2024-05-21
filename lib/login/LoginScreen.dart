@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
       FirebaseFirestore.instance.collection('users');
       String localUid = FirebaseAuth.instance.currentUser!.uid;
       String name = await fu.lookUpNameByUserUid(users, localUid) ;
-      print(name);
+      print (name);
       widget.onNameChanged(name);
       widget.onUidChanged(localUid);
     } on FirebaseAuthException catch (e) {

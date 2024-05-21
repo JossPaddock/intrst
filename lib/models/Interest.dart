@@ -5,7 +5,12 @@ class Interest {
   DateTime created_timestamp;
   DateTime updated_timestamp;
 
-  Interest({this.name = '', this.description = '', this.link = '', required this.created_timestamp, required this.updated_timestamp});
+  Interest(
+      {this.name = '',
+      this.description = '',
+      this.link = '',
+      required this.created_timestamp,
+      required this.updated_timestamp});
 
   Map<String, dynamic> mapper() {
     return {
@@ -16,5 +21,4 @@ class Interest {
       'updated_timestamp': updated_timestamp,
     };
   }
-
 }
