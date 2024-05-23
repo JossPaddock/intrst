@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:name_app/models/UserModel.dart';
 import 'package:name_app/widgets/Interests.dart';
@@ -50,6 +51,15 @@ class _MyHomePageState extends State<MyHomePage> {
   late List<Widget> _signedOutWidgetOptions;
   late List<Widget> _signedInWidgetOptions;
   Future<void> initializeFirebase() async {
+    /*FirebaseAuth.instance
+        .authStateChanges()
+        .listen((User? user) {
+      if (user == null) {
+        print('User is currently signed out!');
+      } else {
+        print('User is signed in!');
+      }
+    });*/
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -57,8 +67,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
-    initializeFirebase();
 
+    initializeFirebase();
     _signedOutWidgetOptions = <Widget>[
       Text(
         'Index 0: Replace this text widget with the google map widget',
