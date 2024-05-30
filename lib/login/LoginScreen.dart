@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
       result = true;
-      //FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+      FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
       print(FirebaseAuth.instance.currentUser?.uid);
       CollectionReference users =
       FirebaseFirestore.instance.collection('users');

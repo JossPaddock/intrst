@@ -72,7 +72,6 @@ class FirebaseUtility {
         Map<String, dynamic>? data =
             documentSnapshot.data() as Map<String, dynamic>?;
         if (data != null) {
-          print(data);
           interests.addAll(fm.mapInterests(data['interests']));
         }
       }));

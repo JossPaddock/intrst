@@ -19,7 +19,12 @@ class InterestInputForm extends StatefulWidget {
 class InterestInputFormState extends State<InterestInputForm> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseUtility fu = FirebaseUtility();
-  Interest interest = Interest(name: '', description: '', link: '', created_timestamp: DateTime.now(), updated_timestamp: DateTime.now());
+  Interest interest = Interest(
+      name: '',
+      description: '',
+      link: '',
+      created_timestamp: DateTime.now(),
+      updated_timestamp: DateTime.now());
 
   bool hasValidUrl(String value) {
     String pattern =
@@ -85,7 +90,7 @@ class InterestInputFormState extends State<InterestInputForm> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       // Validate returns true if the form is valid, or false otherwise.
                       if (_formKey.currentState!.validate()) {
                         // If the form is valid, display a snackbar for confirmation
@@ -97,6 +102,11 @@ class InterestInputFormState extends State<InterestInputForm> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Adding new interest')),
                         );
+                        // todo: future state should not delay this synchronous process but instead manage a local set of interests against the ones stored in the database
+                        await Future.delayed(Duration(milliseconds: 500));
+                        UserModel userModel =
+                        Provider.of<UserModel>(context, listen: false);
+                        userModel.notify();
                       }
                     },
                     child: const Text('Submit'),

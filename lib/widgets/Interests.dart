@@ -13,9 +13,11 @@ class Interests extends StatelessWidget {
 
   Interests({super.key, required this.name, required this.signedIn});
 
-  Future<List<Interest>> fetchInterestsForUser(String user_uid) async {
+  Future<List<Interest>> fetchSortedInterestsForUser(String user_uid) async {
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<Interest> interests = await fu.pullInterestsForUser(users, user_uid);
+    interests
+        .sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
     return interests;
   }
 
@@ -23,7 +25,7 @@ class Interests extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<UserModel>(builder: (context, user, child) {
       return FutureBuilder<List<Interest>>(
-        future: fetchInterestsForUser(user.currentUid),
+        future: fetchSortedInterestsForUser(user.currentUid),
         builder: (context, object) {
           if (object.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -68,6 +70,8 @@ class CardList extends StatelessWidget {
               child: Text(
                 name,
                 style: TextStyle(
+                  color: Colors.white,
+                  backgroundColor: Colors.black,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
@@ -95,7 +99,6 @@ class CardList extends StatelessWidget {
                           title: Text(interest.name),
                           subtitle: Text(interest.description),
                           trailing: Text(interest.created_timestamp.toString()),
-
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,

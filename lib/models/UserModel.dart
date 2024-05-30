@@ -9,4 +9,7 @@ class UserModel extends ChangeNotifier {
     _uid = newValue;
     notifyListeners();
   }
+  void notify() {
+    notifyListeners();
+  }
 }
