@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:name_app/models/UserModel.dart';
 import 'package:name_app/utility/FirebaseUtility.dart';
 import 'package:name_app/widgets/Interests.dart';
@@ -14,6 +16,10 @@ import 'widgets/ButtonWidget.dart';
 import 'widgets/InterestInputForm.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'dart:ui' as ui;
+import 'package:label_marker/label_marker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:location/location.dart';
 
 //import is for google maps
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -52,14 +58,21 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  late CameraPosition _newPosition;
+  Location location = Location();
+  late PermissionStatus _permissionGranted;
+  late bool _serviceEnabled;
+  double _currentZoom = 10;
   bool _signedIn = false;
   String _name = '';
   String _uid = '';
   int _selectedIndex = 0;
   final FirebaseUtility fu = FirebaseUtility();
-
+  Set<Marker> labelMarkers = {};
+  Set<Marker> poiMarkers = {};
+  Set<Marker> markers = {};
+  BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   late List<Widget> _signedOutWidgetOptions;
-  late List<Widget> _signedInWidgetOptions;
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -89,8 +102,28 @@ class _MyHomePageState extends State<MyHomePage> {
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
 
+  void _onCameraMove(double zoom) {
+    if (_currentZoom != zoom) {
+      //print('$_currentZoom + $zoom');
+double level = 10.5;
+      if (zoom > level && _currentZoom < level) {
+        print('load label markers');
+        setState(() {
+          markers = labelMarkers;
+        });
+        _currentZoom = zoom;
+      } else if (zoom < level && _currentZoom > level) {
+        print('load poi markers');
+        setState(() {
+          markers = poiMarkers;
+        });
+        _currentZoom = zoom;
+      }
+    }
+  }
+
   static const CameraPosition _kGooglePlex = CameraPosition(
-    target: LatLng(47.423458, -120.310349),
+    target: LatLng(37.423458, -110.310349),
     zoom: 14.4746,
   );
 
@@ -100,11 +133,22 @@ class _MyHomePageState extends State<MyHomePage> {
       tilt: 59.440717697143555,
       zoom: 19.151926040649414);
 
-  bool _zoomEnabled = false;
+  bool _zoomEnabled = true;
+
+  BitmapDescriptor poi = BitmapDescriptor.defaultMarker;
+
+  Future<Uint8List> loadAssetAsByteData(String path) async {
+    ByteData data = await rootBundle.load(path);
+    return data.buffer.asUint8List();
+  }
 
   @override
   void initState() {
     initializeFirebase();
+    setState(() {
+      markers = poiMarkers;
+    });
+    addCustomIcon();
     _signedOutWidgetOptions = <Widget>[
       Text(
         'Index 0: Replace this text widget with the google map widget',
@@ -118,29 +162,78 @@ class _MyHomePageState extends State<MyHomePage> {
         onUidChanged: _handleUidChanged,
       ),
     ];
-    _signedInWidgetOptions = <Widget>[
-      Scaffold(
-        body: GoogleMap(
-          cloudMapId: mapId, // Set the map style ID here
-          zoomGesturesEnabled: _zoomEnabled,
-          initialCameraPosition: _kGooglePlex,
-          onMapCreated: (GoogleMapController controller) {
-            _controller.complete(controller);
-          },
-        ),
-      ),
-      InterestInputForm(),
-      ButtonWidget(),
-      Text(
-        'Index 3: Replace this text widget with the Messages widget',
-        style: optionStyle,
-      ),
-      Text(
-        'Index 4: Replace this text widget with the Sign Out widget',
-        style: optionStyle,
-      ),
-    ];
     super.initState();
+  }
+
+  void addCustomIcon() async {
+    Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
+    poi = await BitmapDescriptor.bytes(imageData, width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+    const Offset middle = Offset(0.5, 0.5);
+    //Create a new for loop that goes through all the user uid's and calls lookUpNameAndLocationByUserUid
+    //and assign appropriate poi and label markers based on this data.
+    //performance varies at 290 for markers below
+    /*for (var i = 0; i < 200; i++) {
+      final lat = (Random().nextDouble() * 180) - 90;
+      final lng = (Random().nextDouble() * 360) - 180;
+      final title = "title${Random().nextInt(1000)}";
+      setState(() {
+        poiMarkers.add(Marker(
+          anchor: middle,
+          icon: poi,
+          markerId: MarkerId(title),
+          position: LatLng(lat, lng),
+        ));
+      });
+
+      labelMarkers
+          .addLabelMarker(LabelMarker(
+        icon: BitmapDescriptor.defaultMarker,
+        label: title,
+        markerId: MarkerId(title),
+        position: LatLng(lat, lng),
+        backgroundColor: const Color(0xFFFFFF),
+      ))
+          .then(
+        (value) {
+          setState(() {});
+        },
+      );
+    }*/
+  }
+
+  Future<void> _getLocationServiceAndPermission() async {
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        return;
+      }
+    }
+
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.granted) {
+        return;
+      } else {_gotoCurrentUserLocation();}
+    }
+  }
+
+  Future<void> _gotoCurrentUserLocation() async {
+    final GoogleMapController controller = await _controller.future;
+    final locationData = await location.getLocation();
+    CollectionReference users =
+    FirebaseFirestore.instance.collection('users');
+    String localUid = FirebaseAuth.instance.currentUser!.uid;
+    fu.updateUserLocation(users, localUid, GeoPoint(locationData.latitude!, locationData.longitude!));
+    _newPosition = CameraPosition(
+        target: LatLng(
+            locationData.latitude!,
+            locationData.longitude!
+        ),
+        zoom: 12
+    );
+    controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
   }
 
   Future<void> _goToTheLake() async {
@@ -238,9 +331,45 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
       body: Center(
-        child: _signedIn
-            ? _signedInWidgetOptions[_selectedIndex]
-            : _signedOutWidgetOptions[_selectedIndex],
+        child:
+            _signedIn //todo: instead of dynamically loading all of the signed in widgets inject only the Google map widget into a list of late initialized _signedIn widgets(see _signedOut initialized objects as an example of late initialization)
+                ? <Widget>[
+                    Scaffold(
+                      body: Stack(
+                        children: <Widget>[
+                          GoogleMap(
+                            onCameraMove: (CameraPosition cameraPosition) {
+                              _onCameraMove(cameraPosition.zoom);
+                            },
+                            cloudMapId: mapId, // Set the map style ID here
+                            zoomGesturesEnabled: _zoomEnabled,
+                            initialCameraPosition: _kGooglePlex,
+                            zoomControlsEnabled: false,
+                            minMaxZoomPreference:
+                                MinMaxZoomPreference(3.0, 900.0),
+                            markers: markers,
+                            onMapCreated: (GoogleMapController controller) {
+                              _getLocationServiceAndPermission();
+                              print('callback is working');
+                              _controller.complete(controller);
+                            },
+                          ),
+                          Text('name'),
+                        ],
+                      ),
+                    ),
+                    InterestInputForm(),
+                    ButtonWidget(),
+                    Text(
+                      'Index 3: Replace this text widget with the Messages widget',
+                      style: optionStyle,
+                    ),
+                    Text(
+                      'Index 4: Replace this text widget with the Sign Out widget',
+                      style: optionStyle,
+                    ),
+                  ][_selectedIndex]
+                : _signedOutWidgetOptions[_selectedIndex],
       ),
       drawer: Drawer(
         child: _signedIn
@@ -341,10 +470,6 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _zoomEnabled = !state;
         });
-        if (_zoomEnabled) {
-          //we need to rebuild the googlemap widget
-        }
-        print('this is the value of $_zoomEnabled');
       },
     );
   }

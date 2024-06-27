@@ -4,6 +4,22 @@ import '../models/Interest.dart';
 
 class FirebaseUtility {
 
+  void updateUserLocation(CollectionReference users, String userUid, GeoPoint newGeoPoint) {
+    users
+        .where('user_uid', isEqualTo: userUid)
+        .get()
+        .then((querySnapshot) {
+      if (querySnapshot.docs.isNotEmpty) {
+        querySnapshot.docs.first.reference
+            .update({'location': newGeoPoint})
+            .then((_) => print("Updated Location for user with uid: $userUid"))
+            .catchError((error) => print("Couldn't update location: $error"));
+      } else {
+        print("No results for User");
+      }
+    });
+  }
+
   FirebaseMappers fm = FirebaseMappers();
   void addUserToFirestore(CollectionReference users, String userUid,
       String firstName, String lastName, GeoPoint geoPoint) {
@@ -32,6 +48,23 @@ class FirebaseUtility {
       lastname = data['last_name'];
     });
     return '$firstname $lastname';
+  }
+
+  Future<List> lookUpNameAndLocationByUserUid(
+      CollectionReference users, String uid) async {
+    QuerySnapshot querySnapshot =
+    await users.where('user_uid', isEqualTo: uid).get();
+    String firstname = '';
+    String lastname = '';
+    GeoPoint latlng = GeoPoint(0, 0);
+    querySnapshot.docs.forEach((doc) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      firstname = data['first_name'];
+      lastname = data['last_name'];
+      latlng = data['location'];
+    });
+    latlng.latitude;
+    return ['$firstname $lastname', latlng.latitude, latlng.longitude];
   }
 
   void addInterestForUser(
