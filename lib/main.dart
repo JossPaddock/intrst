@@ -105,7 +105,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _onCameraMove(double zoom) {
     if (_currentZoom != zoom) {
       //print('$_currentZoom + $zoom');
-double level = 10.5;
+      double level = 10.5;
       if (zoom > level && _currentZoom < level) {
         print('load label markers');
         setState(() {
@@ -142,13 +142,16 @@ double level = 10.5;
     return data.buffer.asUint8List();
   }
 
+  late String _mapStyleString;
   @override
   void initState() {
     initializeFirebase();
+    rootBundle.loadString('mapstyle.json').then((string) {
+      _mapStyleString = string;
+    });
     setState(() {
       markers = poiMarkers;
     });
-    addCustomIcon();
     _signedOutWidgetOptions = <Widget>[
       Text(
         'Index 0: Replace this text widget with the google map widget',
@@ -165,43 +168,95 @@ double level = 10.5;
     super.initState();
   }
 
-  void addCustomIcon() async {
-    Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
-    poi = await BitmapDescriptor.bytes(imageData, width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
-    const Offset middle = Offset(0.5, 0.5);
-    //Create a new for loop that goes through all the user uid's and calls lookUpNameAndLocationByUserUid
-    //and assign appropriate poi and label markers based on this data.
-    //performance varies at 290 for markers below
-    /*for (var i = 0; i < 200; i++) {
-      final lat = (Random().nextDouble() * 180) - 90;
-      final lng = (Random().nextDouble() * 360) - 180;
-      final title = "title${Random().nextInt(1000)}";
-      setState(() {
-        poiMarkers.add(Marker(
-          anchor: middle,
+  void addMarkers(Set<Marker> markers) {}
+
+  void addMarker(String title, double lat, double lng, bool drag) {
+    setState(() {
+      poiMarkers.add(Marker(
           icon: poi,
           markerId: MarkerId(title),
           position: LatLng(lat, lng),
-        ));
-      });
+          draggable: drag,
+          onDragEnd: (LatLng newPosition) {
+            fu.updateUserLocation(
+                FirebaseFirestore.instance.collection('users'),
+                FirebaseAuth.instance.currentUser!.uid,
+                GeoPoint(newPosition.latitude, newPosition.longitude));
+            loadMarkers();
+            print(markers);
+            setState(() {
+              /*
+              for (var marker in markers) {
+                if (marker.markerId.value == title) {
+                  markers.remove(marker);
+                  markers.add(marker.copyWith(positionParam: newPosition));
+                }
+              }*/
+            });
+          }));
+    });
 
-      labelMarkers
-          .addLabelMarker(LabelMarker(
-        icon: BitmapDescriptor.defaultMarker,
-        label: title,
-        markerId: MarkerId(title),
-        position: LatLng(lat, lng),
-        backgroundColor: const Color(0xFFFFFF),
-      ))
-          .then(
-        (value) {
-          setState(() {});
-        },
-      );
-    }*/
+    labelMarkers
+        .addLabelMarker(LabelMarker(
+            icon: BitmapDescriptor.defaultMarker,
+            label: title,
+            markerId: MarkerId(title),
+            position: LatLng(lat, lng),
+            backgroundColor: const Color(0xFFFFFF),
+            draggable: drag,
+            onDragEnd: (LatLng newPosition) {
+              fu.updateUserLocation(
+                  FirebaseFirestore.instance.collection('users'),
+                  FirebaseAuth.instance.currentUser!.uid,
+                  GeoPoint(newPosition.latitude, newPosition.longitude));
+              loadMarkers();
+              print(markers);
+              setState(() {
+                /*
+                for (var marker in markers) {
+                  if (marker.markerId.value == title) {
+                    markers.remove(marker);
+                    markers.add(marker.copyWith(positionParam: newPosition));
+                  }
+                }*/
+              });
+            }))
+        .then(
+      (value) {
+        setState(() {});
+      },
+    );
   }
 
+  void loadMarkers() async {
+    //markers = {};
+    await Future.delayed(Duration(milliseconds: 1500));
+    Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
+    poi = await BitmapDescriptor.bytes(imageData,
+        width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+    var signedInUserMarkerData =
+        await fu.lookUpNameAndLocationByUserUid(users, _uid);
+    //This is where we load the signed in users marker
+    addMarker(signedInUserMarkerData[0], signedInUserMarkerData[1],
+        signedInUserMarkerData[2], true);
+    print('loadMarkers is working');
+    var uids = await fu.retrieveAllUserUid(users);
+    print(uids);
+    uids.forEach((uid) async {
+      var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
+      if (uid != _uid) {
+        addMarker(markerData[0], markerData[1], markerData[2], false);
+      }
+    });
+    setState(() {});
+  }
+
+  //Make marker loading more reliable (work on first load)
+  //loading other users markers besides logged in user(start by testing firebase utility function that gets all user uids)
+
   Future<void> _getLocationServiceAndPermission() async {
+    final GoogleMapController controller = await _controller.future;
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
       _serviceEnabled = await location.requestService();
@@ -209,31 +264,57 @@ double level = 10.5;
         return;
       }
     }
-
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != PermissionStatus.granted) {
-        return;
-      } else {_gotoCurrentUserLocation();}
+    //do a soft check to determine if latlng is 0,0
+    //if it is 0,0 update user location
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+    final userLocation = await fu.retrieveUserLocation(
+        users, FirebaseAuth.instance.currentUser!.uid);
+    if (userLocation == GeoPoint(0, 0)) {
+      print('user location was 0,0');
+      _gotoCurrentUserLocation(true);
+      _permissionGranted = await location.hasPermission();
+      if (_permissionGranted == PermissionStatus.denied) {
+        _permissionGranted = await location.requestPermission();
+        if (_permissionGranted != PermissionStatus.granted) {
+          return;
+        } else {
+          _gotoCurrentUserLocation(false);
+        }
+      } else {
+        _newPosition = CameraPosition(
+            target: LatLng(userLocation.latitude /*+ randomNumber1*/,
+                userLocation.longitude /*+ randomNumber2*/),
+            zoom: 12);
+        controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
+      }
     }
   }
 
-  Future<void> _gotoCurrentUserLocation() async {
+  Future<void> _gotoCurrentUserLocation(bool updateUserLocation) async {
+    Random random = Random();
+    double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
+    double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
     final GoogleMapController controller = await _controller.future;
     final locationData = await location.getLocation();
-    CollectionReference users =
-    FirebaseFirestore.instance.collection('users');
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
     String localUid = FirebaseAuth.instance.currentUser!.uid;
-    fu.updateUserLocation(users, localUid, GeoPoint(locationData.latitude!, locationData.longitude!));
+    if (updateUserLocation) {
+      fu.updateUserLocation(
+          users,
+          localUid,
+          GeoPoint(locationData.latitude! /*+ randomNumber1*/,
+              locationData.longitude! /*+ randomNumber2*/));
+    }
     _newPosition = CameraPosition(
-        target: LatLng(
-            locationData.latitude!,
-            locationData.longitude!
-        ),
-        zoom: 12
-    );
+        target: LatLng(locationData.latitude! /*+ randomNumber1*/,
+            locationData.longitude! /*+ randomNumber2*/),
+        zoom: 12);
+    loadMarkers();
     controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
+  }
+
+  double generateRandomNumber(double min, double max, Random random) {
+    return min + random.nextDouble() * (max - min);
   }
 
   Future<void> _goToTheLake() async {
@@ -341,7 +422,7 @@ double level = 10.5;
                             onCameraMove: (CameraPosition cameraPosition) {
                               _onCameraMove(cameraPosition.zoom);
                             },
-                            cloudMapId: mapId, // Set the map style ID here
+                            //cloudMapId: mapId, // Set the map style ID here
                             zoomGesturesEnabled: _zoomEnabled,
                             initialCameraPosition: _kGooglePlex,
                             zoomControlsEnabled: false,
@@ -349,8 +430,16 @@ double level = 10.5;
                                 MinMaxZoomPreference(3.0, 900.0),
                             markers: markers,
                             onMapCreated: (GoogleMapController controller) {
+                              print('onMapCreated is running');
+                              _controller.future.then((value) {
+                                value.setMapStyle(_mapStyleString);
+                              });
+                              print('mapStyle should be set');
                               _getLocationServiceAndPermission();
+                              _gotoCurrentUserLocation(false);
                               print('callback is working');
+                              setState(() {});
+                              loadMarkers();
                               _controller.complete(controller);
                             },
                           ),

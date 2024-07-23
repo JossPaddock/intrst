@@ -4,6 +4,24 @@ import '../models/Interest.dart';
 
 class FirebaseUtility {
 
+  Future<GeoPoint> retrieveUserLocation(CollectionReference users, String userUid) async {
+    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: userUid).get();
+    return querySnapshot.docs.first['location'];
+  }
+
+  Future<List<String>> retrieveAllUserUid(CollectionReference users) async {
+    List<String> uids = [];
+
+    QuerySnapshot querySnapshot = await users.get();
+
+    querySnapshot.docs.forEach((user) {
+      uids.add(user['user_uid']);
+    });
+
+    print(uids);
+    return uids;
+  }
+
   void updateUserLocation(CollectionReference users, String userUid, GeoPoint newGeoPoint) {
     users
         .where('user_uid', isEqualTo: userUid)
