@@ -170,13 +170,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void addMarkers(Set<Marker> markers) {}
 
-  void addMarker(String title, double lat, double lng, bool drag) {
+  void addMarker(String title, double lat, double lng, bool drag,
+      BitmapDescriptor poi, String uid) {
     setState(() {
       poiMarkers.add(Marker(
           icon: poi,
           markerId: MarkerId(title),
+          //maybe someday this offset below will work. It should!
+          anchor: Offset(0.5, 0.5),
           position: LatLng(lat, lng),
           draggable: drag,
+          zIndex: drag? 10:1,
+          onTap: () {
+            print(uid);
+            Scaffold.of(context).openEndDrawer();
+          },
           onDragEnd: (LatLng newPosition) {
             fu.updateUserLocation(
                 FirebaseFirestore.instance.collection('users'),
@@ -201,9 +209,22 @@ class _MyHomePageState extends State<MyHomePage> {
             icon: BitmapDescriptor.defaultMarker,
             label: title,
             markerId: MarkerId(title),
+            //maybe someday this offset below will work. It should!
+            anchor: Offset(0.5, 0.5),
             position: LatLng(lat, lng),
             backgroundColor: const Color(0xFFFFFF),
             draggable: drag,
+            zIndex: drag? 10:1,
+            onTap: () {
+              print(uid);
+              try{Scaffold.of(context).openEndDrawer();//A less elegant but more
+                // expedient solution is assign a GlobalKey to the Scaffold, then
+                // use the key.currentState property to obtain the ScaffoldState
+                // rather than using the Scaffold.of() function.
+              } catch (e) {
+              print('Error on marker tap: $e');
+    }
+            },
             onDragEnd: (LatLng newPosition) {
               fu.updateUserLocation(
                   FirebaseFirestore.instance.collection('users'),
@@ -232,21 +253,24 @@ class _MyHomePageState extends State<MyHomePage> {
     //markers = {};
     await Future.delayed(Duration(milliseconds: 1500));
     Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
+    Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
     poi = await BitmapDescriptor.bytes(imageData,
+        width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+    BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
         width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     var signedInUserMarkerData =
         await fu.lookUpNameAndLocationByUserUid(users, _uid);
     //This is where we load the signed in users marker
     addMarker(signedInUserMarkerData[0], signedInUserMarkerData[1],
-        signedInUserMarkerData[2], true);
+        signedInUserMarkerData[2], true, poio, _uid);
     print('loadMarkers is working');
     var uids = await fu.retrieveAllUserUid(users);
     print(uids);
     uids.forEach((uid) async {
       var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
       if (uid != _uid) {
-        addMarker(markerData[0], markerData[1], markerData[2], false);
+        addMarker(markerData[0], markerData[1], markerData[2], false, poi, uid);
       }
     });
     setState(() {});
@@ -278,12 +302,16 @@ class _MyHomePageState extends State<MyHomePage> {
         if (_permissionGranted != PermissionStatus.granted) {
           return;
         } else {
+          setState(() {});
           _gotoCurrentUserLocation(false);
         }
       } else {
+        Random random = Random();
+        double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
+        double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
         _newPosition = CameraPosition(
-            target: LatLng(userLocation.latitude /*+ randomNumber1*/,
-                userLocation.longitude /*+ randomNumber2*/),
+            target: LatLng(userLocation.latitude + randomNumber1,
+                userLocation.longitude + randomNumber2),
             zoom: 12);
         controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
       }
@@ -302,12 +330,12 @@ class _MyHomePageState extends State<MyHomePage> {
       fu.updateUserLocation(
           users,
           localUid,
-          GeoPoint(locationData.latitude! /*+ randomNumber1*/,
-              locationData.longitude! /*+ randomNumber2*/));
+          GeoPoint(locationData.latitude! + randomNumber1,
+              locationData.longitude! + randomNumber2));
     }
     _newPosition = CameraPosition(
-        target: LatLng(locationData.latitude! /*+ randomNumber1*/,
-            locationData.longitude! /*+ randomNumber2*/),
+        target: LatLng(locationData.latitude! + randomNumber1,
+            locationData.longitude! + randomNumber2),
         zoom: 12);
     loadMarkers();
     controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
@@ -404,7 +432,7 @@ class _MyHomePageState extends State<MyHomePage> {
           Builder(
             builder: (context) => IconButton(
               icon: Image.asset('assets/poi.png'),
-              color: Colors.white,
+              color: Colors.red,
               onPressed: () => Scaffold.of(context).openEndDrawer(),
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
             ),
