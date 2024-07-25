@@ -58,6 +58,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late CameraPosition _newPosition;
   Location location = Location();
   late PermissionStatus _permissionGranted;
@@ -183,7 +184,7 @@ class _MyHomePageState extends State<MyHomePage> {
           zIndex: drag? 10:1,
           onTap: () {
             print(uid);
-            Scaffold.of(context).openEndDrawer();
+            _scaffoldKey.currentState?.openEndDrawer();
           },
           onDragEnd: (LatLng newPosition) {
             fu.updateUserLocation(
@@ -217,7 +218,7 @@ class _MyHomePageState extends State<MyHomePage> {
             zIndex: drag? 10:1,
             onTap: () {
               print(uid);
-              try{Scaffold.of(context).openEndDrawer();//A less elegant but more
+              try{_scaffoldKey.currentState?.openEndDrawer();//A less elegant but more
                 // expedient solution is assign a GlobalKey to the Scaffold, then
                 // use the key.currentState property to obtain the ScaffoldState
                 // rather than using the Scaffold.of() function.
@@ -387,6 +388,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         leading: Builder(
           builder: (BuildContext context) {
