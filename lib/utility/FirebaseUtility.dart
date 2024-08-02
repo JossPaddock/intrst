@@ -1,11 +1,14 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:name_app/utility/FirebaseMappers.dart';
 import '../models/Interest.dart';
 
 class FirebaseUtility {
-
-  Future<GeoPoint> retrieveUserLocation(CollectionReference users, String userUid) async {
-    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: userUid).get();
+  Future<GeoPoint> retrieveUserLocation(
+      CollectionReference users, String userUid) async {
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: userUid).get();
     return querySnapshot.docs.first['location'];
   }
 
@@ -22,11 +25,9 @@ class FirebaseUtility {
     return uids;
   }
 
-  void updateUserLocation(CollectionReference users, String userUid, GeoPoint newGeoPoint) {
-    users
-        .where('user_uid', isEqualTo: userUid)
-        .get()
-        .then((querySnapshot) {
+  void updateUserLocation(
+      CollectionReference users, String userUid, GeoPoint newGeoPoint) {
+    users.where('user_uid', isEqualTo: userUid).get().then((querySnapshot) {
       if (querySnapshot.docs.isNotEmpty) {
         querySnapshot.docs.first.reference
             .update({'location': newGeoPoint})
@@ -71,7 +72,7 @@ class FirebaseUtility {
   Future<List> lookUpNameAndLocationByUserUid(
       CollectionReference users, String uid) async {
     QuerySnapshot querySnapshot =
-    await users.where('user_uid', isEqualTo: uid).get();
+        await users.where('user_uid', isEqualTo: uid).get();
     String firstname = '';
     String lastname = '';
     GeoPoint latlng = GeoPoint(0, 0);
@@ -114,7 +115,7 @@ class FirebaseUtility {
 
     List<Future<void>> futures = [];
 
-    for (QueryDocumentSnapshot doc in querySnapshot.docs)  {
+    for (QueryDocumentSnapshot doc in querySnapshot.docs) {
       futures.add(FirebaseFirestore.instance
           .collection('users')
           .doc(doc.id)
@@ -130,5 +131,39 @@ class FirebaseUtility {
     // FORCE waiting for the forEach completion
     await Future.wait(futures);
     return interests;
+  }
+
+  bool searchInterests(String data, String searchTerm) {
+    RegExp regex = RegExp(
+      r'(name|description):\s*[^,}]*' + RegExp.escape(searchTerm),
+      caseSensitive: false,
+    );
+
+    return regex.hasMatch(data);
+  }
+
+  Future<List<String>> searchForPeopleAndInterests(
+      CollectionReference users, String query) async {
+    Set<String> resultingUids = {};
+    QuerySnapshot querySnapshotFull = await users.get();
+    for (var doc in querySnapshotFull.docs) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      String firstname = data['first_name'];
+      if(searchInterests(data.toString(), query)) {
+        resultingUids.add(data['user_uid']);
+      }
+      String lastname = data['last_name'];
+      List<String> interestsSearchTerms = [];
+      interestsSearchTerms.add(firstname);
+      interestsSearchTerms.add(lastname);
+      //To do make a single space not searchable otherwise any search with a space will bring up every user
+      interestsSearchTerms.add('$firstname $lastname');
+      for (String item in interestsSearchTerms) {
+        if (item.toLowerCase().contains(query.toLowerCase())) {
+          resultingUids.add(data['user_uid']);
+        }
+      }
+    }
+    return resultingUids.toList();
   }
 }

@@ -25,7 +25,7 @@ class Interests extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<UserModel>(builder: (context, user, child) {
       return FutureBuilder<List<Interest>>(
-        future: fetchSortedInterestsForUser(user.currentUid),
+        future: fetchSortedInterestsForUser(user.alternateUid),
         builder: (context, object) {
           if (object.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -34,9 +34,10 @@ class Interests extends StatelessWidget {
           } else {
             List<Interest> interests = object.data ?? [];
             return CardList(
-              name: name,
+              name: user.alternateName,
               signedIn: signedIn,
               interests: interests,
+              showInputForm: user.alternateUid == user.currentUid,
             );
           }
         },
@@ -51,11 +52,13 @@ class CardList extends StatelessWidget {
       {super.key,
       required this.name,
       required this.signedIn,
-      required this.interests});
+      required this.interests,
+      required this.showInputForm});
 
   final String name;
   final bool signedIn;
   final List<Interest> interests;
+  final bool showInputForm;
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +134,7 @@ class CardList extends StatelessWidget {
         if (signedIn)
           Padding(
               padding: const EdgeInsets.fromLTRB(200, 5, 200, 80),
-              child: InterestInputForm())
+              child: (showInputForm)?(InterestInputForm()): Text(''))
       ],
     );
   }

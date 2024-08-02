@@ -74,6 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Set<Marker> markers = {};
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   late List<Widget> _signedOutWidgetOptions;
+
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -82,11 +83,11 @@ class _MyHomePageState extends State<MyHomePage> {
       if (user == null) {
         print('User is currently signed out!');
       } else {
+        CollectionReference users =
+            FirebaseFirestore.instance.collection('users');
         print('User is signed in!');
         _signedIn = true;
         _selectedIndex = 0;
-        CollectionReference users =
-            FirebaseFirestore.instance.collection('users');
         String localUid = FirebaseAuth.instance.currentUser!.uid;
         setState(() {});
         String name = await fu.lookUpNameByUserUid(users, localUid);
@@ -181,8 +182,9 @@ class _MyHomePageState extends State<MyHomePage> {
           anchor: Offset(0.5, 0.5),
           position: LatLng(lat, lng),
           draggable: drag,
-          zIndex: drag? 10:1,
+          zIndex: drag ? 10 : 1,
           onTap: () {
+            _handleAlternateUserModel(uid, title);
             print(uid);
             _scaffoldKey.currentState?.openEndDrawer();
           },
@@ -215,16 +217,19 @@ class _MyHomePageState extends State<MyHomePage> {
             position: LatLng(lat, lng),
             backgroundColor: const Color(0xFFFFFF),
             draggable: drag,
-            zIndex: drag? 10:1,
+            zIndex: drag ? 10 : 1,
             onTap: () {
+              _handleAlternateUserModel(uid, title);
               print(uid);
-              try{_scaffoldKey.currentState?.openEndDrawer();//A less elegant but more
+              try {
+                _scaffoldKey.currentState
+                    ?.openEndDrawer(); //A less elegant but more
                 // expedient solution is assign a GlobalKey to the Scaffold, then
                 // use the key.currentState property to obtain the ScaffoldState
                 // rather than using the Scaffold.of() function.
               } catch (e) {
-              print('Error on marker tap: $e');
-    }
+                print('Error on marker tap: $e');
+              }
             },
             onDragEnd: (LatLng newPosition) {
               fu.updateUserLocation(
@@ -281,6 +286,11 @@ class _MyHomePageState extends State<MyHomePage> {
   //loading other users markers besides logged in user(start by testing firebase utility function that gets all user uids)
 
   Future<void> _getLocationServiceAndPermission() async {
+    print('getLocationServiceAndPermission is running');
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+    List<String> results = await fu.searchForPeopleAndInterests(users, 'padd');
+    print('these are the results of the search $results');
+    print('hello world');
     final GoogleMapController controller = await _controller.future;
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
@@ -291,7 +301,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     //do a soft check to determine if latlng is 0,0
     //if it is 0,0 update user location
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
     final userLocation = await fu.retrieveUserLocation(
         users, FirebaseAuth.instance.currentUser!.uid);
     if (userLocation == GeoPoint(0, 0)) {
@@ -374,6 +383,12 @@ class _MyHomePageState extends State<MyHomePage> {
   void _handleUserModel(String value) {
     UserModel userModel = Provider.of<UserModel>(context, listen: false);
     userModel.changeUid(value);
+  }
+
+  void _handleAlternateUserModel(String value, String name) {
+    UserModel userModel = Provider.of<UserModel>(context, listen: false);
+    userModel.changeAlternateUid(value);
+    userModel.changeAlternateName(name);
   }
 
   void _onItemTapped(int index) {
