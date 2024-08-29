@@ -418,7 +418,7 @@ class _MyHomePageState extends State<MyHomePage> {
           builder: (BuildContext context) {
             return IconButton(
               icon: const Icon(Icons.menu),
-              color: Colors.purple,
+              color: Colors.yellow,
               onPressed: () {
                 Scaffold.of(context).openDrawer();
               },
