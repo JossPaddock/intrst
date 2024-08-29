@@ -12,10 +12,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
-      - name: Install Flutter
+      - name: Set up Flutter
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
-          export PATH="$PATH:`pwd`/flutter/bin"
+          echo "::add-path::$(pwd)/flutter/bin"
+      - name: Run flutter doctor
+        run: flutter doctor
+
       - name: Build Flutter Web App
         run: flutter build web
 
