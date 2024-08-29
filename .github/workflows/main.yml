@@ -12,6 +12,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
 
+      - name: Install Flutter
+        run: |
+          git clone https://github.com/flutter/flutter.git --branch stable --depth 1
+          export PATH="$PATH:`pwd`/flutter/bin"
+      - name: Build Flutter Web App
+        run: flutter build web
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -20,4 +27,4 @@ jobs:
           aws-region: us-west-2
 
       - name: Deploy static site to S3 bucket
-        run: aws s3 sync . s3://intrst  --delete
+        run: aws s3 sync build/web/ s3://intrst --delete
