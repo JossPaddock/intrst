@@ -105,9 +105,9 @@ class _MyHomePageState extends State<MyHomePage> {
       Completer<GoogleMapController>();
 
   void _onCameraMove(double zoom) {
+    double level = 10.5;
     if (_currentZoom != zoom) {
       //print('$_currentZoom + $zoom');
-      double level = 10.5;
       if (zoom > level && _currentZoom < level) {
         print('load label markers');
         setState(() {
@@ -121,6 +121,13 @@ class _MyHomePageState extends State<MyHomePage> {
         });
         _currentZoom = zoom;
       }
+    } else {
+      //the following conditions are critical for resetting after search updates
+      if (_currentZoom > level) {
+        markers = labelMarkers;
+      } else {
+        markers = poiMarkers;
+      }
     }
   }
 
@@ -133,7 +140,7 @@ class _MyHomePageState extends State<MyHomePage> {
       bearing: 192.8334901395799,
       target: LatLng(37.43296265331129, -122.08832357078792),
       tilt: 59.440717697143555,
-      zoom: 19.151926040649414);
+      zoom: 3);
 
   bool _zoomEnabled = true;
 
@@ -148,7 +155,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     initializeFirebase();
-    rootBundle.loadString('mapstyle.json').then((string) {
+    _goToInitialPosition();
+    rootBundle.loadString('assets/mapstyle.json').then((string) {
       _mapStyleString = string;
     });
     setState(() {
@@ -177,7 +185,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       poiMarkers.add(Marker(
           icon: poi,
-          markerId: MarkerId(title),
+          markerId: MarkerId(uid),
           //maybe someday this offset below will work. It should!
           anchor: Offset(0.5, 0.5),
           position: LatLng(lat, lng),
@@ -211,7 +219,7 @@ class _MyHomePageState extends State<MyHomePage> {
         .addLabelMarker(LabelMarker(
             icon: BitmapDescriptor.defaultMarker,
             label: title,
-            markerId: MarkerId(title),
+            markerId: MarkerId(uid),
             //maybe someday this offset below will work. It should!
             anchor: Offset(0.5, 0.5),
             position: LatLng(lat, lng),
@@ -288,7 +296,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _getLocationServiceAndPermission() async {
     print('getLocationServiceAndPermission is running');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
-    List<String> results = await fu.searchForPeopleAndInterests(users, 'padd');
+    List<String> results =
+        await fu.searchForPeopleAndInterests(users, "oss Paddoc");
     print('these are the results of the search $results');
     print('hello world');
     final GoogleMapController controller = await _controller.future;
@@ -355,7 +364,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return min + random.nextDouble() * (max - min);
   }
 
-  Future<void> _goToTheLake() async {
+  Future<void> _goToInitialPosition() async {
     final GoogleMapController controller = await _controller.future;
     await controller.animateCamera(CameraUpdate.newCameraPosition(_kLake));
   }
@@ -409,7 +418,7 @@ class _MyHomePageState extends State<MyHomePage> {
           builder: (BuildContext context) {
             return IconButton(
               icon: const Icon(Icons.menu),
-              color: Colors.white,
+              color: Colors.purple,
               onPressed: () {
                 Scaffold.of(context).openDrawer();
               },
@@ -436,10 +445,32 @@ class _MyHomePageState extends State<MyHomePage> {
                         BorderRadius.circular(12.0), // Adjust as needed
                   ),
                 ),
-                onChanged: (value) {
+                onChanged: (value) async {
                   // Perform search based on the value
+                  _onCameraMove(_currentZoom);
+                  CollectionReference users =
+                      FirebaseFirestore.instance.collection('users');
+                  List<String> results =
+                      await fu.searchForPeopleAndInterests(users, value);
+                  print('these are the results of the search $results');
                   setState(() {
                     // Update search results based on the value
+                    print('before values');
+                    for (var item in markers) {
+                      print(item.markerId);
+                    }
+                    markers = markers
+                        .where(
+                            (value) => results.contains(value.markerId.value))
+                        .toSet();
+                    print('after values');
+                    for (var item in markers) {
+                      print(item.markerId);
+                    }
+                    loadMarkers();
+                    if (value == "" || value == " ") {
+                      _onCameraMove(_currentZoom);
+                    }
                   });
                 },
               ),
@@ -450,7 +481,10 @@ class _MyHomePageState extends State<MyHomePage> {
             builder: (context) => IconButton(
               icon: Image.asset('assets/poi.png'),
               color: Colors.red,
-              onPressed: () => Scaffold.of(context).openEndDrawer(),
+              onPressed: () {
+                _handleAlternateUserModel(_uid, _name);
+                Scaffold.of(context).openEndDrawer();
+              },
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
             ),
           ),

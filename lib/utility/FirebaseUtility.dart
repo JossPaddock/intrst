@@ -145,22 +145,22 @@ class FirebaseUtility {
   Future<List<String>> searchForPeopleAndInterests(
       CollectionReference users, String query) async {
     Set<String> resultingUids = {};
-    QuerySnapshot querySnapshotFull = await users.get();
-    for (var doc in querySnapshotFull.docs) {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      String firstname = data['first_name'];
-      if(searchInterests(data.toString(), query)) {
-        resultingUids.add(data['user_uid']);
-      }
-      String lastname = data['last_name'];
-      List<String> interestsSearchTerms = [];
-      interestsSearchTerms.add(firstname);
-      interestsSearchTerms.add(lastname);
-      //To do make a single space not searchable otherwise any search with a space will bring up every user
-      interestsSearchTerms.add('$firstname $lastname');
-      for (String item in interestsSearchTerms) {
-        if (item.toLowerCase().contains(query.toLowerCase())) {
+    if (query != " " && query != "") {
+      QuerySnapshot querySnapshotFull = await users.get();
+      for (var doc in querySnapshotFull.docs) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        String firstname = data['first_name'];
+        if (searchInterests(data.toString(), query)) {
           resultingUids.add(data['user_uid']);
+        }
+        String lastname = data['last_name'];
+        List<String> interestsSearchTerms = [];
+        interestsSearchTerms.add('$firstname $lastname');
+        for (String item in interestsSearchTerms) {
+          if (item.toLowerCase().contains(query.toLowerCase()) &&
+              query != " ") {
+            resultingUids.add(data['user_uid']);
+          }
         }
       }
     }

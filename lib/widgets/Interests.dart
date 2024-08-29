@@ -1,3 +1,4 @@
+import 'dart:html' as html;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:name_app/widgets/InterestInputForm.dart';
@@ -108,18 +109,28 @@ class CardList extends StatelessWidget {
                           children: <Widget>[
                             TextButton(
                               child: const Icon(Icons.link),
-                              onPressed: () {/* ... */},
+                              onPressed: () {
+                                if (interest.link != null) {
+                                  String url = interest.link!;
+                                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                                    url = 'http://' + url;
+                                  }
+                                  html.window.open(url, '_blank');
+                                }
+                              },
                             ),
                             const SizedBox(width: 0),
-                            TextButton(
-                              child: const Icon(Icons.edit),
-                              onPressed: () {/* ... */},
-                            ),
+                            if (showInputForm)
+                              TextButton(
+                                child: const Icon(Icons.edit),
+                                onPressed: () {/* ... */},
+                              ),
                             const SizedBox(width: 0),
-                            TextButton(
-                              child: const Icon(Icons.star),
-                              onPressed: () {/* ... */},
-                            ),
+                            if (showInputForm)
+                              TextButton(
+                                child: const Icon(Icons.star),
+                                onPressed: () {/* ... */},
+                              ),
                             const SizedBox(width: 0),
                           ],
                         ),
@@ -134,7 +145,7 @@ class CardList extends StatelessWidget {
         if (signedIn)
           Padding(
               padding: const EdgeInsets.fromLTRB(200, 5, 200, 80),
-              child: (showInputForm)?(InterestInputForm()): Text(''))
+              child: (showInputForm) ? (InterestInputForm()) : Text(''))
       ],
     );
   }
