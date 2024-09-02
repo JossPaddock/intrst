@@ -15,7 +15,7 @@ jobs:
       - name: Set up Flutter
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
-          echo "::add-path::$(pwd)/flutter/bin"
+          echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
       - name: Run flutter doctor
         run: flutter doctor
 
