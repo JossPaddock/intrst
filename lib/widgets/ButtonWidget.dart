@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:name_app/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
 import '../models/Interest.dart';
 
 class ButtonWidget extends StatelessWidget {

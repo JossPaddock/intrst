@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
 //this is for Firebase
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:name_app/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 const users = {

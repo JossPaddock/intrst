@@ -1,11 +1,12 @@
 import 'dart:html' as html;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:name_app/widgets/InterestInputForm.dart';
-import 'package:name_app/utility/FirebaseUtility.dart';
+import 'package:intrst/widgets/InterestInputForm.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
 import '../models/Interest.dart';
 import 'package:provider/provider.dart';
-import 'package:name_app/models/UserModel.dart';
+import 'package:intrst/models/UserModel.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Interests extends StatelessWidget {
   final String name;
@@ -61,6 +62,17 @@ class CardList extends StatelessWidget {
   final List<Interest> interests;
   final bool showInputForm;
 
+  Future<void> _launchUrl(String url) async {
+    if (!url.startsWith('http://') &&
+        !url.startsWith('https://')) {
+      url = 'http://' + url;
+    }
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -83,63 +95,84 @@ class CardList extends StatelessWidget {
             ),
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: interests.length,
-            itemBuilder: (context, index) {
-              Interest interest = interests[index];
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(200, 5, 200, 5),
-                child: Card(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 600,
-                      maxHeight: 1200,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        ListTile(
-                          title: Text(interest.name),
-                          subtitle: Text(interest.description),
-                          trailing: Text(interest.created_timestamp.toString()),
+        Flexible(
+          child: Align(
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 600,
+                maxHeight: 120.0 * interests.length,
+              ),
+              child: ListView.builder(
+                itemCount: interests.length,
+                itemBuilder: (context, index) {
+                  Interest interest = interests[index];
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                    child: Card(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 200,
+                          maxHeight: 600,
                         ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            TextButton(
-                              child: const Icon(Icons.link),
-                              onPressed: () {
-                                if (interest.link != null) {
-                                  String url = interest.link!;
-                                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                                    url = 'http://' + url;
-                                  }
-                                  html.window.open(url, '_blank');
-                                }
-                              },
+                            ListTile(
+                              title:GestureDetector(
+                                  onTap: ()=> _launchUrl(interest.link!),
+
+                                  child: Text(
+                                    interest.name,
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                      ),
+                              subtitle: Text(interest.description),
+                              //trailing:
+                                  //Text(interest.created_timestamp.toString()),
                             ),
-                            const SizedBox(width: 0),
-                            if (showInputForm)
-                              TextButton(
-                                child: const Icon(Icons.edit),
-                                onPressed: () {/* ... */},
-                              ),
-                            const SizedBox(width: 0),
-                            if (showInputForm)
-                              TextButton(
-                                child: const Icon(Icons.star),
-                                onPressed: () {/* ... */},
-                              ),
-                            const SizedBox(width: 0),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: <Widget>[
+                                /*TextButton(
+                                  child: const Icon(Icons.link),
+                                  onPressed: () {
+                                    if (interest.link != null) {
+                                      String url = interest.link!;
+                                      if (!url.startsWith('http://') &&
+                                          !url.startsWith('https://')) {
+                                        url = 'http://' + url;
+                                      }
+                                      html.window.open(url, '_blank');
+                                    }
+                                  },
+                                ),*/
+                                const SizedBox(width: 0),
+                                if (showInputForm)
+                                  TextButton(
+                                    child: const Icon(Icons.edit),
+                                    onPressed: () {/* ... */},
+                                  ),
+                                const SizedBox(width: 0),
+                                if (showInputForm)
+                                  TextButton(
+                                    child: const Icon(Icons.star),
+                                    onPressed: () {/* ... */},
+                                  ),
+                                const SizedBox(width: 0),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
         ),
         if (signedIn)

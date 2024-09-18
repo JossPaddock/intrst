@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "app.intrst" "\0"
-            VALUE "FileDescription", "name_app" "\0"
+            VALUE "FileDescription", "intrst" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "name_app" "\0"
+            VALUE "InternalName", "intrst" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2024 app.intrst. All rights reserved." "\0"
-            VALUE "OriginalFilename", "name_app.exe" "\0"
-            VALUE "ProductName", "name_app" "\0"
+            VALUE "OriginalFilename", "intrst.exe" "\0"
+            VALUE "ProductName", "intrst" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

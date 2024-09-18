@@ -7,9 +7,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:name_app/models/UserModel.dart';
-import 'package:name_app/utility/FirebaseUtility.dart';
-import 'package:name_app/widgets/Interests.dart';
+import 'package:intrst/models/UserModel.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:intrst/widgets/Interests.dart';
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/ButtonWidget.dart';
@@ -36,7 +36,7 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  static const appTitle = 'Drawer Demo';
+  static const appTitle = 'intrst';
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +104,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
 
+  final Completer<GoogleMapController> _controllerSignedOut =
+      Completer<GoogleMapController>();
+
   void _onCameraMove(double zoom) {
     double level = 10.5;
     if (_currentZoom != zoom) {
@@ -163,9 +166,27 @@ class _MyHomePageState extends State<MyHomePage> {
       markers = poiMarkers;
     });
     _signedOutWidgetOptions = <Widget>[
-      Text(
-        'Index 0: Replace this text widget with the google map widget',
-        style: optionStyle,
+      GoogleMap(
+        onCameraMove: (CameraPosition cameraPosition) {
+          _onCameraMove(cameraPosition.zoom);
+        },
+        //cloudMapId: mapId, // Set the map style ID here
+        zoomGesturesEnabled: _zoomEnabled,
+        initialCameraPosition: _kGooglePlex,
+        zoomControlsEnabled: false,
+        minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+        markers: markers,
+        onMapCreated: (GoogleMapController controller) {
+          print('onMapCreated is running');
+          _controllerSignedOut.future.then((value) {
+            value.setMapStyle(_mapStyleString);
+          });
+          print('mapStyle should be set');
+          print('callback is working');
+          setState(() {});
+          loadMarkers(false);
+          _controllerSignedOut.complete(controller);
+        },
       ),
       LoginScreen(
         signedIn: _signedIn,
@@ -201,7 +222,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 FirebaseFirestore.instance.collection('users'),
                 FirebaseAuth.instance.currentUser!.uid,
                 GeoPoint(newPosition.latitude, newPosition.longitude));
-            loadMarkers();
+            loadMarkers(true);
             print(markers);
             setState(() {
               /*
@@ -244,7 +265,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   FirebaseFirestore.instance.collection('users'),
                   FirebaseAuth.instance.currentUser!.uid,
                   GeoPoint(newPosition.latitude, newPosition.longitude));
-              loadMarkers();
+              loadMarkers(true);
               print(markers);
               setState(() {
                 /*
@@ -263,21 +284,24 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void loadMarkers() async {
+  void loadMarkers(bool loadUserMarker) async {
     //markers = {};
     await Future.delayed(Duration(milliseconds: 1500));
     Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
-    Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
     poi = await BitmapDescriptor.bytes(imageData,
         width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
-    BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
-        width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
     CollectionReference users = FirebaseFirestore.instance.collection('users');
-    var signedInUserMarkerData =
-        await fu.lookUpNameAndLocationByUserUid(users, _uid);
-    //This is where we load the signed in users marker
-    addMarker(signedInUserMarkerData[0], signedInUserMarkerData[1],
-        signedInUserMarkerData[2], true, poio, _uid);
+    //user
+    if (loadUserMarker) {
+      Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
+      BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
+          width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+      var signedInUserMarkerData =
+          await fu.lookUpNameAndLocationByUserUid(users, _uid);
+      //This is where we load the signed in users marker
+      addMarker(signedInUserMarkerData[0], signedInUserMarkerData[1],
+          signedInUserMarkerData[2], true, poio, _uid);
+    }
     print('loadMarkers is working');
     var uids = await fu.retrieveAllUserUid(users);
     print(uids);
@@ -356,7 +380,7 @@ class _MyHomePageState extends State<MyHomePage> {
         target: LatLng(locationData.latitude! + randomNumber1,
             locationData.longitude! + randomNumber2),
         zoom: 12);
-    loadMarkers();
+    loadMarkers(true);
     controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
   }
 
@@ -418,7 +442,7 @@ class _MyHomePageState extends State<MyHomePage> {
           builder: (BuildContext context) {
             return IconButton(
               icon: const Icon(Icons.menu),
-              color: Colors.yellow,
+              color: Colors.white,
               onPressed: () {
                 Scaffold.of(context).openDrawer();
               },
@@ -467,7 +491,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     for (var item in markers) {
                       print(item.markerId);
                     }
-                    loadMarkers();
+                    loadMarkers(_signedIn);
                     if (value == "" || value == " ") {
                       _onCameraMove(_currentZoom);
                     }
@@ -492,7 +516,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Center(
         child:
-            _signedIn //todo: instead of dynamically loading all of the signed in widgets inject only the Google map widget into a list of late initialized _signedIn widgets(see _signedOut initialized objects as an example of late initialization)
+            _signedIn //todo: instead of dynamically loading all of the signed in widgets inject only the Google// map widget into a list of late initialized _signedIn widgets(see _signedOut initialized objects as an example of late initialization)
                 ? <Widget>[
                     Scaffold(
                       body: Stack(
@@ -518,7 +542,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               _gotoCurrentUserLocation(false);
                               print('callback is working');
                               setState(() {});
-                              loadMarkers();
+                              loadMarkers(true);
                               _controller.complete(controller);
                             },
                           ),
@@ -634,6 +658,7 @@ class _MyHomePageState extends State<MyHomePage> {
         width: MediaQuery.of(context).size.width * 1, //<-- SEE HERE
         child: Interests(name: _name, signedIn: _signedIn),
       ),
+      drawerEdgeDragWidth: 200,
       onEndDrawerChanged: (state) {
         setState(() {
           _zoomEnabled = !state;

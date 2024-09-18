@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:name_app/models/UserModel.dart';
-import 'package:name_app/utility/FirebaseUtility.dart';
+import 'package:intrst/models/UserModel.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../models/Interest.dart';

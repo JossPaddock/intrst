@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:name_app/utility/FirebaseMappers.dart';
+import 'package:intrst/utility/FirebaseMappers.dart';
 import '../models/Interest.dart';
 
 class FirebaseUtility {
