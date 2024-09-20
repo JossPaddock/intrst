@@ -158,7 +158,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     initializeFirebase();
-    _goToInitialPosition();
+    _goToInitialPosition(_controller);
+    _goToInitialPosition(_controllerSignedOut);
     rootBundle.loadString('assets/mapstyle.json').then((string) {
       _mapStyleString = string;
     });
@@ -166,6 +167,7 @@ class _MyHomePageState extends State<MyHomePage> {
       markers = poiMarkers;
     });
     _signedOutWidgetOptions = <Widget>[
+      //_signedOutGoogleMap
       GoogleMap(
         onCameraMove: (CameraPosition cameraPosition) {
           _onCameraMove(cameraPosition.zoom);
@@ -183,8 +185,12 @@ class _MyHomePageState extends State<MyHomePage> {
           });
           print('mapStyle should be set');
           print('callback is working');
+          _getLocationServiceAndPermission(_controllerSignedOut);//todo: investigate why this line of code is not running
+          _gotoCurrentUserLocation(false);
           setState(() {});
+          print(markers.length);
           loadMarkers(false);
+          print(markers.length);
           _controllerSignedOut.complete(controller);
         },
       ),
@@ -317,14 +323,14 @@ class _MyHomePageState extends State<MyHomePage> {
   //Make marker loading more reliable (work on first load)
   //loading other users markers besides logged in user(start by testing firebase utility function that gets all user uids)
 
-  Future<void> _getLocationServiceAndPermission() async {
+  Future<void> _getLocationServiceAndPermission(Completer<GoogleMapController> controllerCompleter) async {
     print('getLocationServiceAndPermission is running');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<String> results =
         await fu.searchForPeopleAndInterests(users, "oss Paddoc");
     print('these are the results of the search $results');
     print('hello world');
-    final GoogleMapController controller = await _controller.future;
+    final GoogleMapController controller = await controllerCompleter.future;
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
       _serviceEnabled = await location.requestService();
@@ -388,8 +394,8 @@ class _MyHomePageState extends State<MyHomePage> {
     return min + random.nextDouble() * (max - min);
   }
 
-  Future<void> _goToInitialPosition() async {
-    final GoogleMapController controller = await _controller.future;
+  Future<void> _goToInitialPosition(Completer<GoogleMapController> completerController) async {
+    final GoogleMapController controller = await completerController.future;
     await controller.animateCamera(CameraUpdate.newCameraPosition(_kLake));
   }
 
@@ -445,6 +451,8 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Colors.white,
               onPressed: () {
                 Scaffold.of(context).openDrawer();
+                print(markers.length);
+                print(markers);
               },
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
             );
@@ -516,7 +524,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Center(
         child:
-            _signedIn //todo: instead of dynamically loading all of the signed in widgets inject only the Google// map widget into a list of late initialized _signedIn widgets(see _signedOut initialized objects as an example of late initialization)
+            _signedIn // _signedInGoogleMap
                 ? <Widget>[
                     Scaffold(
                       body: Stack(
@@ -538,7 +546,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 value.setMapStyle(_mapStyleString);
                               });
                               print('mapStyle should be set');
-                              _getLocationServiceAndPermission();
+                              _getLocationServiceAndPermission(_controller);
                               _gotoCurrentUserLocation(false);
                               print('callback is working');
                               setState(() {});
@@ -561,7 +569,39 @@ class _MyHomePageState extends State<MyHomePage> {
                       style: optionStyle,
                     ),
                   ][_selectedIndex]
-                : _signedOutWidgetOptions[_selectedIndex],
+                : <Widget>[
+              GoogleMap(
+                onCameraMove: (CameraPosition cameraPosition) {
+                  _onCameraMove(cameraPosition.zoom);
+                },
+                //cloudMapId: mapId, // Set the map style ID here
+                zoomGesturesEnabled: _zoomEnabled,
+                initialCameraPosition: _kGooglePlex,
+                zoomControlsEnabled: false,
+                minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+                markers: markers,
+                onMapCreated: (GoogleMapController controller) {
+                  print('onMapCreated is running');
+                  _controllerSignedOut.future.then((value) {
+                    value.setMapStyle(_mapStyleString);
+                  });
+                  print('mapStyle should be set');
+                  print('callback is working');
+                  setState(() {});
+                  print(markers.length);
+                  loadMarkers(false);
+                  print(markers.length);
+                  _controllerSignedOut.complete(controller);
+                },
+              ),
+              LoginScreen(
+                signedIn: _signedIn,
+                onSignInChanged: _handleSignInChanged,
+                onSelectedIndexChanged: _onItemTapped,
+                onNameChanged: _handleNameChanged,
+                onUidChanged: _handleUidChanged,
+              ),
+            ][_selectedIndex],
       ),
       drawer: Drawer(
         child: _signedIn
