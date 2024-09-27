@@ -249,8 +249,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void loadMarkers(bool loadUserMarker) async {
-    //markers = {};
-    await Future.delayed(Duration(milliseconds: 1500));
     Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
     poi = await BitmapDescriptor.bytes(imageData,
         width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
@@ -307,6 +305,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (_permissionGranted == PermissionStatus.denied) {
         _permissionGranted = await location.requestPermission();
         if (_permissionGranted != PermissionStatus.granted) {
+          //todo: markers are not loading for some reason
           return;
         } else {
           setState(() {});
@@ -618,8 +617,10 @@ class _MyHomePageState extends State<MyHomePage> {
                     title: const Text('Sign Out'),
                     selected: _selectedIndex == 0,
                     onTap: () {
+                      markers = {};
+                      setState(() {});
                       _onItemTapped(0);
-                      //todo: tell Firebase we signed out
+                      FirebaseAuth.instance.signOut();
                       _handleSignInChanged(false);
                       _handleNameChanged('');
                       _handleUidChanged('');
@@ -656,6 +657,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     title: const Text('Sign In'),
                     selected: _selectedIndex == 1,
                     onTap: () {
+                      markers = {};
+                      setState(() {});
                       _onItemTapped(1);
                       Navigator.pop(context);
                     },
