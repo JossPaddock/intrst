@@ -12,13 +12,10 @@ import 'package:intrst/utility/FirebaseUtility.dart';
 import 'package:intrst/widgets/Interests.dart';
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
-import 'widgets/ButtonWidget.dart';
 import 'widgets/InterestInputForm.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'dart:ui' as ui;
 import 'package:label_marker/label_marker.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:location/location.dart';
 
 //import is for google maps
@@ -73,7 +70,6 @@ class _MyHomePageState extends State<MyHomePage> {
   Set<Marker> poiMarkers = {};
   Set<Marker> markers = {};
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
-  late List<Widget> _signedOutWidgetOptions;
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
@@ -101,10 +97,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final mapId = "bc8e2917cca03ad4";
 
-  final Completer<GoogleMapController> _controller =
-      Completer<GoogleMapController>();
+  Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
 
-  final Completer<GoogleMapController> _controllerSignedOut =
+  Completer<GoogleMapController> _controllerSignedOut =
       Completer<GoogleMapController>();
 
   void _onCameraMove(double zoom) {
@@ -166,42 +161,6 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       markers = poiMarkers;
     });
-    _signedOutWidgetOptions = <Widget>[
-      //_signedOutGoogleMap
-      GoogleMap(
-        onCameraMove: (CameraPosition cameraPosition) {
-          _onCameraMove(cameraPosition.zoom);
-        },
-        //cloudMapId: mapId, // Set the map style ID here
-        zoomGesturesEnabled: _zoomEnabled,
-        initialCameraPosition: _kGooglePlex,
-        zoomControlsEnabled: false,
-        minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
-        markers: markers,
-        onMapCreated: (GoogleMapController controller) {
-          print('onMapCreated is running');
-          _controllerSignedOut.future.then((value) {
-            value.setMapStyle(_mapStyleString);
-          });
-          print('mapStyle should be set');
-          print('callback is working');
-          _getLocationServiceAndPermission(_controllerSignedOut);//todo: investigate why this line of code is not running
-          _gotoCurrentUserLocation(false);
-          setState(() {});
-          print(markers.length);
-          loadMarkers(false);
-          print(markers.length);
-          _controllerSignedOut.complete(controller);
-        },
-      ),
-      LoginScreen(
-        signedIn: _signedIn,
-        onSignInChanged: _handleSignInChanged,
-        onSelectedIndexChanged: _onItemTapped,
-        onNameChanged: _handleNameChanged,
-        onUidChanged: _handleUidChanged,
-      ),
-    ];
     super.initState();
   }
 
@@ -229,7 +188,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 FirebaseAuth.instance.currentUser!.uid,
                 GeoPoint(newPosition.latitude, newPosition.longitude));
             loadMarkers(true);
-            print(markers);
+            //
             setState(() {
               /*
               for (var marker in markers) {
@@ -250,7 +209,7 @@ class _MyHomePageState extends State<MyHomePage> {
             //maybe someday this offset below will work. It should!
             anchor: Offset(0.5, 0.5),
             position: LatLng(lat, lng),
-            backgroundColor: const Color(0xFFFFFF),
+            backgroundColor: const Color(0x00ffffff),
             draggable: drag,
             zIndex: drag ? 10 : 1,
             onTap: () {
@@ -272,7 +231,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   FirebaseAuth.instance.currentUser!.uid,
                   GeoPoint(newPosition.latitude, newPosition.longitude));
               loadMarkers(true);
-              print(markers);
               setState(() {
                 /*
                 for (var marker in markers) {
@@ -310,7 +268,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     print('loadMarkers is working');
     var uids = await fu.retrieveAllUserUid(users);
-    print(uids);
     uids.forEach((uid) async {
       var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
       if (uid != _uid) {
@@ -323,7 +280,8 @@ class _MyHomePageState extends State<MyHomePage> {
   //Make marker loading more reliable (work on first load)
   //loading other users markers besides logged in user(start by testing firebase utility function that gets all user uids)
 
-  Future<void> _getLocationServiceAndPermission(Completer<GoogleMapController> controllerCompleter) async {
+  Future<void> _getLocationServiceAndPermission(
+      Completer<GoogleMapController> controllerCompleter) async {
     print('getLocationServiceAndPermission is running');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<String> results =
@@ -394,7 +352,8 @@ class _MyHomePageState extends State<MyHomePage> {
     return min + random.nextDouble() * (max - min);
   }
 
-  Future<void> _goToInitialPosition(Completer<GoogleMapController> completerController) async {
+  Future<void> _goToInitialPosition(
+      Completer<GoogleMapController> completerController) async {
     final GoogleMapController controller = await completerController.future;
     await controller.animateCamera(CameraUpdate.newCameraPosition(_kLake));
   }
@@ -452,7 +411,6 @@ class _MyHomePageState extends State<MyHomePage> {
               onPressed: () {
                 Scaffold.of(context).openDrawer();
                 print(markers.length);
-                print(markers);
               },
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
             );
@@ -523,85 +481,95 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
       body: Center(
-        child:
-            _signedIn // _signedInGoogleMap
-                ? <Widget>[
-                    Scaffold(
-                      body: Stack(
-                        children: <Widget>[
-                          GoogleMap(
-                            onCameraMove: (CameraPosition cameraPosition) {
-                              _onCameraMove(cameraPosition.zoom);
-                            },
-                            //cloudMapId: mapId, // Set the map style ID here
-                            zoomGesturesEnabled: _zoomEnabled,
-                            initialCameraPosition: _kGooglePlex,
-                            zoomControlsEnabled: false,
-                            minMaxZoomPreference:
-                                MinMaxZoomPreference(3.0, 900.0),
-                            markers: markers,
-                            onMapCreated: (GoogleMapController controller) {
-                              print('onMapCreated is running');
-                              _controller.future.then((value) {
-                                value.setMapStyle(_mapStyleString);
-                              });
-                              print('mapStyle should be set');
-                              _getLocationServiceAndPermission(_controller);
-                              _gotoCurrentUserLocation(false);
-                              print('callback is working');
-                              setState(() {});
-                              loadMarkers(true);
-                              _controller.complete(controller);
-                            },
-                          ),
-                          Text('name'),
-                        ],
+        child: _signedIn // _signedInGoogleMap
+            ? <Widget>[
+                Scaffold(
+                  body: Stack(
+                    children: <Widget>[
+                      GoogleMap(
+                        onCameraMove: (CameraPosition cameraPosition) {
+                          _onCameraMove(cameraPosition.zoom);
+                        },
+                        //cloudMapId: mapId, // Set the map style ID here
+                        zoomGesturesEnabled: _zoomEnabled,
+                        initialCameraPosition: _kGooglePlex,
+                        zoomControlsEnabled: false,
+                        minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+                        markers: markers,
+                        onMapCreated: (GoogleMapController controller) async {
+                          print('onMapCreated is running');
+                          if (_controller.isCompleted) {
+                            _controller = Completer();
+                          }
+                          //await Future.delayed(Duration(milliseconds: 10000));
+                          _controller.future.then((value) {
+                            value.setMapStyle(_mapStyleString);
+                          });
+                          print('mapStyle should be set');
+                          _getLocationServiceAndPermission(_controller);
+                          _gotoCurrentUserLocation(false);
+                          print('callback is working');
+                          setState(() {});
+                          loadMarkers(true);
+                          _controller.complete(controller);
+                        },
                       ),
-                    ),
-                    InterestInputForm(),
-                    ButtonWidget(),
-                    Text(
-                      'Index 3: Replace this text widget with the Messages widget',
-                      style: optionStyle,
-                    ),
-                    Text(
-                      'Index 4: Replace this text widget with the Sign Out widget',
-                      style: optionStyle,
-                    ),
-                  ][_selectedIndex]
-                : <Widget>[
-              GoogleMap(
-                onCameraMove: (CameraPosition cameraPosition) {
-                  _onCameraMove(cameraPosition.zoom);
-                },
-                //cloudMapId: mapId, // Set the map style ID here
-                zoomGesturesEnabled: _zoomEnabled,
-                initialCameraPosition: _kGooglePlex,
-                zoomControlsEnabled: false,
-                minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
-                markers: markers,
-                onMapCreated: (GoogleMapController controller) {
-                  print('onMapCreated is running');
-                  _controllerSignedOut.future.then((value) {
-                    value.setMapStyle(_mapStyleString);
-                  });
-                  print('mapStyle should be set');
-                  print('callback is working');
-                  setState(() {});
-                  print(markers.length);
-                  loadMarkers(false);
-                  print(markers.length);
-                  _controllerSignedOut.complete(controller);
-                },
-              ),
-              LoginScreen(
-                signedIn: _signedIn,
-                onSignInChanged: _handleSignInChanged,
-                onSelectedIndexChanged: _onItemTapped,
-                onNameChanged: _handleNameChanged,
-                onUidChanged: _handleUidChanged,
-              ),
-            ][_selectedIndex],
+                    ],
+                  ),
+                ),
+                InterestInputForm(),
+                Text(
+                  'Index 2: Replace this text widget with the Button widget',
+                  style: optionStyle,
+                ),
+                Text(
+                  'Index 3: Replace this text widget with the Messages widget',
+                  style: optionStyle,
+                ),
+                Text(
+                  'Index 4: Replace this text widget with the Sign Out widget',
+                  style: optionStyle,
+                ),
+              ][_selectedIndex]
+            : <Widget>[
+                GoogleMap(
+                  onCameraMove: (CameraPosition cameraPosition) {
+                    _onCameraMove(cameraPosition.zoom);
+                  },
+                  //cloudMapId: mapId, // Set the map style ID here
+                  zoomGesturesEnabled: _zoomEnabled,
+                  initialCameraPosition: _kGooglePlex,
+                  zoomControlsEnabled: false,
+                  minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+                  markers: markers,
+                  onMapCreated: (GoogleMapController controller) async {
+                    print('onMapCreated is running');
+                    if (_controllerSignedOut.isCompleted) {
+                      _controllerSignedOut = Completer();
+                    }
+
+                    _controllerSignedOut.future.then((value) {
+                      value.setMapStyle(_mapStyleString);
+                    });
+                    print('mapStyle should be set');
+                    print('callback is working');
+                    setState(() {});
+                    print(markers.length);
+                    loadMarkers(false);
+                    //await Future.delayed(Duration(milliseconds: 1000));
+                    print(markers.length);
+                    _controllerSignedOut.complete(controller);
+                    setState(() {});
+                  },
+                ),
+                LoginScreen(
+                  signedIn: _signedIn,
+                  onSignInChanged: _handleSignInChanged,
+                  onSelectedIndexChanged: _onItemTapped,
+                  onNameChanged: _handleNameChanged,
+                  onUidChanged: _handleUidChanged,
+                ),
+              ][_selectedIndex],
       ),
       drawer: Drawer(
         child: _signedIn
@@ -651,6 +619,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     selected: _selectedIndex == 0,
                     onTap: () {
                       _onItemTapped(0);
+                      //todo: tell Firebase we signed out
                       _handleSignInChanged(false);
                       _handleNameChanged('');
                       _handleUidChanged('');
