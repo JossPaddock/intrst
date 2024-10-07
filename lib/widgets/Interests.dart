@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intrst/widgets/InterestInputForm.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
 import '../models/Interest.dart';
@@ -40,6 +41,7 @@ class Interests extends StatelessWidget {
               signedIn: signedIn,
               interests: interests,
               showInputForm: user.alternateUid == user.currentUid,
+              editToggles: []
             );
           }
         },
@@ -49,19 +51,38 @@ class Interests extends StatelessWidget {
 }
 
 // ignore: must_be_immutable
-class CardList extends StatelessWidget {
-  CardList(
-      {super.key,
-      required this.name,
-      required this.signedIn,
-      required this.interests,
-      required this.showInputForm});
+class CardList extends StatefulWidget {
+  const CardList({super.key,
+    required this.name,
+    required this.signedIn,
+    required this.interests,
+    required this.showInputForm,
+    required this.editToggles});
 
   final String name;
   final bool signedIn;
   final List<Interest> interests;
   final bool showInputForm;
+  final List<bool> editToggles;
 
+  @override
+  State<CardList> createState() => _CardList();
+
+}
+class _CardList extends State<CardList> {
+  late List<bool> _editToggles;
+  @override
+  void initState() {
+    super.initState();
+    _editToggles = widget.editToggles;
+  }
+  void updateToggles(int index, bool toggle) {
+    List<bool> editTogglesCopy = _editToggles;
+    editTogglesCopy[index] = toggle;
+    setState(() {
+      _editToggles = editTogglesCopy;
+    });
+  }
   Future<void> _launchUrl(String url) async {
     if (!url.startsWith('http://') &&
         !url.startsWith('https://')) {
@@ -75,6 +96,7 @@ class CardList extends StatelessWidget {
   }
   @override
   Widget build(BuildContext context) {
+    _editToggles = [];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -84,7 +106,7 @@ class CardList extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(0, 100, 0, 0),
               child: Text(
-                name,
+                widget.name,
                 style: TextStyle(
                   color: Colors.white,
                   backgroundColor: Colors.black,
@@ -101,12 +123,14 @@ class CardList extends StatelessWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: 600,
-                maxHeight: 120.0 * interests.length,
+                maxHeight: 120.0 * widget.interests.length,
+
               ),
               child: ListView.builder(
-                itemCount: interests.length,
+                itemCount: widget.interests.length,
                 itemBuilder: (context, index) {
-                  Interest interest = interests[index];
+                  _editToggles.add(false);
+                  Interest interest = widget.interests[index];
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                     child: Card(
@@ -121,8 +145,9 @@ class CardList extends StatelessWidget {
                             ListTile(
                               title:GestureDetector(
                                   onTap: ()=> _launchUrl(interest.link!),
-
-                                  child: Text(
+                                  child: _editToggles[index] ?
+                                  TextField(
+                                  ):Text(
                                     interest.name,
                                     style: TextStyle(
                                       color: Colors.blue,
@@ -130,7 +155,9 @@ class CardList extends StatelessWidget {
                                     ),
                                   ),
                       ),
-                              subtitle: Text(interest.description),
+                              subtitle: _editToggles[index] ?
+                              TextField(
+                              ):Text(interest.description),
                               //trailing:
                                   //Text(interest.created_timestamp.toString()),
                             ),
@@ -151,13 +178,20 @@ class CardList extends StatelessWidget {
                                   },
                                 ),*/
                                 const SizedBox(width: 0),
-                                if (showInputForm)
+                                if (widget.showInputForm)
                                   TextButton(
                                     child: const Icon(Icons.edit),
-                                    onPressed: () {/* ... */},
+                                    onPressed: () {
+                                      //_editToggles[index] = !_editToggles[index];
+                                      updateToggles(index, !_editToggles[index]);
+                                      setState(() {});
+                                      print(_editToggles);
+                                      print(index);
+                                      setState(() {});
+                                    },
                                   ),
                                 const SizedBox(width: 0),
-                                if (showInputForm)
+                                if (widget.showInputForm)
                                   TextButton(
                                     child: const Icon(Icons.star),
                                     onPressed: () {/* ... */},
@@ -175,10 +209,10 @@ class CardList extends StatelessWidget {
             ),
           ),
         ),
-        if (signedIn)
+        if (widget.signedIn)
           Padding(
               padding: const EdgeInsets.fromLTRB(200, 5, 200, 80),
-              child: (showInputForm) ? (InterestInputForm()) : Text(''))
+              child: (widget.showInputForm) ? (InterestInputForm()) : Text(''))
       ],
     );
   }

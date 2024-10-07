@@ -249,6 +249,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void loadMarkers(bool loadUserMarker) async {
+    //Call this if your are dragging the marker!!
+    await Future.delayed(Duration(milliseconds: 1500));
     Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
     poi = await BitmapDescriptor.bytes(imageData,
         width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
@@ -291,25 +293,36 @@ class _MyHomePageState extends State<MyHomePage> {
     if (!_serviceEnabled) {
       _serviceEnabled = await location.requestService();
       if (!_serviceEnabled) {
+        print('location service is not enabled');
         return;
       }
     }
     //do a soft check to determine if latlng is 0,0
     //if it is 0,0 update user location
-    final userLocation = await fu.retrieveUserLocation(
+    /*final userLocation = await fu.retrieveUserLocation(
         users, FirebaseAuth.instance.currentUser!.uid);
     if (userLocation == GeoPoint(0, 0)) {
       print('user location was 0,0');
-      _gotoCurrentUserLocation(true);
+      _gotoCurrentUserLocation(true, true);
       _permissionGranted = await location.hasPermission();
       if (_permissionGranted == PermissionStatus.denied) {
         _permissionGranted = await location.requestPermission();
         if (_permissionGranted != PermissionStatus.granted) {
           //todo: markers are not loading for some reason
-          return;
+          //setState(() {});
+          //print('trying to reload page');
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (BuildContext context) => ChangeNotifierProvider(
+                create: (context) => UserModel(),
+                child: const MyApp(),
+              ),
+            ),
+          );
+          setState(() {});
         } else {
           setState(() {});
-          _gotoCurrentUserLocation(false);
+          _gotoCurrentUserLocation(false, _signedIn);
         }
       } else {
         Random random = Random();
@@ -321,10 +334,11 @@ class _MyHomePageState extends State<MyHomePage> {
             zoom: 12);
         controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
       }
-    }
+    } */
   }
 
-  Future<void> _gotoCurrentUserLocation(bool updateUserLocation) async {
+  Future<void> _gotoCurrentUserLocation(
+      bool updateUserLocation, bool loadUserMarker) async {
     Random random = Random();
     double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
     double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
@@ -343,7 +357,7 @@ class _MyHomePageState extends State<MyHomePage> {
         target: LatLng(locationData.latitude! + randomNumber1,
             locationData.longitude! + randomNumber2),
         zoom: 12);
-    loadMarkers(true);
+    loadMarkers(loadUserMarker);
     controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
   }
 
@@ -506,7 +520,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           });
                           print('mapStyle should be set');
                           _getLocationServiceAndPermission(_controller);
-                          _gotoCurrentUserLocation(false);
+                          _gotoCurrentUserLocation(false, _signedIn);
                           print('callback is working');
                           setState(() {});
                           loadMarkers(true);
