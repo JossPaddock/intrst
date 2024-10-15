@@ -56,7 +56,7 @@ class InterestInputFormState extends State<InterestInputForm> {
                   },
                   decoration: InputDecoration(
                     border: OutlineInputBorder(),
-                    hintText: 'Enter the name of the interest.',
+                    hintText: 'Add a new interest.',
                   ),
                 ),
                 TextFormField(
