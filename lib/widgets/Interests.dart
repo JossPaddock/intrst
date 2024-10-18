@@ -251,6 +251,9 @@ class _CardList extends State<CardList> {
                                               interest.created_timestamp,
                                           updated_timestamp: DateTime.now(),
                                         );
+                                        setState(() {
+                                          widget.interests[index] = newInterest;
+                                        });
                                         fu.updateEditedInterest(
                                             users,
                                             oldInterest,
@@ -262,6 +265,59 @@ class _CardList extends State<CardList> {
                                       setState(() {});
                                     },
                                   ),
+                                if (widget.showInputForm)
+                                  TextButton(
+                                    child: const Icon(Icons.delete),
+                                    onPressed: () => showDialog<String>(
+                                      context: context,
+                                      builder: (BuildContext context) =>
+                                          AlertDialog(
+                                        title: const Text(
+                                            'Are you sure you want\nto delete this interest?'),
+                                        content: Text(
+                                            'This will permanently delete\nthe interest ${interest.name}',
+                                            textAlign: TextAlign.center),
+                                        actions: <Widget>[
+                                           Center(
+                                            child: Column(children: <Widget>[
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                    context, 'Never mind'),
+                                                child: const Text('Never mind'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () {
+                                                  CollectionReference users =
+                                                      FirebaseFirestore.instance
+                                                          .collection('users');
+                                                  Interest oldInterest =
+                                                      Interest(
+                                                    name: interest.name,
+                                                    description:
+                                                        interest.description,
+                                                    link: interest.link,
+                                                    created_timestamp: interest
+                                                        .created_timestamp,
+                                                    updated_timestamp: interest
+                                                        .updated_timestamp,
+                                                  );
+                                                  fu.removeInterest(users,
+                                                      oldInterest, widget.uid);
+                                                  setState(() {
+                                                    widget.interests
+                                                        .removeAt(index);
+                                                  });
+                                                  Navigator.pop(
+                                                      context, 'Delete');
+                                                },
+                                                child: const Text('Delete'),
+                                              ),
+                                            ]),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
                               ],
                             ),
                           ],

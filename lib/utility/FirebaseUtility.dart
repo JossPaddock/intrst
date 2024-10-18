@@ -107,27 +107,6 @@ class FirebaseUtility {
     });
   }
 
-  Future<void> removeInterestForUser(
-      CollectionReference users, Interest interest, String uid) async {
-    QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
-    querySnapshot.docs.forEach((doc) async {
-      DocumentReference documentRef =
-          FirebaseFirestore.instance.collection('users').doc(doc.id);
-      DocumentSnapshot documentSnapshot = await documentRef.get();
-      Map<String, dynamic>? data =
-          documentSnapshot.data() as Map<String, dynamic>?;
-      if (data != null) {
-        List<dynamic> array = data['interests'] ?? [];
-        Map<String, dynamic> interest_map = interest.mapper();
-        array.remove(interest_map);
-        await documentRef.update({'interests': array});
-      } else {
-        print('UH OH Could not find the doc');
-      }
-    });
-  }
-
   Future<void> updateEditedInterest(CollectionReference users, Interest oldInterest, Interest newInterest, String uid) async {
     //fire base arrayRemove and arrayUnion method calls may be more performant!!!
     //fire base object must match directly if doing a plain array remove, but not so much with built-ins
@@ -145,6 +124,22 @@ class FirebaseUtility {
 
       await documentRef.update({
         'interests': FieldValue.arrayUnion([newInterestMap])
+      });
+    }
+  }
+
+  Future<void> removeInterest(CollectionReference users, Interest interest, String uid) async {
+    //fire base arrayRemove and arrayUnion method calls may be more performant!!!
+    //fire base object must match directly if doing a plain array remove, but not so much with built-ins
+    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
+
+    for (var doc in querySnapshot.docs) {
+      DocumentReference documentRef = FirebaseFirestore.instance.collection('users').doc(doc.id);
+
+      Map<String, dynamic> interestMap = interest.mapper();
+
+      await documentRef.update({
+        'interests': FieldValue.arrayRemove([interestMap])
       });
     }
   }
