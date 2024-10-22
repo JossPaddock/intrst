@@ -413,6 +413,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    double screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
@@ -437,7 +438,7 @@ class _MyHomePageState extends State<MyHomePage> {
           StatefulBuilder(
             builder: (context, setState) => SizedBox(
               height: 48.0,
-              width: 400.0,
+              width: screenWidth * 0.5,
               child: TextField(
                 decoration: InputDecoration(
                   fillColor: Colors.white,
