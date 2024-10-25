@@ -413,6 +413,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
+      drawerEnableOpenDragGesture: false,
+      endDrawerEnableOpenDragGesture: false,
       key: _scaffoldKey,
       appBar: AppBar(
         leading: Builder(
@@ -496,8 +498,6 @@ class _MyHomePageState extends State<MyHomePage> {
         child: _signedIn // _signedInGoogleMap
             ? <Widget>[
                 Scaffold(
-                  drawerEnableOpenDragGesture: false,
-                  endDrawerEnableOpenDragGesture: false,
                   body: Stack(
                     children: <Widget>[
                       GoogleMap(
