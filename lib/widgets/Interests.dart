@@ -202,6 +202,7 @@ class _CardList extends State<CardList> {
                                   ? Column(children: [
                                       SizedBox(height: 20),
                                       TextField(
+                                        maxLines: 5,
                                         controller: _subtitleControllers[index],
                                         decoration: InputDecoration(
                                           border: OutlineInputBorder(),
