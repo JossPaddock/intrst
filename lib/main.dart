@@ -190,26 +190,30 @@ class _MyHomePageState extends State<MyHomePage> {
             loadMarkers(true);
             //
             setState(() {
-              /*
-              for (var marker in markers) {
-                if (marker.markerId.value == title) {
-                  markers.remove(marker);
-                  markers.add(marker.copyWith(positionParam: newPosition));
-                }
-              }*/
             });
           }));
     });
+
+    var color = Colors.white;
+    if(drag) {
+      color = Colors.redAccent;
+    }
 
     labelMarkers
         .addLabelMarker(LabelMarker(
             icon: BitmapDescriptor.defaultMarker,
             label: title,
+            textStyle: TextStyle(
+             color: color,
+             fontSize: 27.0,
+             letterSpacing: 1.0,
+             fontFamily: 'Roboto Bold',
+            ),
             markerId: MarkerId(uid),
             //maybe someday this offset below will work. It should!
             anchor: Offset(0.5, 0.5),
             position: LatLng(lat, lng),
-            backgroundColor: const Color(0x00ffffff),
+            backgroundColor: const Color(0x00000000),
             draggable: drag,
             zIndex: drag ? 10 : 1,
             onTap: () {
@@ -232,15 +236,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   GeoPoint(newPosition.latitude, newPosition.longitude));
               loadMarkers(true);
               setState(() {
-                /*
-                for (var marker in markers) {
-                  if (marker.markerId.value == title) {
-                    markers.remove(marker);
-                    markers.add(marker.copyWith(positionParam: newPosition));
-                  }
-                }*/
               });
             }))
+
         .then(
       (value) {
         setState(() {});
@@ -498,6 +496,8 @@ class _MyHomePageState extends State<MyHomePage> {
         child: _signedIn // _signedInGoogleMap
             ? <Widget>[
                 Scaffold(
+                  drawerEnableOpenDragGesture: false,
+                  endDrawerEnableOpenDragGesture: false,
                   body: Stack(
                     children: <Widget>[
                       GoogleMap(
