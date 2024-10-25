@@ -136,10 +136,10 @@ class _CardList extends State<CardList> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(0),
           child: Center(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 100, 0, 0),
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
               child: Text(
                 widget.name,
                 style: TextStyle(
@@ -332,7 +332,7 @@ class _CardList extends State<CardList> {
         ),
         if (widget.signedIn)
           Padding(
-              padding: const EdgeInsets.fromLTRB(200, 5, 200, 80),
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
               child: (widget.showInputForm) ? (InterestInputForm()) : Text(''))
       ],
     );
