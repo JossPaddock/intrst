@@ -415,6 +415,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       drawerEnableOpenDragGesture: false,
       endDrawerEnableOpenDragGesture: false,
+      resizeToAvoidBottomInset: false,
       key: _scaffoldKey,
       appBar: AppBar(
         leading: Builder(
