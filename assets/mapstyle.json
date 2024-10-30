@@ -79,37 +79,36 @@
   },
   {
     "featureType": "poi",
-    "elementType": "labels.text.fill",
+    "elementType": "all",
     "stylers": [
       {
-        "color": "#6f9ba5"
+        "visibility": "off"
       }
     ]
   },
   {
-    "featureType": "poi",
-    "elementType": "labels.text.stroke",
+    "featureType": "poi.business",
     "stylers": [
       {
-        "color": "#1d2c4d"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#023e58"
+        "visibility": "off"
       }
     ]
   },
   {
     "featureType": "poi.park",
-    "elementType": "labels.text.fill",
+    "elementType": "all",
     "stylers": [
       {
-        "color": "#3C7680"
+        "visibility": "off"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.school",
+    "elementType": "all",
+    "stylers": [
+      {
+        "visibility": "off"
       }
     ]
   },
@@ -133,11 +132,30 @@
   },
   {
     "featureType": "road",
+    "elementType": "labels.icon",
+    "stylers": [
+      {
+        "saturation": 0
+      }
+    ]
+  },
+  {
+    "featureType": "road",
+    "elementType": "labels.icon",
+    "stylers": [
+      {
+        "visibility": "off"
+      }
+    ]
+  },
+  {
+    "featureType": "road",
     "elementType": "labels.text.stroke",
     "stylers": [
       {
         "color": "#1d2c4d"
       }
+
     ]
   },
   {
@@ -172,16 +190,16 @@
     "elementType": "labels.text.stroke",
     "stylers": [
       {
-        "color": "#023e58"
+        "visibility": "off"
       }
     ]
   },
   {
     "featureType": "transit",
-    "elementType": "labels.text.fill",
+    "elementType": "all",
     "stylers": [
       {
-        "color": "#98a5be"
+        "visibility": "off"
       }
     ]
   },
@@ -190,7 +208,7 @@
     "elementType": "labels.text.stroke",
     "stylers": [
       {
-        "color": "#1d2c4d"
+        "visibility": "off"
       }
     ]
   },
@@ -199,7 +217,7 @@
     "elementType": "geometry.fill",
     "stylers": [
       {
-        "color": "#283d6a"
+        "visibility": "off"
       }
     ]
   },
@@ -208,7 +226,7 @@
     "elementType": "geometry",
     "stylers": [
       {
-        "color": "#3a4762"
+        "visibility": "off"
       }
     ]
   },

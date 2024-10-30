@@ -132,6 +132,7 @@ class _CardList extends State<CardList> {
 
   @override
   Widget build(BuildContext context) {
+    print('widget is reloading');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
