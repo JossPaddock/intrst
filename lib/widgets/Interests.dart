@@ -139,17 +139,17 @@ class _CardList extends State<CardList> {
           return SingleChildScrollView(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: viewportConstraints.maxHeight,
+                minHeight: viewportConstraints.minHeight,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: <Widget>[
                   Padding(
-                    padding: const EdgeInsets.all(0),
+                    padding: const EdgeInsets.all(50),
                     child: Center(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                        padding: const EdgeInsets.fromLTRB(50, 50, 50, 50),
                         child: Text(
                           widget.name,
                           style: TextStyle(
