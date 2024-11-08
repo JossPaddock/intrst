@@ -196,7 +196,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     var color = Colors.white;
     if(drag) {
-      color = Colors.redAccent;
+      color = Color(0xFFff673a);
     }
 
     labelMarkers
@@ -484,8 +484,8 @@ class _MyHomePageState extends State<MyHomePage> {
           Spacer(),
           Builder(
             builder: (context) => IconButton(
-              icon: Image.asset('assets/poi.png'),
-              color: Colors.red,
+              icon: Image.asset('assets/poio.png'),
+              //color: Colors.red,
               onPressed: () {
                 _handleAlternateUserModel(_uid, _name);
                 Scaffold.of(context).openEndDrawer();

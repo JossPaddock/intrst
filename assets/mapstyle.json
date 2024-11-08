@@ -73,7 +73,7 @@
     "elementType": "geometry",
     "stylers": [
       {
-        "color": "#283d6a"
+        "visibility": "off"
       }
     ]
   },
