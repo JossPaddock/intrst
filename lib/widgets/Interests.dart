@@ -341,7 +341,7 @@ class _CardList extends State<CardList> {
                       ),
                     ),
                   ),
-                  if (widget.signedIn)
+                  if (!widget.signedIn)
                     Padding(
                         padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                         child: (widget.showInputForm) ? (InterestInputForm()) : Text(''))
