@@ -1,13 +1,11 @@
-import 'dart:html' as html;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intrst/widgets/InterestInputForm.dart';
-import 'package:intrst/utility/FirebaseUtility.dart';
-import '../models/Interest.dart';
 import 'package:provider/provider.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intrst/widgets/InterestInputForm.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
+import '../models/Interest.dart';
 
 class Interests extends StatelessWidget {
   final String name;
@@ -19,8 +17,7 @@ class Interests extends StatelessWidget {
   Future<List<Interest>> fetchSortedInterestsForUser(String user_uid) async {
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<Interest> interests = await fu.pullInterestsForUser(users, user_uid);
-    interests
-        .sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
+    interests.sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
     return interests;
   }
 
@@ -29,20 +26,21 @@ class Interests extends StatelessWidget {
     return Consumer<UserModel>(builder: (context, user, child) {
       return FutureBuilder<List<Interest>>(
         future: fetchSortedInterestsForUser(user.alternateUid),
-        builder: (context, object) {
-          if (object.connectionState == ConnectionState.waiting) {
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
-          } else if (object.hasError) {
-            return Center(child: Text('Error: ${object.error}'));
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
           } else {
-            List<Interest> interests = object.data ?? [];
+            List<Interest> interests = snapshot.data ?? [];
             return CardList(
-                name: user.alternateName,
-                uid: user.currentUid,
-                signedIn: signedIn,
-                interests: interests,
-                showInputForm: user.alternateUid == user.currentUid,
-                editToggles: []);
+              name: user.alternateName,
+              uid: user.currentUid,
+              signedIn: signedIn,
+              interests: interests,
+              showInputForm: user.alternateUid == user.currentUid,
+              editToggles: [],
+            );
           }
         },
       );
@@ -50,16 +48,16 @@ class Interests extends StatelessWidget {
   }
 }
 
-// ignore: must_be_immutable
 class CardList extends StatefulWidget {
-  const CardList(
-      {super.key,
-        required this.name,
-        required this.uid,
-        required this.signedIn,
-        required this.interests,
-        required this.showInputForm,
-        required this.editToggles});
+  const CardList({
+    super.key,
+    required this.name,
+    required this.uid,
+    required this.signedIn,
+    required this.interests,
+    required this.showInputForm,
+    required this.editToggles,
+  });
 
   final String name;
   final String uid;
@@ -69,10 +67,10 @@ class CardList extends StatefulWidget {
   final List<bool> editToggles;
 
   @override
-  State<CardList> createState() => _CardList();
+  State<CardList> createState() => _CardListState();
 }
 
-class _CardList extends State<CardList> {
+class _CardListState extends State<CardList> {
   late List<bool> _editToggles;
   final FirebaseUtility fu = FirebaseUtility();
 
@@ -84,12 +82,9 @@ class _CardList extends State<CardList> {
   void initState() {
     super.initState();
     _editToggles = List<bool>.filled(widget.interests.length, false);
-    _titleControllers = List.generate(
-        widget.interests.length, (index) => TextEditingController());
-    _linkControllers = List.generate(
-        widget.interests.length, (index) => TextEditingController());
-    _subtitleControllers = List.generate(
-        widget.interests.length, (index) => TextEditingController());
+    _titleControllers = List.generate(widget.interests.length, (index) => TextEditingController());
+    _linkControllers = List.generate(widget.interests.length, (index) => TextEditingController());
+    _subtitleControllers = List.generate(widget.interests.length, (index) => TextEditingController());
 
     for (int i = 0; i < widget.interests.length; i++) {
       _titleControllers[i].text = widget.interests[i].name;
@@ -100,7 +95,6 @@ class _CardList extends State<CardList> {
 
   @override
   void dispose() {
-    // Dispose of the controllers when the widget is disposed.
     for (var controller in _titleControllers) {
       controller.dispose();
     }
@@ -132,224 +126,152 @@ class _CardList extends State<CardList> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTextStyle(
-      style: Theme.of(context).textTheme.bodyMedium!,
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints viewportConstraints) {
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: viewportConstraints.minHeight,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.all(50),
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(50, 50, 50, 50),
-                        child: Text(
-                          widget.name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            backgroundColor: Colors.black,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Flexible(
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: 600,
-                          maxHeight: 120.0 * widget.interests.length,
-                        ),
-                        child: ListView.builder(
-                          itemCount: widget.interests.length,
-                          itemBuilder: (context, index) {
-                            Interest interest = widget.interests[index];
-
-                            return Padding(
-                              padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-                              child: Card(
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 200,
-                                    maxHeight: 600,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: <Widget>[
-                                      ListTile(
-                                        title: GestureDetector(
-                                          onTap: () => _launchUrl(interest.link!),
-                                          child: _editToggles[index]
-                                              ? Column(children: [
-                                            SizedBox(height: 10),
-                                            TextField(
-                                              controller: _titleControllers[index],
-                                              decoration: InputDecoration(
-                                                border: OutlineInputBorder(),
-                                                labelText: 'Edit title here',
-                                              ),
-                                            ),
-                                          ])
-                                              : Text(
-                                            interest.name,
-                                            style: TextStyle(
-                                              color: Colors.blue,
-                                              decoration: TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                        subtitle: _editToggles[index]
-                                            ? Column(children: [
-                                          SizedBox(height: 20),
-                                          TextField(
-                                            maxLines: 5,
-                                            controller: _subtitleControllers[index],
-                                            decoration: InputDecoration(
-                                              border: OutlineInputBorder(),
-                                              labelText: 'Edit description here',
-                                            ),
-                                          ),
-                                          SizedBox(height: 20),
-                                          TextField(
-                                            controller: _linkControllers[index],
-                                            decoration: InputDecoration(
-                                              border: OutlineInputBorder(),
-                                              labelText: 'Edit link here',
-                                            ),
-                                          ),
-                                        ])
-                                            : Text(interest.description),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
-                                        children: <Widget>[
-                                          if (widget.showInputForm)
-                                            TextButton(
-                                              child: !_editToggles[index]
-                                                  ? const Icon(Icons.edit)
-                                                  : const Icon(Icons.save),
-                                              onPressed: () {
-                                                if (_editToggles[index]) {
-                                                  // Save the new interest details
-                                                  CollectionReference users =
-                                                  FirebaseFirestore.instance
-                                                      .collection('users');
-                                                  Interest oldInterest = Interest(
-                                                    name: interest.name,
-                                                    description: interest.description,
-                                                    link: interest.link,
-                                                    created_timestamp:
-                                                    interest.created_timestamp,
-                                                    updated_timestamp:
-                                                    interest.updated_timestamp,
-                                                  );
-                                                  Interest newInterest = Interest(
-                                                    name: _titleControllers[index].text,
-                                                    description:
-                                                    _subtitleControllers[index].text,
-                                                    link: _linkControllers[index].text,
-                                                    created_timestamp:
-                                                    interest.created_timestamp,
-                                                    updated_timestamp: DateTime.now(),
-                                                  );
-                                                  setState(() {
-                                                    widget.interests[index] = newInterest;
-                                                  });
-                                                  fu.updateEditedInterest(
-                                                      users,
-                                                      oldInterest,
-                                                      newInterest,
-                                                      widget.uid);
-                                                }
-                                                updateToggles(
-                                                    index, !_editToggles[index]);
-                                                setState(() {});
-                                              },
-                                            ),
-                                          if (widget.showInputForm)
-                                            TextButton(
-                                              child: const Icon(Icons.delete),
-                                              onPressed: () => showDialog<String>(
-                                                context: context,
-                                                builder: (BuildContext context) =>
-                                                    AlertDialog(
-                                                      title: const Text(
-                                                          'Are you sure you want\nto delete this interest?'),
-                                                      content: Text(
-                                                          'This will permanently delete\nthe interest ${interest.name}',
-                                                          textAlign: TextAlign.center),
-                                                      actions: <Widget>[
-                                                        Center(
-                                                          child: Column(children: <Widget>[
-                                                            TextButton(
-                                                              onPressed: () => Navigator.pop(
-                                                                  context, 'Never mind'),
-                                                              child: const Text('Never mind'),
-                                                            ),
-                                                            TextButton(
-                                                              onPressed: () {
-                                                                CollectionReference users =
-                                                                FirebaseFirestore.instance
-                                                                    .collection('users');
-                                                                Interest oldInterest =
-                                                                Interest(
-                                                                  name: interest.name,
-                                                                  description:
-                                                                  interest.description,
-                                                                  link: interest.link,
-                                                                  created_timestamp: interest
-                                                                      .created_timestamp,
-                                                                  updated_timestamp: interest
-                                                                      .updated_timestamp,
-                                                                );
-                                                                fu.removeInterest(users,
-                                                                    oldInterest, widget.uid);
-                                                                setState(() {
-                                                                  widget.interests
-                                                                      .removeAt(index);
-                                                                });
-                                                                Navigator.pop(
-                                                                    context, 'Delete');
-                                                              },
-                                                              child: const Text('Delete'),
-                                                            ),
-                                                          ]),
-                                                        ),
-                                                      ],
-                                                    ),
-                                              ),
-                                            )
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (!widget.signedIn)
-                    Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-                        child: (widget.showInputForm) ? (InterestInputForm()) : Text(''))
-                ],
+    double maxWidth = MediaQuery.of(context).size.width * 0.9;
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+              child: Text(
+                widget.name,
+                style: TextStyle(
+                  color: Colors.white,
+                  backgroundColor: Colors.black,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          );
-        },
+          ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: widget.interests.length,
+            itemBuilder: (context, index) {
+              Interest interest = widget.interests[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () => _launchUrl(interest.link!),
+                          child: _editToggles[index]
+                              ? TextField(
+                            controller: _titleControllers[index],
+                            decoration: InputDecoration(
+                              labelText: 'Edit title here',
+                              border: OutlineInputBorder(),
+                            ),
+                          )
+                              : Text(
+                            interest.name,
+                            style: TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        _editToggles[index]
+                            ? Column(
+                          children: [
+                            TextField(
+                              maxLines: 3,
+                              controller: _subtitleControllers[index],
+                              decoration: InputDecoration(
+                                labelText: 'Edit description here',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            TextField(
+                              controller: _linkControllers[index],
+                              decoration: InputDecoration(
+                                labelText: 'Edit link here',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ],
+                        )
+                            : Text(interest.description),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (widget.showInputForm)
+                              IconButton(
+                                icon: Icon(_editToggles[index] ? Icons.save : Icons.edit),
+                                onPressed: () {
+                                  if (_editToggles[index]) {
+                                    CollectionReference users = FirebaseFirestore.instance.collection('users');
+                                    Interest oldInterest = Interest(
+                                      name: interest.name,
+                                      description: interest.description,
+                                      link: interest.link,
+                                      created_timestamp: interest.created_timestamp,
+                                      updated_timestamp: interest.updated_timestamp,
+                                    );
+                                    Interest newInterest = Interest(
+                                      name: _titleControllers[index].text,
+                                      description: _subtitleControllers[index].text,
+                                      link: _linkControllers[index].text,
+                                      created_timestamp: interest.created_timestamp,
+                                      updated_timestamp: DateTime.now(),
+                                    );
+                                    setState(() {
+                                      widget.interests[index] = newInterest;
+                                    });
+                                    fu.updateEditedInterest(users, oldInterest, newInterest, widget.uid);
+                                  }
+                                  updateToggles(index, !_editToggles[index]);
+                                },
+                              ),
+                            if (widget.showInputForm)
+                              IconButton(
+                                icon: Icon(Icons.delete),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text('Delete this interest?'),
+                                      content: Text('This will permanently delete the interest ${interest.name}.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            CollectionReference users = FirebaseFirestore.instance.collection('users');
+                                            fu.removeInterest(users, interest, widget.uid);
+                                            setState(() {
+                                              widget.interests.removeAt(index);
+                                            });
+                                            Navigator.pop(context);
+                                          },
+                                          child: Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          if (widget.signedIn && widget.showInputForm) InterestInputForm(),
+        ],
       ),
     );
   }
