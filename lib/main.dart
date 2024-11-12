@@ -532,7 +532,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ],
                   ),
                 ),
-                InterestInputForm(),
+                Interests(name: _name, signedIn: _signedIn),
                 Text(
                   'Index 2: Replace this text widget with the Button widget',
                   style: optionStyle,
