@@ -71,7 +71,9 @@ class CardList extends StatefulWidget {
   State<CardList> createState() => _CardListState();
 }
 
-class _CardListState extends State<CardList> {
+class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin <CardList>{
+  @override
+  bool get wantKeepAlive => true;
   final FirebaseUtility fu = FirebaseUtility();
 
   List<TextEditingController> _titleControllers = [];
