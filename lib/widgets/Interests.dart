@@ -130,16 +130,16 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
   @override
   Widget build(BuildContext context) {
     UserModel userModel = Provider.of<UserModel>(context);
-    return SingleChildScrollView(
-      child: Container(
-        decoration: BoxDecoration(
+    return Container(
+      alignment: Alignment.topCenter,
+      decoration: BoxDecoration(
           border: Border.all(
             color: Colors.white,
             width: 2.0,
           ),
         ),
         constraints: BoxConstraints(
-          maxHeight: 250,
+          maxHeight: 100,
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -161,7 +161,7 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
               ),
               ListView.builder(
                 shrinkWrap: true,
-                physics: AlwaysScrollableScrollPhysics(),
+                physics: NeverScrollableScrollPhysics(),
                 itemCount: widget.interests.length,
                 itemBuilder: (context, index) {
                   Interest interest = widget.interests[index];
@@ -327,7 +327,6 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }

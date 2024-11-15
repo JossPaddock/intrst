@@ -189,13 +189,12 @@ class _MyHomePageState extends State<MyHomePage> {
                 GeoPoint(newPosition.latitude, newPosition.longitude));
             loadMarkers(true);
             //
-            setState(() {
-            });
+            setState(() {});
           }));
     });
 
     var color = Colors.white;
-    if(drag) {
+    if (drag) {
       color = Color(0xFFff673a);
     }
 
@@ -204,10 +203,10 @@ class _MyHomePageState extends State<MyHomePage> {
             icon: BitmapDescriptor.defaultMarker,
             label: title,
             textStyle: TextStyle(
-             color: color,
-             fontSize: 27.0,
-             letterSpacing: 1.0,
-             fontFamily: 'Roboto Bold',
+              color: color,
+              fontSize: 27.0,
+              letterSpacing: 1.0,
+              fontFamily: 'Roboto Bold',
             ),
             markerId: MarkerId(uid),
             //maybe someday this offset below will work. It should!
@@ -235,10 +234,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   FirebaseAuth.instance.currentUser!.uid,
                   GeoPoint(newPosition.latitude, newPosition.longitude));
               loadMarkers(true);
-              setState(() {
-              });
+              setState(() {});
             }))
-
         .then(
       (value) {
         setState(() {});
@@ -684,7 +681,10 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       endDrawer: SizedBox(
         width: MediaQuery.of(context).size.width * 1, //<-- SEE HERE
-        child: Interests(name: _name, signedIn: _signedIn),
+        child: Container(
+          child: Interests(name: _name, signedIn: _signedIn),
+          alignment: Alignment.topCenter,
+        ),
       ),
       drawerEdgeDragWidth: 200,
       onEndDrawerChanged: (state) {
