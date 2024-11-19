@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intrst/widgets/InterestInputForm.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
 import '../models/Interest.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class Interests extends StatelessWidget {
   final String name;
@@ -139,7 +140,7 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
           ),
         ),
         constraints: BoxConstraints(
-          maxHeight: 100,
+          maxHeight: 700,
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -226,39 +227,78 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
                                     icon:
                                         Icon(toggle ? Icons.save : Icons.edit),
                                     onPressed: () {
-                                      if (toggle) {
-                                        // Save changes logic
-                                        CollectionReference users =
-                                            FirebaseFirestore.instance
-                                                .collection('users');
-                                        Interest oldInterest = Interest(
-                                          name: interest.name,
-                                          description: interest.description,
-                                          link: interest.link,
-                                          created_timestamp:
-                                              interest.created_timestamp,
-                                          updated_timestamp:
-                                              interest.updated_timestamp,
+                                      print(kIsWeb);
+                                      if(kIsWeb) {
+                                        if (toggle) {
+                                          // Save changes logic
+                                          CollectionReference users =
+                                          FirebaseFirestore.instance
+                                              .collection('users');
+                                          Interest oldInterest = Interest(
+                                            name: interest.name,
+                                            description: interest.description,
+                                            link: interest.link,
+                                            created_timestamp:
+                                            interest.created_timestamp,
+                                            updated_timestamp:
+                                            interest.updated_timestamp,
+                                          );
+                                          Interest newInterest = Interest(
+                                            name: _titleControllers[index].text,
+                                            description:
+                                            _subtitleControllers[index].text,
+                                            link: _linkControllers[index].text,
+                                            created_timestamp:
+                                            interest.created_timestamp,
+                                            updated_timestamp: DateTime.now(),
+                                          );
+                                          setState(() {
+                                            widget.interests[index] = newInterest;
+                                          });
+                                          fu.updateEditedInterest(
+                                              users,
+                                              oldInterest,
+                                              newInterest,
+                                              widget.uid);
+                                        }
+                                        updateToggles(interestId, !toggle);
+                                      } else {
+                                        showDialog<String>(
+                                          context: context,
+                                          builder: (BuildContext context) =>
+                                              AlertDialog(
+                                                title: const Text(
+                                                    'Are you sure you want\nto delete this interest?'),
+                                                content: Column(
+                                                  children: [
+                                                    TextField(
+                                                      maxLines: 3,
+                                                      controller: _subtitleControllers[index],
+                                                      decoration: InputDecoration(
+                                                        labelText: 'Edit description here',
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                  ]
+                                                ),
+                                                actions: <Widget>[
+                                                  Center(
+                                                    child: Column(children: <Widget>[
+                                                      TextButton(
+                                                        onPressed: () => Navigator.pop(
+                                                            context, 'Never mind'),
+                                                        child: const Text('Never mind'),
+                                                      ),
+                                                      TextButton(
+                                                        onPressed: () {},
+                                                        child: const Text('Delete'),
+                                                      ),
+                                                    ]),
+                                                  ),
+                                                ],
+                                              ),
                                         );
-                                        Interest newInterest = Interest(
-                                          name: _titleControllers[index].text,
-                                          description:
-                                              _subtitleControllers[index].text,
-                                          link: _linkControllers[index].text,
-                                          created_timestamp:
-                                              interest.created_timestamp,
-                                          updated_timestamp: DateTime.now(),
-                                        );
-                                        setState(() {
-                                          widget.interests[index] = newInterest;
-                                        });
-                                        fu.updateEditedInterest(
-                                            users,
-                                            oldInterest,
-                                            newInterest,
-                                            widget.uid);
                                       }
-                                      updateToggles(interestId, !toggle);
                                     },
                                   ),
                                 if (widget.showInputForm)
