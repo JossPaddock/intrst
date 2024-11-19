@@ -296,17 +296,32 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
                                       } else {
                                         showDialog<String>(
                                           context: context,
+                                          barrierDismissible: false,
                                           builder: (BuildContext context) =>
                                               AlertDialog(
                                                 title: const Text(
-                                                    'Are you sure you want\nto delete this interest?'),
+                                                    'Edit Your Interest'),
                                                 content: Column(
                                                   children: [
+                                                    TextField(
+                                                      //controller: _titleControllers[index],
+                                                      decoration: InputDecoration(
+                                                        labelText: 'Edit title here',
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                    ),
                                                     TextField(
                                                       maxLines: 3,
                                                       //controller: _subtitleControllers[index],
                                                       decoration: InputDecoration(
                                                         labelText: 'Edit description here',
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                    TextField(
+                                                      //controller: _linkControllers[index],
+                                                      decoration: InputDecoration(
+                                                        labelText: 'Edit link here',
                                                         border: OutlineInputBorder(),
                                                       ),
                                                     ),
