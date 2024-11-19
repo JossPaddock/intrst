@@ -304,7 +304,7 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
                                                   children: [
                                                     TextField(
                                                       maxLines: 3,
-                                                      controller: _subtitleControllers[index],
+                                                      //controller: _subtitleControllers[index],
                                                       decoration: InputDecoration(
                                                         labelText: 'Edit description here',
                                                         border: OutlineInputBorder(),
