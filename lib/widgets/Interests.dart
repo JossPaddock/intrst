@@ -229,6 +229,24 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
                                     onPressed: () {
                                       print(kIsWeb);
                                       if(kIsWeb) {
+                                        showDialog<String> (
+                                          context: context,
+                                          builder: (BuildContext context) =>
+                                              AlertDialog(
+                                                title: const Text('kIsWeb? $kIsWeb'),
+                                                actions: <Widget>[
+                                                  Center(
+                                                    child: Column(children: <Widget>[
+                                                      TextButton(
+                                                        onPressed: () => Navigator.pop(
+                                                            context, 'Never mind'),
+                                                        child: const Text('Never mind'),
+                                                      ),
+                                                    ]),
+                                                  ),
+                                                ],
+                                              ),
+                                        );
                                         if (toggle) {
                                           // Save changes logic
                                           CollectionReference users =
