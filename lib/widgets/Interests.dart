@@ -7,6 +7,7 @@ import 'package:intrst/widgets/InterestInputForm.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
 import '../models/Interest.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:html' as html;
 
 class Interests extends StatelessWidget {
   final String name;
@@ -127,7 +128,19 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
       throw 'Could not launch $url';
     }
   }
+  bool isMobileBrowser(BuildContext context) {
+    final userAgent = html.window.navigator.userAgent.toLowerCase();
+    bool isMobileUserAgent = userAgent.contains('iphone') ||
+        userAgent.contains('android') ||
+        userAgent.contains('ipad') ||
+        userAgent.contains('mobile');
 
+    //optionally do this as well.. mileage may vary
+    bool isSmallScreen = MediaQuery.of(context).size.width < 800 ||
+        MediaQuery.of(context).size.height < 800;
+
+    return isMobileUserAgent && isSmallScreen;
+  }
   @override
   Widget build(BuildContext context) {
     UserModel userModel = Provider.of<UserModel>(context);
@@ -227,13 +240,13 @@ class _CardListState extends State<CardList> with AutomaticKeepAliveClientMixin 
                                     icon:
                                         Icon(toggle ? Icons.save : Icons.edit),
                                     onPressed: () {
-                                      print(kIsWeb);
-                                      if(kIsWeb) {
+                                      print(!isMobileBrowser(context));
+                                      if(!isMobileBrowser(context)) {
                                         showDialog<String> (
                                           context: context,
                                           builder: (BuildContext context) =>
                                               AlertDialog(
-                                                title: const Text('kIsWeb? $kIsWeb'),
+                                                title: Text('is mobile? ${isMobileBrowser(context)}'),
                                                 actions: <Widget>[
                                                   Center(
                                                     child: Column(children: <Widget>[
