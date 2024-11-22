@@ -246,7 +246,7 @@ class _CardListState extends State<CardList>
                                 IconButton(
                                   icon: Icon(toggle ? Icons.save : Icons.edit),
                                   onPressed: () {
-                                    if (isMobileBrowser(context)) {
+                                    if (!isMobileBrowser(context)) {
                                       showDialog<String>(
                                         context: context,
                                         builder: (BuildContext context) =>
