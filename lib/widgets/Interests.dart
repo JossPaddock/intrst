@@ -246,7 +246,7 @@ class _CardListState extends State<CardList>
                                 IconButton(
                                   icon: Icon(toggle ? Icons.save : Icons.edit),
                                   onPressed: () {
-                                    if (isMobileBrowser(context)) {
+                                    if (!isMobileBrowser(context)) {
                                       showDialog<String>(
                                         context: context,
                                         builder: (BuildContext context) =>
@@ -361,9 +361,9 @@ class _CardListState extends State<CardList>
                                                           interest.created_timestamp,
                                                           updated_timestamp: DateTime.now(),
                                                         );
-                                                        setState(() {
-                                                          widget.interests[index] = newInterest;
-                                                        });
+                                                        //setState(() {
+                                                          //widget.interests[index] = newInterest;
+                                                        //});
                                                         fu.updateEditedInterest(
                                                             users,
                                                             oldInterest,
