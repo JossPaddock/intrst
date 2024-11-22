@@ -246,7 +246,7 @@ class _CardListState extends State<CardList>
                                 IconButton(
                                   icon: Icon(toggle ? Icons.save : Icons.edit),
                                   onPressed: () {
-                                    if (!isMobileBrowser(context)) {
+                                    if (isMobileBrowser(context)) {
                                       showDialog<String>(
                                         context: context,
                                         builder: (BuildContext context) =>
@@ -302,12 +302,15 @@ class _CardListState extends State<CardList>
                                       }
                                       updateToggles(interestId, !toggle);
                                     } else {
+                                     _mobileTitleController.text = _titleControllers[index].text;
+                                     _mobileSubtitleController.text = _subtitleControllers[index].text;
+                                     _mobileLinkController.text = _linkControllers[index].text;
                                       showDialog<String>(
                                         context: context,
                                         barrierDismissible: false,
                                         builder: (BuildContext context) =>
                                             AlertDialog(
-                                          content: Column(children: [
+                                             content: Column(children: [
                                             TextField(
                                               controller: _mobileTitleController,
                                               decoration: InputDecoration(
