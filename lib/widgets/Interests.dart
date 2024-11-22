@@ -246,8 +246,7 @@ class _CardListState extends State<CardList>
                                 IconButton(
                                   icon: Icon(toggle ? Icons.save : Icons.edit),
                                   onPressed: () {
-                                    print(!isMobileBrowser(context));
-                                    if (!isMobileBrowser(context)) {
+                                    if (isMobileBrowser(context)) {
                                       showDialog<String>(
                                         context: context,
                                         builder: (BuildContext context) =>
@@ -339,6 +338,7 @@ class _CardListState extends State<CardList>
                                                 IconButton(
                                                     icon: Icon(Icons.save),
                                                     onPressed: () {
+                                                      print('attempting to save');
                                                         // Save changes logic
                                                         CollectionReference users =
                                                         FirebaseFirestore.instance
@@ -369,6 +369,7 @@ class _CardListState extends State<CardList>
                                                             oldInterest,
                                                             newInterest,
                                                             widget.uid);
+                                                        Navigator.pop(context, 'saving');
                                                     }),
                                                 IconButton(
                                                   icon: Icon(Icons.cancel),

@@ -108,6 +108,7 @@ class FirebaseUtility {
   }
 
   Future<void> updateEditedInterest(CollectionReference users, Interest oldInterest, Interest newInterest, String uid) async {
+    print('attempting to update interest: $newInterest');
     //fire base arrayRemove and arrayUnion method calls may be more performant!!!
     //fire base object must match directly if doing a plain array remove, but not so much with built-ins
     QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
