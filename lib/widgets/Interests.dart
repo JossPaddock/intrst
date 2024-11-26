@@ -245,7 +245,7 @@ class _CardListState extends State<CardList>
                               if (widget.showInputForm)
                                 IconButton(
                                   icon: Icon(toggle ? Icons.save : Icons.edit),
-                                  onPressed: () {
+                                  onPressed: () async {
                                     if (!isMobileBrowser(context)) {
                                       showDialog<String>(
                                         context: context,
@@ -302,17 +302,25 @@ class _CardListState extends State<CardList>
                                       }
                                       updateToggles(interestId, !toggle);
                                     } else {
-                                     _mobileTitleController.text = _titleControllers[index].text;
-                                     _mobileSubtitleController.text = _subtitleControllers[index].text;
-                                     _mobileLinkController.text = _linkControllers[index].text;
-                                      showDialog<String>(
+                                      _mobileTitleController.text =
+                                          _titleControllers[index].text;
+                                      _mobileSubtitleController.text =
+                                          _subtitleControllers[index].text;
+                                      _mobileLinkController.text =
+                                          _linkControllers[index].text;
+                                      Interest dialogueInterest = Interest(
+                                          created_timestamp: DateTime.now(),
+                                          updated_timestamp: DateTime.now());
+                                      bool editCancelled = false;
+                                      await showDialog<String>(
                                         context: context,
                                         barrierDismissible: false,
                                         builder: (BuildContext context) =>
                                             AlertDialog(
-                                             content: Column(children: [
+                                          content: Column(children: [
                                             TextField(
-                                              controller: _mobileTitleController,
+                                              controller:
+                                                  _mobileTitleController,
                                               decoration: InputDecoration(
                                                 labelText: 'Edit title here',
                                                 border: OutlineInputBorder(),
@@ -320,7 +328,8 @@ class _CardListState extends State<CardList>
                                             ),
                                             TextField(
                                               maxLines: 2,
-                                              controller: _mobileSubtitleController,
+                                              controller:
+                                                  _mobileSubtitleController,
                                               decoration: InputDecoration(
                                                 labelText:
                                                     'Edit description here',
@@ -341,50 +350,77 @@ class _CardListState extends State<CardList>
                                                 IconButton(
                                                     icon: Icon(Icons.save),
                                                     onPressed: () {
-                                                      print('attempting to save');
-                                                        // Save changes logic
-                                                        CollectionReference users =
-                                                        FirebaseFirestore.instance
-                                                            .collection('users');
-                                                        Interest oldInterest = Interest(
-                                                          name: interest.name,
-                                                          description: interest.description,
-                                                          link: interest.link,
-                                                          created_timestamp:
-                                                          interest.created_timestamp,
-                                                          updated_timestamp:
-                                                          interest.updated_timestamp,
-                                                        );
-                                                        Interest newInterest = Interest(
-                                                          name: _mobileTitleController.text,
-                                                          description:
-                                                          _mobileSubtitleController.text,
-                                                          link: _mobileLinkController.text,
-                                                          created_timestamp:
-                                                          interest.created_timestamp,
-                                                          updated_timestamp: DateTime.now(),
-                                                        );
-                                                        //setState(() {
-                                                          //widget.interests[index] = newInterest;
-                                                        //});
-                                                        fu.updateEditedInterest(
-                                                            users,
-                                                            oldInterest,
-                                                            newInterest,
-                                                            widget.uid);
-                                                        Navigator.pop(context, 'saving');
+                                                      print(
+                                                          'attempting to save');
+                                                      // Save changes logic
+                                                      CollectionReference
+                                                          users =
+                                                          FirebaseFirestore
+                                                              .instance
+                                                              .collection(
+                                                                  'users');
+                                                      Interest oldInterest =
+                                                          Interest(
+                                                        name: interest.name,
+                                                        description: interest
+                                                            .description,
+                                                        link: interest.link,
+                                                        created_timestamp: interest
+                                                            .created_timestamp,
+                                                        updated_timestamp: interest
+                                                            .updated_timestamp,
+                                                      );
+                                                      Interest newInterest =
+                                                          Interest(
+                                                        name:
+                                                            _mobileTitleController
+                                                                .text,
+                                                        description:
+                                                            _mobileSubtitleController
+                                                                .text,
+                                                        link:
+                                                            _mobileLinkController
+                                                                .text,
+                                                        created_timestamp: interest
+                                                            .created_timestamp,
+                                                        updated_timestamp:
+                                                            DateTime.now(),
+                                                      );
+                                                      dialogueInterest =
+                                                          newInterest;
+                                                      //setState(() {
+                                                      //widget.interests[index] = newInterest;
+                                                      //});
+                                                      fu.updateEditedInterest(
+                                                          users,
+                                                          oldInterest,
+                                                          newInterest,
+                                                          widget.uid);
+                                                      _titleControllers[index].text =  _mobileTitleController.text;
+                                                      _subtitleControllers[index].text = _mobileSubtitleController.text;
+                                                      _linkControllers[index].text = _mobileLinkController.text;
+                                                      Navigator.pop(
+                                                          context, 'saving');
                                                     }),
                                                 IconButton(
-                                                  icon: Icon(Icons.cancel),
-                                                  onPressed: () =>
+                                                    icon: Icon(Icons.cancel),
+                                                    onPressed: () {
+                                                      editCancelled = true;
                                                       Navigator.pop(
-                                                          context, 'cancel'),
-                                                ),
+                                                          context, 'cancel');
+                                                    }),
                                               ]),
                                             ),
                                           ],
                                         ),
                                       );
+                                      //await Future.delayed(Duration(milliseconds: 1000));
+                                      setState(() {
+                                        if (!editCancelled) {
+                                          widget.interests[index] =
+                                              dialogueInterest;
+                                        }
+                                      });
                                     }
                                   },
                                 ),
