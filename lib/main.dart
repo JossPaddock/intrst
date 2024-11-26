@@ -504,6 +504,14 @@ class _MyHomePageState extends State<MyHomePage> {
                         },
                         //cloudMapId: mapId, // Set the map style ID here
                         zoomGesturesEnabled: _zoomEnabled,
+                        gestureRecognizers: _zoomEnabled
+                            ? <Factory<OneSequenceGestureRecognizer>>{
+                          Factory<PanGestureRecognizer>(() => PanGestureRecognizer()),
+                          Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
+                          Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
+                          Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
+                        }
+                            : <Factory<OneSequenceGestureRecognizer>>{}.toSet(),
                         initialCameraPosition: _kGooglePlex,
                         zoomControlsEnabled: false,
                         minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
