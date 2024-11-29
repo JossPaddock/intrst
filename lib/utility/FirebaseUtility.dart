@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intrst/utility/FirebaseMappers.dart';
 import '../models/Interest.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
 
 class FirebaseUtility {
   Future<GeoPoint> retrieveUserLocation(
@@ -88,6 +90,10 @@ class FirebaseUtility {
 
   Future<void> addInterestForUser(
       CollectionReference users, Interest interest, String uid) async {
+    if(interest.link != null) {
+      print('isValidWebsite:');
+      print(isValidWebsite(interest.link!!));
+    }
     QuerySnapshot querySnapshot =
         await users.where('user_uid', isEqualTo: uid).get();
     querySnapshot.docs.forEach((doc) async {
@@ -127,6 +133,24 @@ class FirebaseUtility {
         'interests': FieldValue.arrayUnion([newInterestMap])
       });
     }
+  }
+
+  Future<bool> isValidWebsite(String url) async {
+    try {
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://$url';
+      }
+
+      final uri = Uri.parse(url);
+      final response = await http.head(uri);
+
+      if (response.statusCode >= 200 && response.statusCode < 400) {
+        return true;
+      }
+    } catch (e) {
+      print('Error verifying URL: $e');
+    }
+    return false;
   }
 
   Future<void> removeInterest(CollectionReference users, Interest interest, String uid) async {
