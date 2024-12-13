@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
 import 'package:intrst/widgets/Interests.dart';
+import 'package:intrst/widgets/Preview.dart';
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/InterestInputForm.dart';
@@ -122,11 +123,19 @@ class _MyHomePageState extends State<MyHomePage> {
     } else {
       //the following conditions are critical for resetting after search updates
       if (_currentZoom > level) {
-        markers = labelMarkers;
+        setState(() {
+          markers = {};
+          markers = labelMarkers;
+        });
       } else {
-        markers = poiMarkers;
+        setState(() {
+          markers = {};
+          markers = poiMarkers;
+        });
       }
     }
+    print('this is how many markers: ' + markers.length.toString());
+    print(markers);
   }
 
   static const CameraPosition _kGooglePlex = CameraPosition(
@@ -164,6 +173,30 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
   }
 
+  Future<void>? handleMarkerTap(String title, String uid, bool isPoi) {
+    if (_zoomEnabled) {
+      _handleAlternateUserModel(uid, title);
+      print(uid);
+      if (uid == _uid) {
+        //this is the case where you tapped on the signed in users marker
+        _scaffoldKey.currentState?.openEndDrawer();
+        //markers = isPoi ? poiMarkers : labelMarkers;
+        return null;
+      } else {
+        return showDialog<String>(
+            context: context,
+            builder: (BuildContext context) {
+              _zoomEnabled = false;
+              return Preview(uid: uid);
+            }).then((value) {
+          _zoomEnabled = true;
+          markers = isPoi ? poiMarkers : labelMarkers;
+          setState(() {});
+        });
+      }
+    }
+  }
+
   void addMarkers(Set<Marker> markers) {}
 
   void addMarker(String title, double lat, double lng, bool drag,
@@ -178,10 +211,10 @@ class _MyHomePageState extends State<MyHomePage> {
           draggable: drag,
           zIndex: drag ? 10 : 1,
           onTap: () {
-            _handleAlternateUserModel(uid, title);
-            print(uid);
-            _scaffoldKey.currentState?.openEndDrawer();
-          },
+              markers = {};
+              handleMarkerTap(title, uid, true);
+              setState(() {});
+            },
           onDragEnd: (LatLng newPosition) {
             fu.updateUserLocation(
                 FirebaseFirestore.instance.collection('users'),
@@ -216,18 +249,10 @@ class _MyHomePageState extends State<MyHomePage> {
             draggable: drag,
             zIndex: drag ? 10 : 1,
             onTap: () {
-              _handleAlternateUserModel(uid, title);
-              print(uid);
-              try {
-                _scaffoldKey.currentState
-                    ?.openEndDrawer(); //A less elegant but more
-                // expedient solution is assign a GlobalKey to the Scaffold, then
-                // use the key.currentState property to obtain the ScaffoldState
-                // rather than using the Scaffold.of() function.
-              } catch (e) {
-                print('Error on marker tap: $e');
-              }
-            },
+                markers = {};
+                handleMarkerTap(title, uid, false);
+                setState(() {});
+              },
             onDragEnd: (LatLng newPosition) {
               fu.updateUserLocation(
                   FirebaseFirestore.instance.collection('users'),
@@ -506,11 +531,15 @@ class _MyHomePageState extends State<MyHomePage> {
                         zoomGesturesEnabled: _zoomEnabled,
                         gestureRecognizers: _zoomEnabled
                             ? <Factory<OneSequenceGestureRecognizer>>{
-                          Factory<PanGestureRecognizer>(() => PanGestureRecognizer()),
-                          Factory<ScaleGestureRecognizer>(() => ScaleGestureRecognizer()),
-                          Factory<TapGestureRecognizer>(() => TapGestureRecognizer()),
-                          Factory<VerticalDragGestureRecognizer>(() => VerticalDragGestureRecognizer()),
-                        }
+                                Factory<PanGestureRecognizer>(
+                                    () => PanGestureRecognizer()),
+                                Factory<ScaleGestureRecognizer>(
+                                    () => ScaleGestureRecognizer()),
+                                Factory<TapGestureRecognizer>(
+                                    () => TapGestureRecognizer()),
+                                Factory<VerticalDragGestureRecognizer>(
+                                    () => VerticalDragGestureRecognizer()),
+                              }
                             : <Factory<OneSequenceGestureRecognizer>>{}.toSet(),
                         initialCameraPosition: _kGooglePlex,
                         zoomControlsEnabled: false,
@@ -530,7 +559,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           _gotoCurrentUserLocation(false, _signedIn);
                           print('callback is working');
                           setState(() {});
-                          loadMarkers(true);
+                          if (markers.isEmpty) {
+                            loadMarkers(true);
+                          }
                           _controller.complete(controller);
                         },
                       ),
@@ -538,10 +569,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 Interests(name: _name, signedIn: _signedIn),
-                Text(
-                  'Index 2: Replace this text widget with the Button widget',
-                  style: optionStyle,
-                ),
+                Preview(uid: _uid),
                 Text(
                   'Index 3: Replace this text widget with the Messages widget',
                   style: optionStyle,
@@ -696,6 +724,12 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       drawerEdgeDragWidth: 200,
       onEndDrawerChanged: (state) {
+        print('endDrawer is $state');
+        if(state) {
+          markers = {};
+        }else{
+          _onCameraMove(_currentZoom);
+        }
         setState(() {
           _zoomEnabled = !state;
         });

@@ -28,7 +28,7 @@ class InterestInputFormState extends State<InterestInputForm> {
 
   bool hasValidUrl(String value) {
     String pattern =
-        r'^\S*(https:\/\/www\.|http:\/\/www\.|https:\/\/|http:\/\/)?\S[a-zA-Z0-9]{2,}(\.[a-zA-Z0-9]{2,})(\.[a-zA-Z0-9]{2,})?$';
+        r'^\S*(https:\/\/www\.|http:\/\/www\.|https:\/\/|http:\/\/)?\S[a-zA-Z0-9\/\-]{2,}(\.[a-zA-Z0-9\/\-]{2,})(\.[a-zA-Z0-9\/\-]{2,})?$';
     RegExp regExp = RegExp(pattern);
     if (!regExp.hasMatch(value)) {
       return false;

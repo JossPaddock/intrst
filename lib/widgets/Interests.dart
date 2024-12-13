@@ -396,9 +396,19 @@ class _CardListState extends State<CardList>
                                                           oldInterest,
                                                           newInterest,
                                                           widget.uid);
-                                                      _titleControllers[index].text =  _mobileTitleController.text;
-                                                      _subtitleControllers[index].text = _mobileSubtitleController.text;
-                                                      _linkControllers[index].text = _mobileLinkController.text;
+                                                      _titleControllers[index]
+                                                              .text =
+                                                          _mobileTitleController
+                                                              .text;
+                                                      _subtitleControllers[
+                                                                  index]
+                                                              .text =
+                                                          _mobileSubtitleController
+                                                              .text;
+                                                      _linkControllers[index]
+                                                              .text =
+                                                          _mobileLinkController
+                                                              .text;
                                                       Navigator.pop(
                                                           context, 'saving');
                                                     }),
@@ -442,7 +452,7 @@ class _CardListState extends State<CardList>
                                             TextButton(
                                               onPressed: () => Navigator.pop(
                                                   context, 'Never mind'),
-                                              child: const Text('Never mind'),
+                                              child: const Text('Keep'),
                                             ),
                                             TextButton(
                                               onPressed: () {

@@ -1,0 +1,103 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:intrst/utility/FirebaseUtility.dart';
+
+import '../models/Interest.dart';
+
+class Preview extends StatefulWidget {
+  const Preview({
+  super.key,
+  required this.uid,});
+  final String uid;
+
+  @override
+  _InterestAlertDialogState createState() => _InterestAlertDialogState();
+}
+
+class _InterestAlertDialogState extends State<Preview> {
+  List<String> _buttonLabels = [];
+  String _name = '';
+  FirebaseUtility fu = FirebaseUtility();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchNameAndButtonLabels();
+  }
+
+  Future<void> _fetchNameAndButtonLabels() async {
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+    List<Interest> interests = await fu.pullInterestsForUser(users, widget.uid);
+    String name = await fu.lookUpNameByUserUid(users, widget.uid);
+    List<String> labels = interests.map((interest)=>
+    interest.name).toList();
+    setState(() {
+      _buttonLabels = labels;
+      _name = name;});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        side: BorderSide(
+        color: Colors.grey, // Border color
+        width: 1.0, // Border width
+      ),
+    ),
+      title: Text(
+        _name,
+        textAlign: TextAlign.center, // Center the title text
+        style: TextStyle(
+          fontSize: 20, // Adjust font size as needed
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16.0,
+            runSpacing: 8.0,
+            children: _buttonLabels.map((label) {
+              return ElevatedButton(
+                onPressed: () {
+                  // Handle button press
+                  print('Button pressed: $label');
+                  Navigator.pop(context); // Close the dialog
+                },
+                child: Text(label),
+              );
+            }).toList(),
+          ),
+          SizedBox(height: 16.0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Handle chat button press
+                  print('Chat button pressed');
+                  Navigator.pop(context); // Close the dialog
+                },
+                icon: Icon(Icons.chat),
+                label: Text('Chat'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Handle "list all interests" button press
+                  print('List all interests button pressed');
+                  Navigator.pop(context); // Close the dialog
+                },
+                icon: Icon(Icons.add),
+                label: Text('List all interests'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
