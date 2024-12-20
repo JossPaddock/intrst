@@ -8,15 +8,18 @@ import '../models/UserModel.dart';
 
 class Preview extends StatefulWidget {
   const Preview({
-  super.key,
-  required this.uid,
-  required this.scaffoldKey,
-  required this.onItemTapped,
-  required this.signedIn});
+    super.key,
+    required this.uid,
+    required this.scaffoldKey,
+    required this.onItemTapped,
+    required this.signedIn,
+    required this.onDrawerOpened,
+  });
   final String uid;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final void Function(int) onItemTapped;
   final bool signedIn;
+  final VoidCallback onDrawerOpened;
 
   @override
   _InterestAlertDialogState createState() => _InterestAlertDialogState();
@@ -43,11 +46,11 @@ class _InterestAlertDialogState extends State<Preview> {
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<Interest> interests = await fu.pullInterestsForUser(users, widget.uid);
     String name = await fu.lookUpNameByUserUid(users, widget.uid);
-    List<String> labels = interests.map((interest)=>
-    interest.name).toList();
+    List<String> labels = interests.map((interest) => interest.name).toList();
     setState(() {
       _buttonLabels = labels;
-      _name = name;});
+      _name = name;
+    });
   }
 
   @override
@@ -56,10 +59,10 @@ class _InterestAlertDialogState extends State<Preview> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10.0),
         side: BorderSide(
-        color: Colors.grey, // Border color
-        width: 1.0, // Border width
+          color: Colors.grey, // Border color
+          width: 1.0, // Border width
+        ),
       ),
-    ),
       title: Text(
         _name,
         textAlign: TextAlign.center, // Center the title text
@@ -92,10 +95,10 @@ class _InterestAlertDialogState extends State<Preview> {
             children: [
               ElevatedButton.icon(
                 onPressed: () {
-                  if(widget.signedIn) {
+                  if (widget.signedIn) {
                   } else {
                     widget.onItemTapped(1);
-                  }//
+                  } //
                   Navigator.pop(context); // Close the dialog
                 },
                 icon: Icon(Icons.chat),
@@ -103,13 +106,14 @@ class _InterestAlertDialogState extends State<Preview> {
               ),
               ElevatedButton.icon(
                 onPressed: () {
-                  if(widget.signedIn) {
+                  if (widget.signedIn) {
                     _handleAlternateUserModel(widget.uid, _name);
-                  widget.scaffoldKey.currentState?.openEndDrawer();
+                    widget.scaffoldKey.currentState?.openEndDrawer();
+                    widget.onDrawerOpened();
                   } else {
                     widget.onItemTapped(1);
-                  }//
-                  Navigator.pop(context);// Close the dialog
+                    Navigator.of(context).pop(false);
+                  }
                 },
                 icon: Icon(Icons.add),
                 label: Text('List all interests'),

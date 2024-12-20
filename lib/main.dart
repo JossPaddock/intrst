@@ -183,13 +183,23 @@ class _MyHomePageState extends State<MyHomePage> {
         //markers = isPoi ? poiMarkers : labelMarkers;
         return null;
       } else {
-        return showDialog<String>(
+        return showDialog<bool>(
             context: context,
             builder: (BuildContext context) {
               _zoomEnabled = false;
-              return Preview(uid: uid, scaffoldKey: _scaffoldKey, onItemTapped: _onItemTapped, signedIn: _signedIn);
-            }).then((value) {
-          _zoomEnabled = true;
+              return Preview(
+                uid: uid,
+                scaffoldKey: _scaffoldKey,
+                onItemTapped: _onItemTapped,
+                signedIn: _signedIn,
+                onDrawerOpened: () {
+                  Navigator.of(context).pop(true);
+                },
+              );
+            }).then((drawerOpened) {
+          if (drawerOpened != true) {
+            _zoomEnabled = true;
+          }
           markers = isPoi ? poiMarkers : labelMarkers;
           setState(() {});
         });
@@ -260,7 +270,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   GeoPoint(newPosition.latitude, newPosition.longitude));
               loadMarkers(true);
               setState(() {
-                  updateMarkerDragState(uid, false);
+                updateMarkerDragState(uid, false);
               });
             }))
         .then(
@@ -587,7 +597,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 Interests(name: _name, signedIn: _signedIn),
-                Preview(uid: _uid, scaffoldKey:_scaffoldKey, onItemTapped: _onItemTapped, signedIn: _signedIn),
+                Preview(
+                    uid: _uid,
+                    scaffoldKey: _scaffoldKey,
+                    onItemTapped: _onItemTapped,
+                    signedIn: _signedIn, onDrawerOpened: () {  },),
                 Text(
                   'Index 3: Replace this text widget with the Messages widget',
                   style: optionStyle,
