@@ -78,7 +78,7 @@ class _CardListState extends State<CardList>
   @override
   bool get wantKeepAlive => true;
   final FirebaseUtility fu = FirebaseUtility();
-
+  bool draggable = true;
   List<TextEditingController> _titleControllers = [];
   List<TextEditingController> _linkControllers = [];
   List<TextEditingController> _subtitleControllers = [];
@@ -168,8 +168,18 @@ class _CardListState extends State<CardList>
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Center(
-                child: Text(
+              child: Row(
+                children: [
+                Switch(
+                // This bool value toggles the switch.
+                value: draggable,
+                activeColor: Colors.red,
+                onChanged: (bool value) {
+                  // This is called when the user toggles the switch.
+                  setState(() {draggable = value;});
+                },
+              ),
+                  Text(
                   widget.name,
                   style: TextStyle(
                     color: Colors.white,
@@ -177,7 +187,7 @@ class _CardListState extends State<CardList>
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
-                ),
+                )],
               ),
             ),
             ListView.builder(

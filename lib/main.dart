@@ -187,7 +187,7 @@ class _MyHomePageState extends State<MyHomePage> {
             context: context,
             builder: (BuildContext context) {
               _zoomEnabled = false;
-              return Preview(uid: uid);
+              return Preview(uid: uid, scaffoldKey: _scaffoldKey, onItemTapped: _onItemTapped, signedIn: _signedIn);
             }).then((value) {
           _zoomEnabled = true;
           markers = isPoi ? poiMarkers : labelMarkers;
@@ -211,10 +211,10 @@ class _MyHomePageState extends State<MyHomePage> {
           draggable: drag,
           zIndex: drag ? 10 : 1,
           onTap: () {
-              markers = {};
-              handleMarkerTap(title, uid, true);
-              setState(() {});
-            },
+            markers = {};
+            handleMarkerTap(title, uid, true);
+            setState(() {});
+          },
           onDragEnd: (LatLng newPosition) {
             fu.updateUserLocation(
                 FirebaseFirestore.instance.collection('users'),
@@ -249,23 +249,41 @@ class _MyHomePageState extends State<MyHomePage> {
             draggable: drag,
             zIndex: drag ? 10 : 1,
             onTap: () {
-                markers = {};
-                handleMarkerTap(title, uid, false);
-                setState(() {});
-              },
+              markers = {};
+              handleMarkerTap(title, uid, false);
+              setState(() {});
+            },
             onDragEnd: (LatLng newPosition) {
               fu.updateUserLocation(
                   FirebaseFirestore.instance.collection('users'),
                   FirebaseAuth.instance.currentUser!.uid,
                   GeoPoint(newPosition.latitude, newPosition.longitude));
               loadMarkers(true);
-              setState(() {});
+              setState(() {
+                  updateMarkerDragState(uid, false);
+              });
             }))
         .then(
       (value) {
         setState(() {});
       },
     );
+  }
+
+  void updateMarkerDragState(String uid, bool draggable) {
+    poiMarkers = poiMarkers.map((marker) {
+      if (marker.markerId.value == _uid && marker.markerId.value == uid) {
+        marker.copyWith(draggableParam: draggable);
+      }
+      return marker;
+    }).toSet();
+
+    labelMarkers = labelMarkers.map((marker) {
+      if (marker.markerId.value == _uid && marker.markerId.value == uid) {
+        marker.copyWith(draggableParam: draggable);
+      }
+      return marker;
+    }).toSet();
   }
 
   void loadMarkers(bool loadUserMarker) async {
@@ -569,7 +587,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 Interests(name: _name, signedIn: _signedIn),
-                Preview(uid: _uid),
+                Preview(uid: _uid, scaffoldKey:_scaffoldKey, onItemTapped: _onItemTapped, signedIn: _signedIn),
                 Text(
                   'Index 3: Replace this text widget with the Messages widget',
                   style: optionStyle,
@@ -725,9 +743,9 @@ class _MyHomePageState extends State<MyHomePage> {
       drawerEdgeDragWidth: 200,
       onEndDrawerChanged: (state) {
         print('endDrawer is $state');
-        if(state) {
+        if (state) {
           markers = {};
-        }else{
+        } else {
           _onCameraMove(_currentZoom);
         }
         setState(() {

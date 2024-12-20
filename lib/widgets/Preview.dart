@@ -1,14 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:provider/provider.dart';
 
 import '../models/Interest.dart';
+import '../models/UserModel.dart';
 
 class Preview extends StatefulWidget {
   const Preview({
   super.key,
-  required this.uid,});
+  required this.uid,
+  required this.scaffoldKey,
+  required this.onItemTapped,
+  required this.signedIn});
   final String uid;
+  final GlobalKey<ScaffoldState> scaffoldKey;
+  final void Function(int) onItemTapped;
+  final bool signedIn;
 
   @override
   _InterestAlertDialogState createState() => _InterestAlertDialogState();
@@ -23,6 +31,12 @@ class _InterestAlertDialogState extends State<Preview> {
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
+  }
+
+  void _handleAlternateUserModel(String value, String name) {
+    UserModel userModel = Provider.of<UserModel>(context, listen: false);
+    userModel.changeAlternateUid(value);
+    userModel.changeAlternateName(name);
   }
 
   Future<void> _fetchNameAndButtonLabels() async {
@@ -78,8 +92,10 @@ class _InterestAlertDialogState extends State<Preview> {
             children: [
               ElevatedButton.icon(
                 onPressed: () {
-                  // Handle chat button press
-                  print('Chat button pressed');
+                  if(widget.signedIn) {
+                  } else {
+                    widget.onItemTapped(1);
+                  }//
                   Navigator.pop(context); // Close the dialog
                 },
                 icon: Icon(Icons.chat),
@@ -87,9 +103,13 @@ class _InterestAlertDialogState extends State<Preview> {
               ),
               ElevatedButton.icon(
                 onPressed: () {
-                  // Handle "list all interests" button press
-                  print('List all interests button pressed');
-                  Navigator.pop(context); // Close the dialog
+                  if(widget.signedIn) {
+                    _handleAlternateUserModel(widget.uid, _name);
+                  widget.scaffoldKey.currentState?.openEndDrawer();
+                  } else {
+                    widget.onItemTapped(1);
+                  }//
+                  Navigator.pop(context);// Close the dialog
                 },
                 icon: Icon(Icons.add),
                 label: Text('List all interests'),
