@@ -53,6 +53,17 @@ class _InterestAlertDialogState extends State<Preview> {
     });
   }
 
+  void _handlePreviewToInterestsWidgetFlow() {
+    if (widget.signedIn) {
+      _handleAlternateUserModel(widget.uid, _name);
+      widget.scaffoldKey.currentState?.openEndDrawer();
+      widget.onDrawerOpened();
+    } else {
+      widget.onItemTapped(1);
+      Navigator.of(context).pop(false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -81,13 +92,11 @@ class _InterestAlertDialogState extends State<Preview> {
             children: _buttonLabels.map((label) {
               return ElevatedButton(
                 onPressed: () {
-                  // Handle button press
-                  print('Button pressed: $label');
-                  Navigator.pop(context); // Close the dialog
+                  _handlePreviewToInterestsWidgetFlow();
                 },
                 child: Text(label),
               );
-            }).toList(),
+            }).toList().take(5).toList(),
           ),
           SizedBox(height: 16.0),
           Row(
@@ -106,14 +115,7 @@ class _InterestAlertDialogState extends State<Preview> {
               ),
               ElevatedButton.icon(
                 onPressed: () {
-                  if (widget.signedIn) {
-                    _handleAlternateUserModel(widget.uid, _name);
-                    widget.scaffoldKey.currentState?.openEndDrawer();
-                    widget.onDrawerOpened();
-                  } else {
-                    widget.onItemTapped(1);
-                    Navigator.of(context).pop(false);
-                  }
+                  _handlePreviewToInterestsWidgetFlow();
                 },
                 icon: Icon(Icons.add),
                 label: Text('List all interests'),

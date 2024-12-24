@@ -23,6 +23,7 @@ dependencies:
   label_marker: ^1.0.1
   location: ^6.0.2
   http: ^1.2.2
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:
