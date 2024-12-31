@@ -132,6 +132,63 @@ class FirebaseUtility {
       await documentRef.update({
         'interests': FieldValue.arrayUnion([newInterestMap])
       });
+      if(!oldInterest.favorite && newInterest.favorite) {
+        DocumentSnapshot updatedDoc = await documentRef.get();
+        List<dynamic> interests = updatedDoc['interests'];
+        int favoriteCount = interests
+            .where((interest) => interest['favorite'] == true)
+            .length;
+        if(favoriteCount > 5) {
+
+          print('User has more than 5 interests!, attempting to limit favorited interests');
+          limitFavoritedInterests(users, uid, 5);
+        }
+      }
+    }
+  }
+
+  Future<void> limitFavoritedInterests(
+      CollectionReference users, String uid, int maxFavorites) async {
+    print('Checking favorite interests for user with UID: $uid');
+    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
+
+    for (var doc in querySnapshot.docs) {
+      DocumentReference documentRef = FirebaseFirestore.instance.collection('users').doc(doc.id);
+      DocumentSnapshot updatedDoc = await documentRef.get();
+
+      List<dynamic> interests = updatedDoc['interests'];
+
+      List<Map<String, dynamic>> favoriteInterests = interests
+          .where((interest) => interest['favorite'] == true)
+          .cast<Map<String, dynamic>>()
+          .toList();
+
+      // maxFavorites is the limit passed into this method
+      if (favoriteInterests.length > maxFavorites) {
+        print('Too many favorites: ${favoriteInterests.length} (The max defined is: $maxFavorites)');
+
+        // Sort by `favorited_timestamp` in ASCENDING order
+        favoriteInterests.sort((a, b) {
+          DateTime aTimestamp = (a['favorited_timestamp'] as Timestamp).toDate();
+          DateTime bTimestamp = (b['favorited_timestamp'] as Timestamp).toDate();
+          return aTimestamp.compareTo(bTimestamp);
+        });
+
+        // these are the favorites we need to now unfavorite
+        int extraCount = favoriteInterests.length - maxFavorites;
+        List<Map<String, dynamic>> interestsToUnfavorite = favoriteInterests.take(extraCount).toList();
+        for (var interest in interestsToUnfavorite) {
+          await documentRef.update({
+            'interests': FieldValue.arrayRemove([interest]),
+          });
+          interest['favorite'] = false;
+          await documentRef.update({
+            'interests': FieldValue.arrayUnion([interest]),
+          });
+        }
+      } else {
+        print('Favorite interests count is within the limit already (${favoriteInterests.length}).');
+      }
     }
   }
 

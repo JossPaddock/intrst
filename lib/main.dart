@@ -135,7 +135,7 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
     print('this is how many markers: ' + markers.length.toString());
-    print(markers);
+    //print(markers);
   }
 
   static const CameraPosition _kGooglePlex = CameraPosition(
