@@ -86,21 +86,26 @@ class _CardListState extends State<CardList>
   TextEditingController _mobileTitleController = TextEditingController();
   TextEditingController _mobileLinkController = TextEditingController();
   TextEditingController _mobileSubtitleController = TextEditingController();
+  late List<Interest> localInterests = widget.interests;
+
+  Future<List<Interest>> refreshInterestsForUser(String user_uid) async {
+    return Interests(name: widget.name, signedIn: widget.signedIn).fetchSortedInterestsForUser(user_uid);
+  }
 
   @override
   void initState() {
     super.initState();
     _titleControllers = List.generate(
-        widget.interests.length, (index) => TextEditingController());
+        localInterests.length, (index) => TextEditingController());
     _linkControllers = List.generate(
-        widget.interests.length, (index) => TextEditingController());
+        localInterests.length, (index) => TextEditingController());
     _subtitleControllers = List.generate(
-        widget.interests.length, (index) => TextEditingController());
+        localInterests.length, (index) => TextEditingController());
 
-    for (int i = 0; i < widget.interests.length; i++) {
-      _titleControllers[i].text = widget.interests[i].name;
-      _linkControllers[i].text = widget.interests[i].link ?? '';
-      _subtitleControllers[i].text = widget.interests[i].description;
+    for (int i = 0; i < localInterests.length; i++) {
+      _titleControllers[i].text = localInterests[i].name;
+      _linkControllers[i].text = localInterests[i].link ?? '';
+      _subtitleControllers[i].text = localInterests[i].description;
     }
   }
 
@@ -196,9 +201,9 @@ class _CardListState extends State<CardList>
             ListView.builder(
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
-              itemCount: widget.interests.length,
+              itemCount: localInterests.length,
               itemBuilder: (context, index) {
-                Interest interest = widget.interests[index];
+                Interest interest = localInterests[index];
                 String interestId =
                     interest.name; // Or a unique ID for the interest
                 bool toggle = userModel.getToggle(interestId);
@@ -269,10 +274,15 @@ class _CardListState extends State<CardList>
                                       Interest newInterest = interest.copyWith(
                                           favorite: !interest.favorite,
                                           favorited_timestamp: favorited ? DateTime.now(): interest.favorited_timestamp);
+                                      setState(() {
+                                        localInterests[index] = newInterest;
+                                      });
                                       await fu.updateEditedInterest(users, interest,
                                           newInterest, widget.uid);
+                                      List<Interest> updatedInterests = await refreshInterestsForUser(widget.uid);
                                       setState(() {
-                                        widget.interests[index] = newInterest;
+                                        //localInterests[index] = newInterest;
+                                        localInterests = updatedInterests;
                                       });
                                     }),
                               IconButton(
@@ -293,11 +303,12 @@ class _CardListState extends State<CardList>
                                             interest.created_timestamp,
                                         updated_timestamp: DateTime.now(),
                                       );
-                                      setState(() {
-                                        widget.interests[index] = newInterest;
-                                      });
-                                      fu.updateEditedInterest(users, interest,
+                                      await fu.updateEditedInterest(users, interest,
                                           newInterest, widget.uid);
+                                      setState(() {
+                                        localInterests[index] = newInterest;
+                                      });
+
                                     }
                                     updateToggles(interestId, !toggle);
                                   } else {
@@ -411,7 +422,7 @@ class _CardListState extends State<CardList>
                                     //await Future.delayed(Duration(milliseconds: 1000));
                                     setState(() {
                                       if (!editCancelled) {
-                                        widget.interests[index] =
+                                        localInterests[index] =
                                             dialogueInterest;
                                       }
                                     });
@@ -459,7 +470,7 @@ class _CardListState extends State<CardList>
                                                 fu.removeInterest(users,
                                                     oldInterest, widget.uid);
                                                 setState(() {
-                                                  widget.interests
+                                                  localInterests
                                                       .removeAt(index);
                                                 });
                                                 Navigator.pop(

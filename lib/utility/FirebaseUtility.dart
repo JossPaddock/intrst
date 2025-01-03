@@ -141,7 +141,7 @@ class FirebaseUtility {
         if(favoriteCount > 5) {
 
           print('User has more than 5 interests!, attempting to limit favorited interests');
-          limitFavoritedInterests(users, uid, 5);
+          await limitFavoritedInterests(users, uid, 5);
         }
       }
     }
