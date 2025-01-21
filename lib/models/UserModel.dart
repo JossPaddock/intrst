@@ -9,6 +9,7 @@ class UserModel extends ChangeNotifier {
   String get currentUid => _uid;
   Map<String, bool> _editToggles = {};
   Map<String, bool> get editToggles => _editToggles;
+  bool draggability = false;
   bool getToggle(String interestId) {
     return _editToggles[interestId] ?? false;
   }
@@ -28,5 +29,8 @@ class UserModel extends ChangeNotifier {
   }
   void notify() {
     notifyListeners();
+  }
+  void changeDraggability(bool value) {
+    draggability = value;
   }
 }

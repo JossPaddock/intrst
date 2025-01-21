@@ -71,6 +71,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Set<Marker> poiMarkers = {};
   Set<Marker> markers = {};
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
+  late bool lastKnownDraggabilityState;
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
@@ -168,6 +169,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _mapStyleString = string;
     });
     setState(() {
+      lastKnownDraggabilityState = _retrieveDraggabilityUserModel();
       markers = poiMarkers;
     });
     super.initState();
@@ -210,7 +212,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void addMarkers(Set<Marker> markers) {}
 
   void addMarker(String title, double lat, double lng, bool drag,
-      BitmapDescriptor poi, String uid) {
+      BitmapDescriptor poi, String uid, bool user) {
     setState(() {
       poiMarkers.add(Marker(
           icon: poi,
@@ -225,19 +227,18 @@ class _MyHomePageState extends State<MyHomePage> {
             handleMarkerTap(title, uid, true);
             setState(() {});
           },
-          onDragEnd: (LatLng newPosition) {
+          onDragEnd: (LatLng newPosition) async {
             fu.updateUserLocation(
                 FirebaseFirestore.instance.collection('users'),
                 FirebaseAuth.instance.currentUser!.uid,
                 GeoPoint(newPosition.latitude, newPosition.longitude));
-            loadMarkers(true);
+            await loadMarkers(true);
             //
-            setState(() {});
           }));
     });
 
     var color = Colors.white;
-    if (drag) {
+    if (user) {
       color = Color(0xFFff673a);
     }
 
@@ -263,15 +264,12 @@ class _MyHomePageState extends State<MyHomePage> {
               handleMarkerTap(title, uid, false);
               setState(() {});
             },
-            onDragEnd: (LatLng newPosition) {
+            onDragEnd: (LatLng newPosition) async {
               fu.updateUserLocation(
                   FirebaseFirestore.instance.collection('users'),
                   FirebaseAuth.instance.currentUser!.uid,
                   GeoPoint(newPosition.latitude, newPosition.longitude));
-              loadMarkers(true);
-              setState(() {
-                updateMarkerDragState(uid, false);
-              });
+              await loadMarkers(true);
             }))
         .then(
       (value) {
@@ -280,25 +278,14 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void updateMarkerDragState(String uid, bool draggable) {
-    poiMarkers = poiMarkers.map((marker) {
-      if (marker.markerId.value == _uid && marker.markerId.value == uid) {
-        marker.copyWith(draggableParam: draggable);
-      }
-      return marker;
-    }).toSet();
-
-    labelMarkers = labelMarkers.map((marker) {
-      if (marker.markerId.value == _uid && marker.markerId.value == uid) {
-        marker.copyWith(draggableParam: draggable);
-      }
-      return marker;
-    }).toSet();
-  }
-
-  void loadMarkers(bool loadUserMarker) async {
+  Future<bool> loadMarkers(bool loadUserMarker) async {
     //Call this if your are dragging the marker!!
     await Future.delayed(Duration(milliseconds: 1500));
+    setState(() {
+      //markers = {};
+      labelMarkers = {};
+      poiMarkers = {};
+    });
     Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
     poi = await BitmapDescriptor.bytes(imageData,
         width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
@@ -311,18 +298,26 @@ class _MyHomePageState extends State<MyHomePage> {
       var signedInUserMarkerData =
           await fu.lookUpNameAndLocationByUserUid(users, _uid);
       //This is where we load the signed in users marker
-      addMarker(signedInUserMarkerData[0], signedInUserMarkerData[1],
-          signedInUserMarkerData[2], true, poio, _uid);
+      addMarker(
+          signedInUserMarkerData[0],
+          signedInUserMarkerData[1],
+          signedInUserMarkerData[2],
+          _retrieveDraggabilityUserModel(),
+          poio,
+          _uid,
+          true);
     }
     print('loadMarkers is working');
     var uids = await fu.retrieveAllUserUid(users);
     uids.forEach((uid) async {
       var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
       if (uid != _uid) {
-        addMarker(markerData[0], markerData[1], markerData[2], false, poi, uid);
+        addMarker(markerData[0], markerData[1], markerData[2], false, poi, uid,
+            false);
       }
     });
     setState(() {});
+    return loadUserMarker;
   }
 
   //Make marker loading more reliable (work on first load)
@@ -405,7 +400,7 @@ class _MyHomePageState extends State<MyHomePage> {
         target: LatLng(locationData.latitude! + randomNumber1,
             locationData.longitude! + randomNumber2),
         zoom: 12);
-    loadMarkers(loadUserMarker);
+    await loadMarkers(loadUserMarker);
     controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
   }
 
@@ -442,6 +437,18 @@ class _MyHomePageState extends State<MyHomePage> {
   void _handleUserModel(String value) {
     UserModel userModel = Provider.of<UserModel>(context, listen: false);
     userModel.changeUid(value);
+  }
+
+  bool _retrieveDraggabilityUserModel() {
+    UserModel userModel = Provider.of<UserModel>(context, listen: false);
+    return userModel.draggability;
+  }
+
+  Future<void> _setDraggabilityUserModel(bool value) async {
+    UserModel userModel = Provider.of<UserModel>(context, listen: false);
+    print('Changing draggability $value');
+    userModel.changeDraggability(value);
+    await loadMarkers(true);
   }
 
   void _handleAlternateUserModel(String value, String name) {
@@ -508,7 +515,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   List<String> results =
                       await fu.searchForPeopleAndInterests(users, value);
                   print('these are the results of the search $results');
-                  setState(() {
+                  setState(() async {
                     // Update search results based on the value
                     print('before values');
                     for (var item in markers) {
@@ -522,7 +529,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     for (var item in markers) {
                       print(item.markerId);
                     }
-                    loadMarkers(_signedIn);
+                    await loadMarkers(_signedIn);
                     if (value == "" || value == " ") {
                       _onCameraMove(_currentZoom);
                     }
@@ -530,6 +537,19 @@ class _MyHomePageState extends State<MyHomePage> {
                 },
               ),
             ),
+          ),
+          Spacer(),
+          Switch(
+            // This bool value toggles the switch.
+            value: _retrieveDraggabilityUserModel(),
+            activeColor: Colors.red,
+            onChanged: (bool value) {
+              // This is called when the user toggles the switch.
+              _setDraggabilityUserModel(value);
+              setState(() {
+                //draggabilityStatus = value? 'Your marker is draggable' : 'Your marker is not draggable';
+              });
+            },
           ),
           Spacer(),
           Builder(
@@ -574,6 +594,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
                         markers: markers,
                         onMapCreated: (GoogleMapController controller) async {
+                          double zoom = await controller.getZoomLevel();
+                          _currentZoom = zoom;
                           print('onMapCreated is running');
                           if (_controller.isCompleted) {
                             _controller = Completer();
@@ -588,7 +610,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           print('callback is working');
                           setState(() {});
                           if (markers.isEmpty) {
-                            loadMarkers(true);
+                            print('markers is empty attempting to load markers now');
+                            await loadMarkers(true);
                           }
                           _controller.complete(controller);
                         },
@@ -596,12 +619,18 @@ class _MyHomePageState extends State<MyHomePage> {
                     ],
                   ),
                 ),
-                Interests(name: _name, signedIn: _signedIn),
+                Interests(
+                  name: _name,
+                  scaffoldKey: _scaffoldKey,
+                  signedIn: _signedIn,
+                ),
                 Preview(
-                    uid: _uid,
-                    scaffoldKey: _scaffoldKey,
-                    onItemTapped: _onItemTapped,
-                    signedIn: _signedIn, onDrawerOpened: () {  },),
+                  uid: _uid,
+                  scaffoldKey: _scaffoldKey,
+                  onItemTapped: _onItemTapped,
+                  signedIn: _signedIn,
+                  onDrawerOpened: () {},
+                ),
                 Text(
                   'Index 3: Replace this text widget with the Messages widget',
                   style: optionStyle,
@@ -623,6 +652,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
                   markers: markers,
                   onMapCreated: (GoogleMapController controller) async {
+                    double zoom = await controller.getZoomLevel();
+                    _currentZoom = zoom;
                     print('onMapCreated is running');
                     if (_controllerSignedOut.isCompleted) {
                       _controllerSignedOut = Completer();
@@ -635,7 +666,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     print('callback is working');
                     setState(() {});
                     print(markers.length);
-                    loadMarkers(false);
+                    await loadMarkers(false);
                     //await Future.delayed(Duration(milliseconds: 1000));
                     print(markers.length);
                     _controllerSignedOut.complete(controller);
@@ -750,16 +781,25 @@ class _MyHomePageState extends State<MyHomePage> {
       endDrawer: SizedBox(
         width: MediaQuery.of(context).size.width * 1, //<-- SEE HERE
         child: Container(
-          child: Interests(name: _name, signedIn: _signedIn),
           alignment: Alignment.topCenter,
+          child: Interests(
+            name: _name,
+            scaffoldKey: _scaffoldKey,
+            signedIn: _signedIn,
+          ),
         ),
       ),
       drawerEdgeDragWidth: 200,
-      onEndDrawerChanged: (state) {
+      onEndDrawerChanged: (state) async {
         print('endDrawer is $state');
         if (state) {
           markers = {};
         } else {
+          //await loadMarkers(true);
+          if (_retrieveDraggabilityUserModel() != lastKnownDraggabilityState) {
+            //await loadMarkers(true);
+            lastKnownDraggabilityState = _retrieveDraggabilityUserModel();
+          }
           _onCameraMove(_currentZoom);
         }
         setState(() {
