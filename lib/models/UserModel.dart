@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 class UserModel extends ChangeNotifier {
+
+  static final UserModel _instance = UserModel._internal();
+  factory UserModel() => _instance;
+  UserModel._internal();
+
   String _uid = '';
   String _alternateUid = '';
   String _alternateName = '';
@@ -31,6 +36,7 @@ class UserModel extends ChangeNotifier {
     notifyListeners();
   }
   void changeDraggability(bool value) {
+    print('Changing draggability to $value');
     draggability = value;
   }
 }

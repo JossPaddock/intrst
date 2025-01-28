@@ -18,14 +18,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:label_marker/label_marker.dart';
 import 'package:location/location.dart';
+import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 
 //import is for google maps
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => UserModel(),
+    ChangeNotifierProvider<UserModel>.value(
+      value: UserModel(),
       child: const MyApp(),
     ),
   );
@@ -72,6 +73,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Set<Marker> markers = {};
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   late bool lastKnownDraggabilityState;
+  bool _isLoading = false;
+  int toggleIndex = 0;
+  bool mapOptionsVisibility = false;
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
@@ -435,26 +439,21 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _handleUserModel(String value) {
-    UserModel userModel = Provider.of<UserModel>(context, listen: false);
-    userModel.changeUid(value);
+    UserModel().changeUid(value);
   }
 
   bool _retrieveDraggabilityUserModel() {
-    UserModel userModel = Provider.of<UserModel>(context, listen: false);
-    return userModel.draggability;
+    return UserModel().draggability;
   }
 
   Future<void> _setDraggabilityUserModel(bool value) async {
-    UserModel userModel = Provider.of<UserModel>(context, listen: false);
     print('Changing draggability $value');
-    userModel.changeDraggability(value);
-    await loadMarkers(true);
+    UserModel().changeDraggability(value);
   }
 
   void _handleAlternateUserModel(String value, String name) {
-    UserModel userModel = Provider.of<UserModel>(context, listen: false);
-    userModel.changeAlternateUid(value);
-    userModel.changeAlternateName(name);
+    UserModel().changeAlternateUid(value);
+    UserModel().changeAlternateName(name);
   }
 
   void _onItemTapped(int index) {
@@ -463,8 +462,37 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void _showLoadingIndicator() {
+    setState(() {
+      _isLoading = true;
+    });
+    Future.delayed(Duration(seconds: 5), () {
+      setState(() {
+        _isLoading = false;
+      });
+    });
+  }
+
   static const TextStyle optionStyle =
       TextStyle(fontSize: 30, fontWeight: FontWeight.bold);
+
+  Widget rollingIconBuilder(int? value, bool foreground) {
+    return Icon(iconDataByValue(value));
+  }
+
+  Widget iconBuilder(int value) {
+    return rollingIconBuilder(value, false);
+  }
+
+  IconData iconDataByValue(int? value) => switch (value) {
+        0 => Icons.disabled_by_default,
+        _ => Icons.swipe,
+      };
+
+  Widget sizeIconBuilder(BuildContext context,
+      AnimatedToggleProperties<int> local, GlobalToggleProperties<int> global) {
+    return iconBuilder(local.value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -539,19 +567,6 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           ),
           Spacer(),
-          Switch(
-            // This bool value toggles the switch.
-            value: _retrieveDraggabilityUserModel(),
-            activeColor: Colors.red,
-            onChanged: (bool value) {
-              // This is called when the user toggles the switch.
-              _setDraggabilityUserModel(value);
-              setState(() {
-                //draggabilityStatus = value? 'Your marker is draggable' : 'Your marker is not draggable';
-              });
-            },
-          ),
-          Spacer(),
           Builder(
             builder: (context) => IconButton(
               icon: Image.asset('assets/poio.png'),
@@ -566,121 +581,192 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
       body: Center(
-        child: _signedIn // _signedInGoogleMap
-            ? <Widget>[
-                Scaffold(
-                  body: Stack(
-                    children: <Widget>[
-                      GoogleMap(
-                        onCameraMove: (CameraPosition cameraPosition) {
-                          _onCameraMove(cameraPosition.zoom);
-                        },
-                        //cloudMapId: mapId, // Set the map style ID here
-                        zoomGesturesEnabled: _zoomEnabled,
-                        gestureRecognizers: _zoomEnabled
-                            ? <Factory<OneSequenceGestureRecognizer>>{
-                                Factory<PanGestureRecognizer>(
-                                    () => PanGestureRecognizer()),
-                                Factory<ScaleGestureRecognizer>(
-                                    () => ScaleGestureRecognizer()),
-                                Factory<TapGestureRecognizer>(
-                                    () => TapGestureRecognizer()),
-                                Factory<VerticalDragGestureRecognizer>(
-                                    () => VerticalDragGestureRecognizer()),
-                              }
-                            : <Factory<OneSequenceGestureRecognizer>>{}.toSet(),
-                        initialCameraPosition: _kGooglePlex,
-                        zoomControlsEnabled: false,
-                        minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
-                        markers: markers,
-                        onMapCreated: (GoogleMapController controller) async {
-                          double zoom = await controller.getZoomLevel();
-                          _currentZoom = zoom;
-                          print('onMapCreated is running');
-                          if (_controller.isCompleted) {
-                            _controller = Completer();
-                          }
-                          //await Future.delayed(Duration(milliseconds: 10000));
-                          _controller.future.then((value) {
-                            value.setMapStyle(_mapStyleString);
-                          });
-                          print('mapStyle should be set');
-                          _getLocationServiceAndPermission(_controller);
-                          _gotoCurrentUserLocation(false, _signedIn);
-                          print('callback is working');
-                          setState(() {});
-                          if (markers.isEmpty) {
-                            print('markers is empty attempting to load markers now');
-                            await loadMarkers(true);
-                          }
-                          _controller.complete(controller);
-                        },
+        child: _isLoading
+            ? Container(
+                color: Colors.black.withOpacity(0.5),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(
+                        height: 10,
                       ),
+                      Text(
+                        'Changing draggability',
+                        style: TextStyle(color: Colors.white, fontSize: 20),
+                      )
                     ],
                   ),
                 ),
-                Interests(
-                  name: _name,
-                  scaffoldKey: _scaffoldKey,
-                  signedIn: _signedIn,
-                ),
-                Preview(
-                  uid: _uid,
-                  scaffoldKey: _scaffoldKey,
-                  onItemTapped: _onItemTapped,
-                  signedIn: _signedIn,
-                  onDrawerOpened: () {},
-                ),
-                Text(
-                  'Index 3: Replace this text widget with the Messages widget',
-                  style: optionStyle,
-                ),
-                Text(
-                  'Index 4: Replace this text widget with the Sign Out widget',
-                  style: optionStyle,
-                ),
-              ][_selectedIndex]
-            : <Widget>[
-                GoogleMap(
-                  onCameraMove: (CameraPosition cameraPosition) {
-                    _onCameraMove(cameraPosition.zoom);
-                  },
-                  //cloudMapId: mapId, // Set the map style ID here
-                  zoomGesturesEnabled: _zoomEnabled,
-                  initialCameraPosition: _kGooglePlex,
-                  zoomControlsEnabled: false,
-                  minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
-                  markers: markers,
-                  onMapCreated: (GoogleMapController controller) async {
-                    double zoom = await controller.getZoomLevel();
-                    _currentZoom = zoom;
-                    print('onMapCreated is running');
-                    if (_controllerSignedOut.isCompleted) {
-                      _controllerSignedOut = Completer();
-                    }
+              )
+            : _signedIn // _signedInGoogleMap
+                ? <Widget>[
+                    Scaffold(
+                      body: Stack(
+                        children: <Widget>[
+                          GoogleMap(
+                            onCameraMove: (CameraPosition cameraPosition) {
+                              _onCameraMove(cameraPosition.zoom);
+                            },
+                            //cloudMapId: mapId, // Set the map style ID here
+                            zoomGesturesEnabled: _zoomEnabled,
+                            gestureRecognizers: _zoomEnabled
+                                ? <Factory<OneSequenceGestureRecognizer>>{
+                                    Factory<PanGestureRecognizer>(
+                                        () => PanGestureRecognizer()),
+                                    Factory<ScaleGestureRecognizer>(
+                                        () => ScaleGestureRecognizer()),
+                                    Factory<TapGestureRecognizer>(
+                                        () => TapGestureRecognizer()),
+                                    Factory<VerticalDragGestureRecognizer>(
+                                        () => VerticalDragGestureRecognizer()),
+                                  }
+                                : <Factory<OneSequenceGestureRecognizer>>{}
+                                    .toSet(),
+                            initialCameraPosition: _kGooglePlex,
+                            zoomControlsEnabled: false,
+                            minMaxZoomPreference:
+                                MinMaxZoomPreference(3.0, 900.0),
+                            markers: markers,
+                            onMapCreated:
+                                (GoogleMapController controller) async {
+                              double zoom = await controller.getZoomLevel();
+                              _currentZoom = zoom;
+                              print('onMapCreated is running');
+                              if (_controller.isCompleted) {
+                                _controller = Completer();
+                              }
+                              //await Future.delayed(Duration(milliseconds: 10000));
+                              _controller.future.then((value) {
+                                value.setMapStyle(_mapStyleString);
+                              });
+                              print('mapStyle should be set');
+                              _getLocationServiceAndPermission(_controller);
+                              _gotoCurrentUserLocation(false, _signedIn);
+                              print('callback is working');
+                              setState(() {});
+                              if (markers.isEmpty) {
+                                print(
+                                    'markers is empty attempting to load markers now');
+                                await loadMarkers(true);
+                              }
+                              _controller.complete(controller);
+                            },
+                          ),
+                          Positioned(
+                            top: 5,
+                            right: 5,
+                            child: FloatingActionButton(
+                              onPressed: () {
+                                setState(() {
+                                  mapOptionsVisibility = !mapOptionsVisibility;
+                                });
+                              },
+                              child: Icon(Icons.location_on),
+                              backgroundColor: Colors.blue,
+                            ),
+                          ),
+                          Visibility(
+                            visible: mapOptionsVisibility,
+                            child: Positioned(
+                              top: 60,
+                              right: 5,
+                              child: Container(
+                                padding: EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                    color: Colors.cyan,
+                                    borderRadius: BorderRadius.circular(5)),
+                                child: SizedBox(
+                                  height: 50,
+                                  width: 100,
+                                  child: AnimatedToggleSwitch<int>.rolling(
+                                    current: toggleIndex,
+                                    values: [0, 1],
+                                    onChanged: (i) async {
+                                      print(toggleIndex);
+                                      setState(() => toggleIndex = i);
+                                      bool choice = (i == 1);
+                                      _setDraggabilityUserModel(choice);
+                                      await loadMarkers(true);
+                                      _onCameraMove(_currentZoom);
+                                      setState(() => toggleIndex = i);
+                                      print(toggleIndex);
+                                    },
+                                    //loading: false, // for deactivating loading animation
+                                    iconBuilder: rollingIconBuilder,
+                                    style: ToggleStyle(),
+                                    height: 50,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Interests(
+                      name: _name,
+                      scaffoldKey: _scaffoldKey,
+                      signedIn: _signedIn,
+                    ),
+                    Preview(
+                      uid: _uid,
+                      scaffoldKey: _scaffoldKey,
+                      onItemTapped: _onItemTapped,
+                      signedIn: _signedIn,
+                      onDrawerOpened: () {},
+                    ),
+                    Text(
+                      'Index 3: Replace this text widget with the Messages widget',
+                      style: optionStyle,
+                    ),
+                    Text(
+                      'Index 4: Replace this text widget with the Sign Out widget',
+                      style: optionStyle,
+                    ),
+                  ][_selectedIndex]
+                : <Widget>[
+                    GoogleMap(
+                      onCameraMove: (CameraPosition cameraPosition) {
+                        _onCameraMove(cameraPosition.zoom);
+                      },
+                      //cloudMapId: mapId, // Set the map style ID here
+                      zoomGesturesEnabled: _zoomEnabled,
+                      initialCameraPosition: _kGooglePlex,
+                      zoomControlsEnabled: false,
+                      minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+                      markers: markers,
+                      onMapCreated: (GoogleMapController controller) async {
+                        double zoom = await controller.getZoomLevel();
+                        _currentZoom = zoom;
+                        print('onMapCreated is running');
+                        if (_controllerSignedOut.isCompleted) {
+                          _controllerSignedOut = Completer();
+                        }
 
-                    _controllerSignedOut.future.then((value) {
-                      value.setMapStyle(_mapStyleString);
-                    });
-                    print('mapStyle should be set');
-                    print('callback is working');
-                    setState(() {});
-                    print(markers.length);
-                    await loadMarkers(false);
-                    //await Future.delayed(Duration(milliseconds: 1000));
-                    print(markers.length);
-                    _controllerSignedOut.complete(controller);
-                    setState(() {});
-                  },
-                ),
-                LoginScreen(
-                  signedIn: _signedIn,
-                  onSignInChanged: _handleSignInChanged,
-                  onSelectedIndexChanged: _onItemTapped,
-                  onNameChanged: _handleNameChanged,
-                  onUidChanged: _handleUidChanged,
-                ),
-              ][_selectedIndex],
+                        _controllerSignedOut.future.then((value) {
+                          value.setMapStyle(_mapStyleString);
+                        });
+                        print('mapStyle should be set');
+                        print('callback is working');
+                        setState(() {});
+                        print(markers.length);
+                        await loadMarkers(false);
+                        //await Future.delayed(Duration(milliseconds: 1000));
+                        print(markers.length);
+                        _controllerSignedOut.complete(controller);
+                        setState(() {});
+                      },
+                    ),
+                    LoginScreen(
+                      signedIn: _signedIn,
+                      onSignInChanged: _handleSignInChanged,
+                      onSelectedIndexChanged: _onItemTapped,
+                      onNameChanged: _handleNameChanged,
+                      onUidChanged: _handleUidChanged,
+                    ),
+                  ][_selectedIndex],
       ),
       drawer: Drawer(
         child: _signedIn

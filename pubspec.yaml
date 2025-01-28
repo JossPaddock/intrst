@@ -24,6 +24,7 @@ dependencies:
   location: ^6.0.2
   http: ^1.2.2
   uuid: ^4.5.1
+  animated_toggle_switch: ^0.8.4
 
 dev_dependencies:
   flutter_test:
