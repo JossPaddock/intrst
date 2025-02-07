@@ -497,6 +497,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+    double mapHeight = mapOptionsVisibility ? screenHeight - 200 : screenHeight;
     return Scaffold(
       drawerEnableOpenDragGesture: false,
       endDrawerEnableOpenDragGesture: false,
@@ -603,82 +605,84 @@ class _MyHomePageState extends State<MyHomePage> {
             : _signedIn // _signedInGoogleMap
                 ? <Widget>[
                     Scaffold(
-                      body: Stack(
+                      floatingActionButton: FloatingActionButton(
+                        onPressed: () {
+                          setState(() {
+                            _zoomEnabled = false;
+                            mapOptionsVisibility = !mapOptionsVisibility;
+                          });
+                        },
+                        child: Icon(Icons.location_on),
+                        backgroundColor: Colors.blue,
+                      ),
+                      body: Column(
                         children: <Widget>[
-                          GoogleMap(
-                            onCameraMove: (CameraPosition cameraPosition) {
-                              _onCameraMove(cameraPosition.zoom);
-                            },
-                            //cloudMapId: mapId, // Set the map style ID here
-                            zoomGesturesEnabled: _zoomEnabled,
-                            gestureRecognizers: _zoomEnabled
-                                ? <Factory<OneSequenceGestureRecognizer>>{
-                                    Factory<PanGestureRecognizer>(
-                                        () => PanGestureRecognizer()),
-                                    Factory<ScaleGestureRecognizer>(
-                                        () => ScaleGestureRecognizer()),
-                                    Factory<TapGestureRecognizer>(
-                                        () => TapGestureRecognizer()),
-                                    Factory<VerticalDragGestureRecognizer>(
-                                        () => VerticalDragGestureRecognizer()),
-                                  }
-                                : <Factory<OneSequenceGestureRecognizer>>{}
-                                    .toSet(),
-                            initialCameraPosition: _kGooglePlex,
-                            zoomControlsEnabled: false,
-                            minMaxZoomPreference:
-                                MinMaxZoomPreference(3.0, 900.0),
-                            markers: markers,
-                            onMapCreated:
-                                (GoogleMapController controller) async {
-                              double zoom = await controller.getZoomLevel();
-                              _currentZoom = zoom;
-                              print('onMapCreated is running');
-                              if (_controller.isCompleted) {
-                                _controller = Completer();
-                              }
-                              //await Future.delayed(Duration(milliseconds: 10000));
-                              _controller.future.then((value) {
-                                value.setMapStyle(_mapStyleString);
-                              });
-                              print('mapStyle should be set');
-                              _getLocationServiceAndPermission(_controller);
-                              _gotoCurrentUserLocation(false, _signedIn);
-                              print('callback is working');
-                              setState(() {});
-                              if (markers.isEmpty) {
-                                print(
-                                    'markers is empty attempting to load markers now');
-                                await loadMarkers(true);
-                              }
-                              _controller.complete(controller);
-                            },
-                          ),
-                          Positioned(
-                            top: 5,
-                            right: 5,
-                            child: FloatingActionButton(
-                              onPressed: () {
-                                setState(() {
-                                  mapOptionsVisibility = !mapOptionsVisibility;
-                                });
+                          Expanded(
+                            child: GoogleMap(
+                              onCameraMove: (CameraPosition cameraPosition) {
+                                _onCameraMove(cameraPosition.zoom);
                               },
-                              child: Icon(Icons.location_on),
-                              backgroundColor: Colors.blue,
+                              //cloudMapId: mapId, // Set the map style ID here
+                              zoomGesturesEnabled: _zoomEnabled,
+                              gestureRecognizers: _zoomEnabled
+                                  ? <Factory<OneSequenceGestureRecognizer>>{
+                                      Factory<PanGestureRecognizer>(
+                                          () => PanGestureRecognizer()),
+                                      Factory<ScaleGestureRecognizer>(
+                                          () => ScaleGestureRecognizer()),
+                                      Factory<TapGestureRecognizer>(
+                                          () => TapGestureRecognizer()),
+                                      Factory<VerticalDragGestureRecognizer>(
+                                          () =>
+                                              VerticalDragGestureRecognizer()),
+                                    }
+                                  : <Factory<OneSequenceGestureRecognizer>>{}
+                                      .toSet(),
+                              initialCameraPosition: _kGooglePlex,
+                              zoomControlsEnabled: false,
+                              minMaxZoomPreference:
+                                  MinMaxZoomPreference(3.0, 900.0),
+                              markers: markers,
+                              onMapCreated:
+                                  (GoogleMapController controller) async {
+                                double zoom = await controller.getZoomLevel();
+                                _currentZoom = zoom;
+                                print('onMapCreated is running');
+                                if (_controller.isCompleted) {
+                                  _controller = Completer();
+                                }
+                                //await Future.delayed(Duration(milliseconds: 10000));
+                                _controller.future.then((value) {
+                                  value.setMapStyle(_mapStyleString);
+                                });
+                                print('mapStyle should be set');
+                                _getLocationServiceAndPermission(_controller);
+                                _gotoCurrentUserLocation(false, _signedIn);
+                                print('callback is working');
+                                setState(() {});
+                                if (markers.isEmpty) {
+                                  print(
+                                      'markers is empty attempting to load markers now');
+                                  await loadMarkers(true);
+                                }
+                                _controller.complete(controller);
+                              },
                             ),
                           ),
-                          Visibility(
-                            visible: mapOptionsVisibility,
-                            child: Positioned(
-                              top: 60,
-                              right: 5,
+                          //Visibility(
+                          //visible: mapOptionsVisibility,
+                          //child:
+                          if (mapOptionsVisibility)
+                            Positioned(
+                              bottom: 0,
+                              right: 61,
                               child: Container(
                                 padding: EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                    color: Colors.cyan,
-                                    borderRadius: BorderRadius.circular(5)),
+                                    color: Colors.blue,
+                                    borderRadius: BorderRadius.circular(8)),
                                 child: SizedBox(
-                                  height: 50,
+                                  height: 40,
                                   width: 100,
                                   child: AnimatedToggleSwitch<int>.rolling(
                                     current: toggleIndex,
@@ -692,6 +696,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _onCameraMove(_currentZoom);
                                       setState(() => toggleIndex = i);
                                       print(toggleIndex);
+                                      setState(() {
+                                        _zoomEnabled = true;
+                                        mapOptionsVisibility = false;
+                                      });
                                     },
                                     //loading: false, // for deactivating loading animation
                                     iconBuilder: rollingIconBuilder,
@@ -701,7 +709,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                               ),
                             ),
-                          ),
+                          // ),
                         ],
                       ),
                     ),
