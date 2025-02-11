@@ -139,8 +139,6 @@ class _MyHomePageState extends State<MyHomePage> {
         });
       }
     }
-    print('this is how many markers: ' + markers.length.toString());
-    //print(markers);
   }
 
   static const CameraPosition _kGooglePlex = CameraPosition(
@@ -617,7 +615,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       body: Column(
                         children: <Widget>[
-                          Expanded(
+                          Flexible(
                             child: GoogleMap(
                               onCameraMove: (CameraPosition cameraPosition) {
                                 _onCameraMove(cameraPosition.zoom);
