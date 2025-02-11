@@ -495,14 +495,15 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    double screenHeight = MediaQuery.of(context).size.height;
-    double mapHeight = mapOptionsVisibility ? screenHeight - 200 : screenHeight;
+    double mapHeight = MediaQuery.of(context).size.height;
+    double toolbarHeight = 56;
     return Scaffold(
       drawerEnableOpenDragGesture: false,
       endDrawerEnableOpenDragGesture: false,
       resizeToAvoidBottomInset: false,
       key: _scaffoldKey,
       appBar: AppBar(
+        toolbarHeight: toolbarHeight,
         leading: Builder(
           builder: (BuildContext context) {
             return IconButton(
@@ -615,7 +616,8 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       body: Column(
                         children: <Widget>[
-                          Flexible(
+                          Container(
+                            height: mapOptionsVisibility ? mapHeight - toolbarHeight - 60 : mapHeight - toolbarHeight,
                             child: GoogleMap(
                               onCameraMove: (CameraPosition cameraPosition) {
                                 _onCameraMove(cameraPosition.zoom);
@@ -670,10 +672,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           //Visibility(
                           //visible: mapOptionsVisibility,
                           //child:
-                          if (mapOptionsVisibility)
-                            Positioned(
-                              bottom: 0,
-                              right: 61,
+                            Visibility(
+                              visible: mapOptionsVisibility,
                               child: Container(
                                 padding: EdgeInsets.all(10),
                                 decoration: BoxDecoration(
