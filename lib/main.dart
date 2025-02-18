@@ -76,6 +76,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoading = false;
   int toggleIndex = 0;
   bool mapOptionsVisibility = false;
+  String _markerDraggabilityText = 'Your marker is not movable';
+
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
@@ -615,6 +617,11 @@ class _MyHomePageState extends State<MyHomePage> {
                               child: Stack(
                                 children: [
                                   GoogleMap(
+                                    /*onTap: (LatLng position) {
+                                      if (mapOptionsVisibility) {
+                                        mapOptionsVisibility = false;
+                                      }
+                                    },*/
                                     onCameraMove:
                                         (CameraPosition cameraPosition) {
                                       _onCameraMove(cameraPosition.zoom);
@@ -674,9 +681,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                     bottom: 25,
                                     right: 10,
                                     child: FloatingActionButton(
-                                      onPressed: () {
+                                      onPressed: () async {
                                         setState(() {
-                                          _zoomEnabled = false;
+                                          //_zoomEnabled = false;
                                           mapOptionsVisibility =
                                               !mapOptionsVisibility;
                                         });
@@ -701,40 +708,54 @@ class _MyHomePageState extends State<MyHomePage> {
                                   visible: mapOptionsVisibility,
                                   child: Column(children: [
                                     SizedBox(height: 10),
-                                    Container(
-                                      padding: EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                          color: Colors.blue,
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                      child: SizedBox(
-                                        height: 40,
-                                        width: 100,
-                                        child:
-                                            AnimatedToggleSwitch<int>.rolling(
-                                          current: toggleIndex,
-                                          values: [0, 1],
-                                          onChanged: (i) async {
-                                            print(toggleIndex);
-                                            setState(() => toggleIndex = i);
-                                            bool choice = (i == 1);
-                                            _setDraggabilityUserModel(choice);
-                                            await loadMarkers(true);
-                                            _onCameraMove(_currentZoom);
-                                            setState(() => toggleIndex = i);
-                                            print(toggleIndex);
-                                            setState(() {
-                                              _zoomEnabled = true;
-                                              mapOptionsVisibility = false;
-                                            });
-                                          },
-                                          //loading: false, // for deactivating loading animation
-                                          iconBuilder: rollingIconBuilder,
-                                          style: ToggleStyle(),
-                                          height: 50,
+                                    Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                      Text(_markerDraggabilityText,
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      SizedBox(width: 40,),
+                                          Container(
+                                        padding: EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                            color: Colors.blue,
+                                            borderRadius:
+                                            BorderRadius.circular(8)),
+                                        child: SizedBox(
+                                          height: 40,
+                                          width: 100,
+                                          child:
+                                          AnimatedToggleSwitch<int>.rolling(
+                                            current: toggleIndex,
+                                            values: [0, 1],
+                                            onChanged: (i) async {
+                                              print(toggleIndex);
+                                              setState(() => toggleIndex = i);
+                                              bool choice = (i == 1);
+                                              _setDraggabilityUserModel(choice);
+                                              await loadMarkers(true);
+                                              _onCameraMove(_currentZoom);
+                                              setState(() => toggleIndex = i);
+                                              print(toggleIndex);
+                                              setState(() {
+                                                _zoomEnabled = true;
+                                                if(!choice) {
+                                                  mapOptionsVisibility = false;
+                                                  _markerDraggabilityText = 'Your marker is not movable';
+                                                }
+                                                else{
+                                                  _markerDraggabilityText = 'Your marker is movable';
+                                                }
+                                              });
+                                            },
+                                            //loading: false, // for deactivating loading animation
+                                            iconBuilder: rollingIconBuilder,
+                                            style: ToggleStyle(),
+                                            height: 50,
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ]),
                                   ]),
                                 ),
                               ),
