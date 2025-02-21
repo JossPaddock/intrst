@@ -13,9 +13,8 @@ jobs:
       - name: Set up Flutter
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
-          echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
-          source $GITHUB_PATH
-          
+          echo "$(pwd)/flutter/bin" >> $GITHUB_PATH  # Add Flutter to PATH
+
       - name: Run flutter version to check if we have flutter
         run: flutter --version
 
