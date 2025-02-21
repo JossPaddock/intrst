@@ -8,12 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Set up Flutter
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
+          cd flutter
+          git fetch --all
           echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
+
       - name: Run flutter version to check if we have flutter
         run: flutter --version
 
