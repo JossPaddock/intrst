@@ -13,7 +13,6 @@ jobs:
       - name: Set up Flutter
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
-          cd flutter
           git checkout stable 
           echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
 
