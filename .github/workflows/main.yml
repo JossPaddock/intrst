@@ -1,5 +1,3 @@
-name: Upload Website
-
 on:
   push:
     branches:
@@ -16,10 +14,8 @@ jobs:
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
           echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
-          flutter --version
-
-      - name: Run flutter doctor
-        run: flutter doctor
+      - name: Run flutter version to check if we have flutter
+        run: flutter --version
 
       - name: Build Flutter Web App
         run: flutter build web
