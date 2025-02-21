@@ -10,7 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
 import 'package:intrst/widgets/Interests.dart';
-import 'package:intrst/widgets/Preview.dart';
+import  'package:intrst/widgets/Preview.dart'as custom_preview;
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/InterestInputForm.dart';
@@ -193,7 +193,7 @@ class _MyHomePageState extends State<MyHomePage> {
             context: context,
             builder: (BuildContext context) {
               _zoomEnabled = false;
-              return Preview(
+              return custom_preview.Preview(
                 uid: uid,
                 scaffoldKey: _scaffoldKey,
                 onItemTapped: _onItemTapped,
@@ -769,7 +769,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       scaffoldKey: _scaffoldKey,
                       signedIn: _signedIn,
                     ),
-                    Preview(
+                    custom_preview.Preview(
                       uid: _uid,
                       scaffoldKey: _scaffoldKey,
                       onItemTapped: _onItemTapped,
