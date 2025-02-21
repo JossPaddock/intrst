@@ -15,6 +15,9 @@ jobs:
       - name: Set up Flutter
         run: |
           git clone https://github.com/flutter/flutter.git --branch stable --depth 1
+          cd flutter
+          git remote set-url origin https://github.com/flutter/flutter.git
+          git fetch origin
           echo "$(pwd)/flutter/bin" >> $GITHUB_PATH
       - name: Run flutter doctor
         run: flutter doctor
