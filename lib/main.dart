@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUtility.dart';
 import 'package:intrst/widgets/Interests.dart';
+import 'package:intrst/widgets/Messaging.dart';
 import  'package:intrst/widgets/Preview.dart'as custom_preview;
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
@@ -163,15 +164,11 @@ class _MyHomePageState extends State<MyHomePage> {
     return data.buffer.asUint8List();
   }
 
-  late String _mapStyleString;
   @override
   void initState() {
     initializeFirebase();
     _goToInitialPosition(_controller);
     _goToInitialPosition(_controllerSignedOut);
-    rootBundle.loadString('assets/mapstyle.json').then((string) {
-      _mapStyleString = string;
-    });
     setState(() {
       lastKnownDraggabilityState = _retrieveDraggabilityUserModel();
       markers = poiMarkers;
@@ -626,7 +623,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                         (CameraPosition cameraPosition) {
                                       _onCameraMove(cameraPosition.zoom);
                                     },
-                                    //cloudMapId: mapId, // Set the map style ID here
+                                    cloudMapId: mapId, // Set the map style ID here
+                                    mapToolbarEnabled: false,
                                     zoomGesturesEnabled: _zoomEnabled,
                                     gestureRecognizers: _zoomEnabled
                                         ? <Factory<
@@ -646,6 +644,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                             .toSet(),
                                     initialCameraPosition: _kGooglePlex,
                                     zoomControlsEnabled: false,
+                                    myLocationButtonEnabled: true,
+                                    compassEnabled: true,
                                     minMaxZoomPreference:
                                         MinMaxZoomPreference(3.0, 900.0),
                                     markers: markers,
@@ -658,11 +658,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                       if (_controller.isCompleted) {
                                         _controller = Completer();
                                       }
-                                      //await Future.delayed(Duration(milliseconds: 10000));
-                                      _controller.future.then((value) {
-                                        value.setMapStyle(_mapStyleString);
-                                      });
-                                      print('mapStyle should be set');
                                       _getLocationServiceAndPermission(
                                           _controller);
                                       _gotoCurrentUserLocation(
@@ -678,9 +673,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                     },
                                   ),
                                   Positioned(
-                                    bottom: 25,
+                                    bottom: 75,
                                     right: 10,
                                     child: FloatingActionButton(
+                                      mini: true,
                                       onPressed: () async {
                                         setState(() {
                                           //_zoomEnabled = false;
@@ -776,10 +772,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       signedIn: _signedIn,
                       onDrawerOpened: () {},
                     ),
-                    Text(
-                      'Index 3: Replace this text widget with the Messages widget',
-                      style: optionStyle,
-                    ),
+                    Messaging(),
                     Text(
                       'Index 4: Replace this text widget with the Sign Out widget',
                       style: optionStyle,
@@ -790,7 +783,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       onCameraMove: (CameraPosition cameraPosition) {
                         _onCameraMove(cameraPosition.zoom);
                       },
-                      //cloudMapId: mapId, // Set the map style ID here
+                      cloudMapId: mapId, // Set the map style ID here
                       zoomGesturesEnabled: _zoomEnabled,
                       initialCameraPosition: _kGooglePlex,
                       zoomControlsEnabled: false,
@@ -803,10 +796,6 @@ class _MyHomePageState extends State<MyHomePage> {
                         if (_controllerSignedOut.isCompleted) {
                           _controllerSignedOut = Completer();
                         }
-
-                        _controllerSignedOut.future.then((value) {
-                          value.setMapStyle(_mapStyleString);
-                        });
                         print('mapStyle should be set');
                         print('callback is working');
                         setState(() {});

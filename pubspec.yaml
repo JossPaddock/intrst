@@ -18,13 +18,15 @@ dependencies:
   firebase_auth: ^5.1.0
   firebase_core: ^3.1.0
   cloud_firestore: ^5.0.1
-  google_maps_flutter: 2.7.0
+  google_maps_flutter: 2.10.0
   geolocator: ^12.0.0
   label_marker: ^1.0.1
   location: ^6.0.2
   http: ^1.2.2
   uuid: ^4.5.1
   animated_toggle_switch: ^0.8.4
+  google_maps_flutter_web: ^0.5.10+1
+
 
 dev_dependencies:
   flutter_test:
