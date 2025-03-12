@@ -8,7 +8,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
-import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:intrst/widgets/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
 import  'package:intrst/widgets/Preview.dart'as custom_preview;
@@ -68,7 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String _name = '';
   String _uid = '';
   int _selectedIndex = 0;
-  final FirebaseUtility fu = FirebaseUtility();
+  final FirebaseUsersUtility fu = FirebaseUsersUtility();
   Set<Marker> labelMarkers = {};
   Set<Marker> poiMarkers = {};
   Set<Marker> markers = {};
@@ -328,10 +328,6 @@ class _MyHomePageState extends State<MyHomePage> {
       Completer<GoogleMapController> controllerCompleter) async {
     print('getLocationServiceAndPermission is running');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
-    List<String> results =
-        await fu.searchForPeopleAndInterests(users, "oss Paddoc");
-    print('these are the results of the search $results');
-    print('hello world');
     final GoogleMapController controller = await controllerCompleter.future;
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
@@ -541,7 +537,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   CollectionReference users =
                       FirebaseFirestore.instance.collection('users');
                   List<String> results =
-                      await fu.searchForPeopleAndInterests(users, value);
+                      await fu.searchForPeopleAndInterests(users, value, true);
                   print('these are the results of the search $results');
                   setState(() async {
                     // Update search results based on the value
@@ -772,7 +768,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       signedIn: _signedIn,
                       onDrawerOpened: () {},
                     ),
-                    Messaging(),
+                    Messaging(user_uid: _uid),
                     Text(
                       'Index 4: Replace this text widget with the Sign Out widget',
                       style: optionStyle,

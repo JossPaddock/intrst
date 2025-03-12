@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intrst/models/UserModel.dart';
-import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../models/Interest.dart';
@@ -18,7 +18,7 @@ class InterestInputForm extends StatefulWidget {
 
 class InterestInputFormState extends State<InterestInputForm> {
   final _formKey = GlobalKey<FormState>();
-  final FirebaseUtility fu = FirebaseUtility();
+  final FirebaseUsersUtility fu = FirebaseUsersUtility();
   Interest interest = Interest(
       name: '',
       description: '',

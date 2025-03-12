@@ -6,7 +6,7 @@ import '../models/Interest.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 
-class FirebaseUtility {
+class FirebaseUsersUtility {
   Future<GeoPoint> retrieveUserLocation(
       CollectionReference users, String userUid) async {
     QuerySnapshot querySnapshot =
@@ -262,14 +262,14 @@ class FirebaseUtility {
   }
 
   Future<List<String>> searchForPeopleAndInterests(
-      CollectionReference users, String query) async {
+      CollectionReference users, String query, bool includeInterests) async {
     Set<String> resultingUids = {};
     if (query != " " && query != "") {
       QuerySnapshot querySnapshotFull = await users.get();
       for (var doc in querySnapshotFull.docs) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         String firstname = data['first_name'];
-        if (searchInterests(data.toString(), query)) {
+        if (searchInterests(data.toString(), query) && includeInterests) {
           resultingUids.add(data['user_uid']);
         }
         String lastname = data['last_name'];

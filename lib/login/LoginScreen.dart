@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
 //this is for Firebase
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 const users = {
@@ -30,7 +30,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final FirebaseUtility fu = FirebaseUtility();
+  final FirebaseUsersUtility fu = FirebaseUsersUtility();
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   Duration get loginTime => const Duration(milliseconds: 2250);
 

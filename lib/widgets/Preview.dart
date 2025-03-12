@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:provider/provider.dart';
 
 import '../models/Interest.dart';
@@ -28,7 +28,7 @@ class Preview extends StatefulWidget {
 class _InterestAlertDialogState extends State<Preview> {
   List<String> _buttonLabels = [];
   String _name = '';
-  FirebaseUtility fu = FirebaseUtility();
+  FirebaseUsersUtility fu = FirebaseUsersUtility();
 
   @override
   void initState() {

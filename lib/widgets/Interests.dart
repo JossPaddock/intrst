@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intrst/widgets/InterestInputForm.dart';
-import 'package:intrst/utility/FirebaseUtility.dart';
+import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import '../models/Interest.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html;
@@ -13,7 +13,7 @@ class Interests extends StatelessWidget {
   final String name;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final bool signedIn;
-  final FirebaseUtility fu = FirebaseUtility();
+  final FirebaseUsersUtility fu = FirebaseUsersUtility();
 
   Interests({
     super.key,
@@ -86,7 +86,7 @@ class _CardListState extends State<CardList>
     with AutomaticKeepAliveClientMixin<CardList> {
   @override
   bool get wantKeepAlive => true;
-  final FirebaseUtility fu = FirebaseUtility();
+  final FirebaseUsersUtility fu = FirebaseUsersUtility();
   List<TextEditingController> _titleControllers = [];
   List<TextEditingController> _linkControllers = [];
   List<TextEditingController> _subtitleControllers = [];
