@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intrst/widgets/ChatScreen.dart';
-
+import 'package:intrst/widgets/CollapsibleChatScreen.dart';
 import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
 
@@ -127,7 +126,7 @@ class _MessagingState extends State<Messaging> {
             child: ListView.builder(
               itemCount: messageData.length,
               itemBuilder: (context, index) {
-                return ChatScreen(
+                return CollapsibleChatScreen(
                     uid: widget.user_uid, documentData: messageData[index]);
               },
             ),

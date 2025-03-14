@@ -28,52 +28,49 @@ class ChatScreen extends StatelessWidget {
       messages.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
     }
     final DateTimeUtility dtu = DateTimeUtility();
-    return Container(
-        decoration:
-            BoxDecoration(border: Border.all(color: Colors.black, width: 5)),
-        child: SizedBox(
-          height: 400,
-          width: 200,
-          child: ListView.builder(
-            itemCount: messages.length,
-            itemBuilder: (context, index) {
-              var message = messages[index];
-              CollectionReference users =
-                  FirebaseFirestore.instance.collection('users');
-              var isUserMessage = message['user_uid'] == uid;
-              return FutureBuilder<String>(
-                future: fu.lookUpNameByUserUid(users, message['user_uid']),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return ListTile(title: Text('Loading...'));
-                  } else if (snapshot.hasError) {
-                    return ListTile(title: Text('Error'));
-                  } else {
-                    return ListTile(
-                      title: Padding(
-                        padding: const EdgeInsets.only(left: 15, right: 15),
-                        child: Text(
-                          style: TextStyle(fontSize: 13.0),
-                          snapshot.data == null ? 'unknown' : snapshot.data!,
-                          textAlign:
-                              isUserMessage ? TextAlign.right : TextAlign.left,
-                        ),
-                      ),
-                      subtitle: Tooltip(
-                        message: dtu.getFormattedTime(
-                          message['timestamp'],
-                        ),
-                        child: ChatBubble(
-                          message: message['message_content'],
-                          isSender: isUserMessage,
-                        ),
-                      ),
-                    );
-                  }
-                },
-              );
+    return SizedBox(
+      height: 300,
+      width: 200,
+      child: ListView.builder(
+        itemCount: messages.length,
+        itemBuilder: (context, index) {
+          var message = messages[index];
+          CollectionReference users =
+              FirebaseFirestore.instance.collection('users');
+          var isUserMessage = message['user_uid'] == uid;
+          return FutureBuilder<String>(
+            future: fu.lookUpNameByUserUid(users, message['user_uid']),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return ListTile(title: Text('Loading...'));
+              } else if (snapshot.hasError) {
+                return ListTile(title: Text('Error'));
+              } else {
+                return ListTile(
+                  title: Padding(
+                    padding: const EdgeInsets.only(left: 15, right: 15),
+                    child: Text(
+                      style: TextStyle(fontSize: 13.0),
+                      snapshot.data == null ? 'unknown' : snapshot.data!,
+                      textAlign:
+                          isUserMessage ? TextAlign.right : TextAlign.left,
+                    ),
+                  ),
+                  subtitle: Tooltip(
+                    message: dtu.getFormattedTime(
+                      message['timestamp'],
+                    ),
+                    child: ChatBubble(
+                      message: message['message_content'],
+                      isSender: isUserMessage,
+                    ),
+                  ),
+                );
+              }
             },
-          ),
-        ));
+          );
+        },
+      ),
+    );
   }
 }
