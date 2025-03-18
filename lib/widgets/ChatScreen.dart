@@ -30,7 +30,7 @@ class ChatScreen extends StatelessWidget {
     final DateTimeUtility dtu = DateTimeUtility();
     return SizedBox(
       height: 300,
-      width: 200,
+      width: 300,
       child: ListView.builder(
         itemCount: messages.length,
         itemBuilder: (context, index) {

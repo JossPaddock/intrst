@@ -18,4 +18,14 @@ class FirebaseMessagesUtility {
     }
     return message_data;
   }
+
+  Future<void> createMessageDocument(List<String> userUids) async {
+    Map<String, Map<String, dynamic>> conversation = {};
+    Map<String, dynamic> data = {
+      'user_uids': userUids,
+      'conversation': conversation,
+      'created_at': FieldValue.serverTimestamp(),
+    };
+    await messages.add(data);
+  }
 }

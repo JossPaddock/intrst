@@ -18,8 +18,7 @@ class Messaging extends StatefulWidget {
 class _MessagingState extends State<Messaging> {
   final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
-  CollectionReference users =
-  FirebaseFirestore.instance.collection('users');
+  CollectionReference users = FirebaseFirestore.instance.collection('users');
   Set<String> selectedItems = {};
   List<String> searchResults = [];
   List<Map<String, dynamic>> messageData = [];
@@ -54,27 +53,60 @@ class _MessagingState extends State<Messaging> {
             onChanged: (value) async {
               List<String> results =
                   await fuu.searchForPeopleAndInterests(users, value, false);
+              if(results.contains(widget.user_uid)) {
+                results.remove(widget.user_uid);
+              }
               setState(() {
                 searchResults = results;
               });
             },
           ),
-          Text(searchResults.join(",")),
           Wrap(
             spacing: 20.0,
             children: searchResults.map((item) {
               final isSelected = selectedItems.contains(item);
-              return isSelected ? SizedBox.shrink(): ElevatedButton(
+              return isSelected
+                  ? SizedBox.shrink()
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            isSelected ? Colors.green : Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          if (isSelected) {
+                            selectedItems.remove(item);
+                          } else {
+                            selectedItems.add(item);
+                          }
+                        });
+                      },
+                      child: FutureBuilder<String>(
+                        future: fuu.lookUpNameByUserUid(users, item),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return Text('');
+                          } else if (snapshot.hasError) {
+                            return const Text("Could Not Load Users Name");
+                          } else {
+                            return Text(snapshot.data ?? 'No Name');
+                          }
+                        },
+                      ),
+                    );
+            }).toList(),
+          ),
+          Wrap(
+            spacing: 20.0,
+            children: selectedItems.map((item) {
+              return ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isSelected ? Colors.green : Colors.grey,
+                  backgroundColor: Colors.green,
                 ),
                 onPressed: () {
                   setState(() {
-                    if (isSelected) {
-                      selectedItems.remove(item);
-                    } else {
-                      selectedItems.add(item);
-                    }
+                    selectedItems.remove(item);
                   });
                 },
                 child: FutureBuilder<String>(
@@ -92,37 +124,18 @@ class _MessagingState extends State<Messaging> {
               );
             }).toList(),
           ),
-          Wrap(
-            spacing: 20.0,
-            children: selectedItems.map((item) {
-              return ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                ),
+          if (selectedItems.isNotEmpty)
+            TextButton(
                 onPressed: () {
-                  setState(() {
-                      selectedItems.remove(item);
-                    }
-                  );
+                  List<String> conversationParticipants =
+                      selectedItems.toList();
+                  conversationParticipants.add(widget.user_uid);
+                  fmu.createMessageDocument(conversationParticipants);
                 },
-                child: FutureBuilder<String>(
-                  future: fuu.lookUpNameByUserUid(users, item),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Text('');
-                    } else if (snapshot.hasError) {
-                      return const Text("Could Not Load Users Name");
-                    } else {
-                      return Text(snapshot.data ?? 'No Name');
-                    }
-                  },
-                ),
-              );
-            }).toList(),
-          ),
+                child: Text('create new chat')),
           Container(
             width: 300,
-            height: 500,
+            height: 600,
             child: ListView.builder(
               itemCount: messageData.length,
               itemBuilder: (context, index) {

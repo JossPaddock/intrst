@@ -34,24 +34,53 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       }
     });
     return Column(children: [
-      Text('Chat with ${messagesWith.join(',')}'),
-      IconButton(
-          icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-          onPressed: () {
-            setState(() {
-              _isExpanded = !_isExpanded;
-            });
-          }),
-      AnimatedContainer(
-        duration: const Duration(milliseconds: 1000),
-        height: _isExpanded ? 400 : 0,
-        child: _isExpanded
-            ? ChatScreen(
-                uid: widget.uid,
-                documentData: widget.documentData,
-              )
-            : const SizedBox.shrink(),
-      ),
+      Container(
+        width: 400,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: Colors.black,
+              width: 3.0,
+            ),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(children: [
+            Text('Chat with ${messagesWith.join(',')}'),
+            IconButton(
+                icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                onPressed: () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                }),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 1000),
+              height: _isExpanded ? 400 : 0,
+              child: _isExpanded
+                  ? ChatScreen(
+                      uid: widget.uid,
+                      documentData: widget.documentData,
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            if (_isExpanded)
+              TextField(
+                decoration: InputDecoration(
+                  fillColor: Colors.white,
+                  filled: true,
+                  hintText: 'send message',
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(12.0), // Adjust as needed
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.send),
+                    onPressed: () {},
+                  ),
+                ),
+              ),
+          ])),
+      SizedBox(
+        height: 5,)
     ]);
   }
 }
