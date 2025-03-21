@@ -22,6 +22,7 @@ class _MessagingState extends State<Messaging> {
   Set<String> selectedItems = {};
   List<String> searchResults = [];
   List<Map<String, dynamic>> messageData = [];
+  List<DocumentReference> messageDocumentReference = [];
   @override
   void initState() {
     super.initState();
@@ -29,16 +30,22 @@ class _MessagingState extends State<Messaging> {
   }
 
   Future<void> getMessages() async {
-    List<Map<String, dynamic>> data =
+    List<Map<DocumentReference, Map<String, dynamic>>> data =
         await fmu.getMessageDocumentsByUserUid(widget.user_uid);
+    List<Map<String, dynamic>> extractedList =
+        data.map((entry) => entry.values.first).toList();
+    List<DocumentReference> extractedDocumentReference =
+        data.map((entry) => entry.keys.first).toList();
     setState(() {
-      messageData = data;
+      messageData = extractedList;
+      messageDocumentReference = extractedDocumentReference;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Column(
         children: [
           TextField(
@@ -53,7 +60,7 @@ class _MessagingState extends State<Messaging> {
             onChanged: (value) async {
               List<String> results =
                   await fuu.searchForPeopleAndInterests(users, value, false);
-              if(results.contains(widget.user_uid)) {
+              if (results.contains(widget.user_uid)) {
                 results.remove(widget.user_uid);
               }
               setState(() {
@@ -140,7 +147,10 @@ class _MessagingState extends State<Messaging> {
               itemCount: messageData.length,
               itemBuilder: (context, index) {
                 return CollapsibleChatScreen(
-                    uid: widget.user_uid, documentData: messageData[index]);
+                  uid: widget.user_uid,
+                  documentData: messageData[index],
+                  documentReference: messageDocumentReference[index],
+                );
               },
             ),
           )

@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:intrst/utility/DateTimeUtility.dart';
 import 'package:intrst/widgets/ChatBubble.dart';
 
+import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
 import 'ChatScreen.dart';
 
 class CollapsibleChatScreen extends StatefulWidget {
   final Map<String, dynamic> documentData;
   final String uid;
+  final DocumentReference documentReference;
   const CollapsibleChatScreen({
     Key? key,
     required this.uid,
     required this.documentData,
+    required this.documentReference,
   }) : super(key: key);
 
   @override
@@ -21,6 +24,8 @@ class CollapsibleChatScreen extends StatefulWidget {
 }
 
 class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
+  final TextEditingController _send_message_controller = TextEditingController();
+  final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   bool _isExpanded = false;
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
   CollectionReference users = FirebaseFirestore.instance.collection('users');
@@ -35,7 +40,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     });
     return Column(children: [
       Container(
-        width: 400,
+          width: 400,
           decoration: BoxDecoration(
             border: Border.all(
               color: Colors.black,
@@ -64,6 +69,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             ),
             if (_isExpanded)
               TextField(
+                controller: _send_message_controller,
                 decoration: InputDecoration(
                   fillColor: Colors.white,
                   filled: true,
@@ -74,13 +80,19 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(Icons.send),
-                    onPressed: () {},
+                    onPressed: () {
+                      final text = _send_message_controller.text;
+                      //todo: message input validation eg. make sure they don't send an empty message.
+                      fmu.sendMessage(text,
+                          widget.documentReference, widget.uid);
+                    },
                   ),
                 ),
               ),
           ])),
       SizedBox(
-        height: 5,)
+        height: 5,
+      )
     ]);
   }
 }
