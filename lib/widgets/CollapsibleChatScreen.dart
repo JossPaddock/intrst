@@ -24,7 +24,8 @@ class CollapsibleChatScreen extends StatefulWidget {
 }
 
 class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
-  final TextEditingController _send_message_controller = TextEditingController();
+  final TextEditingController _send_message_controller =
+      TextEditingController();
   final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   bool _isExpanded = false;
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
@@ -61,9 +62,28 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
               duration: const Duration(milliseconds: 1000),
               height: _isExpanded ? 400 : 0,
               child: _isExpanded
-                  ? ChatScreen(
-                      uid: widget.uid,
-                      documentData: widget.documentData,
+                  ? StreamBuilder<DocumentSnapshot>(
+                      stream: widget.documentReference
+                          .snapshots(), // Listen to changes in the document
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Text('Something went wrong :(');
+                        }
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Text('Loading...');
+                        }
+                        if (!snapshot.hasData || !snapshot.data!.exists) {
+                          return Text('No messages found');
+                        }
+
+                        var data =
+                            snapshot.data!.data() as Map<String, dynamic>;
+                        return ChatScreen(
+                          uid: widget.uid,
+                          documentData: data,
+                        );
+                      },
                     )
                   : const SizedBox.shrink(),
             ),
@@ -83,8 +103,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                     onPressed: () {
                       final text = _send_message_controller.text;
                       //todo: message input validation eg. make sure they don't send an empty message.
-                      fmu.sendMessage(text,
-                          widget.documentReference, widget.uid);
+                      fmu.sendMessage(
+                          text, widget.documentReference, widget.uid);
                     },
                   ),
                 ),

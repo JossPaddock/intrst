@@ -13,6 +13,7 @@ class ChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ScrollController scrollController = ScrollController();
     final FirebaseUsersUtility fu = FirebaseUsersUtility();
     List<Map<String, dynamic>> messages = [];
     if (documentData['conversation'] != null) {
@@ -28,10 +29,25 @@ class ChatScreen extends StatelessWidget {
       messages.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
     }
     final DateTimeUtility dtu = DateTimeUtility();
+    // This code makes it so the chat screen scrolls to the bottom of the chats by
+    // default each time there is a new message from any user in the chat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: Duration(milliseconds: 1000),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+
+    });
     return SizedBox(
       height: 300,
       width: 300,
       child: ListView.builder(
+        controller: scrollController,
         itemCount: messages.length,
         itemBuilder: (context, index) {
           var message = messages[index];
