@@ -20,7 +20,9 @@ class ChatScreen extends StatelessWidget {
       documentData['conversation'].forEach((key, value) {
         messages.add({
           'message_content': value['message_content'],
-          'timestamp': (value['timestamp'] as Timestamp).toDate(),
+          'timestamp': value['timestamp'] != null
+              ? (value['timestamp'] as Timestamp).toDate()
+              : null, // Assign null if timestamp is missing
           'user_uid': value['user_uid'],
         });
       });
@@ -31,18 +33,26 @@ class ChatScreen extends StatelessWidget {
     final DateTimeUtility dtu = DateTimeUtility();
     // This code makes it so the chat screen scrolls to the bottom of the chats by
     // default each time there is a new message from any user in the chat
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(Duration(milliseconds: 100), () {
-        if (scrollController.hasClients) {
+
+    void scrollToBottomLoop() {
+      if (!scrollController.hasClients) return;
+
+      double currentExtent = scrollController.position.maxScrollExtent;
+      double currentOffset = scrollController.offset;
+
+      if (currentOffset < currentExtent) {
+        Future.delayed(Duration(milliseconds: 200), () {
           scrollController.animateTo(
             scrollController.position.maxScrollExtent,
-            duration: Duration(milliseconds: 1000),
+            duration: Duration(milliseconds: 500),
             curve: Curves.easeOut,
           );
-        }
-      });
+          scrollToBottomLoop(); //RECURSION Fairies!
+        });
+      }
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => scrollToBottomLoop());
 
-    });
     return SizedBox(
       height: 300,
       width: 300,

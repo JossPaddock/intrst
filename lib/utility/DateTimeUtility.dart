@@ -1,5 +1,7 @@
 class DateTimeUtility {
-  String getFormattedTime(DateTime dt) {
+  String getFormattedTime(DateTime? dt) {
+    if (dt == null) return ''; // Return an empty string if dt is null
+
     String weekday = _getWeekday(dt.weekday);
     String timeOfDay = _formatTime(dt);
     return '$weekday $timeOfDay';
