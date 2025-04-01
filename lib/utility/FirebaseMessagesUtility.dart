@@ -9,17 +9,51 @@ import 'package:uuid/uuid.dart';
 class FirebaseMessagesUtility {
   final CollectionReference messages =
       FirebaseFirestore.instance.collection('messages');
-  Future<List<Map<DocumentReference, Map<String, dynamic>>>> getMessageDocumentsByUserUid(String userUid) async {
+
+  Future<List<Map<DocumentReference, Map<String, dynamic>>>>
+      getMessageDocumentsByUserUid(String userUid) async {
     QuerySnapshot querySnapshot =
         await messages.where('user_uids', arrayContains: userUid).get();
     List<Map<DocumentReference, Map<String, dynamic>>> message_data = [];
     for (var doc in querySnapshot.docs) {
       Map<DocumentReference, Map<String, dynamic>> myMap = {
-      doc.reference: doc.data()as Map<String,dynamic>,
+        doc.reference: doc.data() as Map<String, dynamic>,
       };
       message_data.add(myMap);
     }
     return message_data;
+  }
+
+  Future<Map<DocumentReference, Map<String, dynamic>>?>
+      getMessageDocumentsExclusivelyByUserUids(List<String> userUids) async {
+    List<Map<DocumentReference, Map<String, dynamic>>> messages_data = [];
+    QuerySnapshot querySnapshot =
+        await messages.where('user_uids', arrayContainsAny: userUids).get();
+
+    userUids.sort();
+    for (var doc in querySnapshot.docs) {
+      List<String> docUserUids = List<String>.from(doc["user_uids"] ?? []);
+      docUserUids.sort();
+
+      if (docUserUids.join(",") == userUids.join(",")) {
+        print("Matched Message: ${doc.id}, Data: ${doc.data()}");
+        Map<DocumentReference, Map<String, dynamic>> myMap = {
+          doc.reference: doc.data() as Map<String, dynamic>,
+        };
+        messages_data.add(myMap);
+      }
+    }
+    if (messages_data.length > 1) {
+      print(
+          "Warning, found more than one message document. Length: ${messages_data.length}. "
+              "This should have been one, but was more because the user probably has more than "
+              "one message with the same person!!!");
+    }
+    if(messages_data.isEmpty) {
+      print("warning could not find any message documents");
+      return null;
+    }
+    return messages_data[0];
   }
 
   Future<void> createMessageDocument(List<String> userUids) async {
@@ -32,7 +66,8 @@ class FirebaseMessagesUtility {
     await messages.add(data);
   }
 
-  Future<void> sendMessage(String message, DocumentReference dr, String user_uid) async {
+  Future<void> sendMessage(
+      String message, DocumentReference dr, String user_uid) async {
     try {
       final String messageId = const Uuid().v4();
 

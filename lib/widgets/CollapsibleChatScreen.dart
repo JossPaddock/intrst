@@ -8,15 +8,19 @@ import '../utility/FirebaseUsersUtility.dart';
 import 'ChatScreen.dart';
 
 class CollapsibleChatScreen extends StatefulWidget {
+  final bool showNameAtTop;
+  final bool autoOpen;
   final Map<String, dynamic> documentData;
   final String uid;
   final DocumentReference documentReference;
   const CollapsibleChatScreen({
-    Key? key,
+    super.key,
+    this.showNameAtTop = true,
+    this.autoOpen = false,
     required this.uid,
     required this.documentData,
     required this.documentReference,
-  }) : super(key: key);
+  });
 
   @override
   State<CollapsibleChatScreen> createState() =>
@@ -33,12 +37,24 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   Set<String> messagesWith = {};
 
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
     widget.documentData['user_uids'].forEach((value) async {
       if (value != widget.uid) {
-        messagesWith.add(await fuu.lookUpNameByUserUid(users, value));
+        String name = await fuu.lookUpNameByUserUid(users, value);
+        setState(() {
+          messagesWith.add(name);
+        });
       }
     });
+    if(widget.autoOpen) {
+      setState(() {
+        _isExpanded = true;
+      });
+    }
+  }
+
+  Widget build(BuildContext context) {
     return Column(children: [
       Container(
           width: 400,
@@ -50,14 +66,16 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             borderRadius: BorderRadius.circular(15),
           ),
           child: Column(children: [
-            Text('Chat with ${messagesWith.join(',')}'),
-            IconButton(
-                icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-                onPressed: () {
-                  setState(() {
-                    _isExpanded = !_isExpanded;
-                  });
-                }),
+            if (widget.showNameAtTop) Text(messagesWith.join(',')),
+            if (!widget.autoOpen)
+              IconButton(
+                  icon:
+                      Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                  onPressed: () {
+                    setState(() {
+                      _isExpanded = !_isExpanded;
+                    });
+                  }),
             AnimatedContainer(
               duration: const Duration(milliseconds: 1000),
               height: _isExpanded ? 400 : 0,

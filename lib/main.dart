@@ -144,11 +144,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  static const CameraPosition _kGooglePlex = CameraPosition(
-    target: LatLng(37.423458, -110.310349),
-    zoom: 14.4746,
-  );
-
   static const CameraPosition _kLake = CameraPosition(
       bearing: 192.8334901395799,
       target: LatLng(37.43296265331129, -122.08832357078792),
@@ -191,7 +186,8 @@ class _MyHomePageState extends State<MyHomePage> {
             builder: (BuildContext context) {
               _zoomEnabled = false;
               return custom_preview.Preview(
-                uid: uid,
+                uid: _uid,
+                alternateUid: uid,
                 scaffoldKey: _scaffoldKey,
                 onItemTapped: _onItemTapped,
                 signedIn: _signedIn,
@@ -638,7 +634,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                         : <Factory<
                                                 OneSequenceGestureRecognizer>>{}
                                             .toSet(),
-                                    initialCameraPosition: _kGooglePlex,
+                                    initialCameraPosition: _kLake,
                                     zoomControlsEnabled: false,
                                     myLocationButtonEnabled: true,
                                     compassEnabled: true,
@@ -763,6 +759,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     custom_preview.Preview(
                       uid: _uid,
+                      alternateUid: _uid,
                       scaffoldKey: _scaffoldKey,
                       onItemTapped: _onItemTapped,
                       signedIn: _signedIn,
@@ -781,7 +778,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       },
                       cloudMapId: mapId, // Set the map style ID here
                       zoomGesturesEnabled: _zoomEnabled,
-                      initialCameraPosition: _kGooglePlex,
+                      initialCameraPosition: _kLake,
                       zoomControlsEnabled: false,
                       minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
                       markers: markers,

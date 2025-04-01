@@ -48,25 +48,29 @@ class _MessagingState extends State<Messaging> {
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [
-          TextField(
-            decoration: InputDecoration(
-              fillColor: Colors.white,
-              filled: true,
-              hintText: 'find someone to message',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0), // Adjust as needed
+          SizedBox(
+            width: 350,
+            child: TextField(
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                fillColor: Colors.white,
+                filled: true,
+                hintText: 'find someone to message',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0), // Adjust as needed
+                ),
               ),
+              onChanged: (value) async {
+                List<String> results =
+                    await fuu.searchForPeopleAndInterests(users, value, false);
+                if (results.contains(widget.user_uid)) {
+                  results.remove(widget.user_uid);
+                }
+                setState(() {
+                  searchResults = results;
+                });
+              },
             ),
-            onChanged: (value) async {
-              List<String> results =
-                  await fuu.searchForPeopleAndInterests(users, value, false);
-              if (results.contains(widget.user_uid)) {
-                results.remove(widget.user_uid);
-              }
-              setState(() {
-                searchResults = results;
-              });
-            },
           ),
           Wrap(
             spacing: 20.0,
