@@ -37,7 +37,7 @@ class _InterestAlertDialogState extends State<Preview> {
   bool chatOpen = false;
   CollectionReference messages =
       FirebaseFirestore.instance.collection('messages');
-  late Map<DocumentReference, Map<String, dynamic>> initMessageData;
+  Map<DocumentReference, Map<String, dynamic>>? initMessageData = null;
 
   @override
   void initState() {
@@ -73,9 +73,12 @@ class _InterestAlertDialogState extends State<Preview> {
     List<String> userUids = [widget.uid, widget.alternateUid];
     Map<DocumentReference, Map<String, dynamic>>? data =
         await fmu.getMessageDocumentsExclusivelyByUserUids(userUids);
-    data ??= {messages.doc(): {}};
+    if (data == null) {
+      await fmu.createMessageDocument([widget.uid, widget.alternateUid]);
+      data = await fmu.getMessageDocumentsExclusivelyByUserUids(userUids);
+    }
     setState(() {
-      initMessageData = data!;
+      initMessageData = data;
     });
   }
 
@@ -155,15 +158,15 @@ class _InterestAlertDialogState extends State<Preview> {
               ),
             ],
           ),
-          if (chatOpen)
+          if (chatOpen && initMessageData != null)
             Column(
               children: [
                 CollapsibleChatScreen(
                     autoOpen: true,
                     showNameAtTop: false,
                     uid: _handleLookUpViewerOfPreviewWidget(),
-                    documentData: initMessageData.entries.first.value,
-                    documentReference: initMessageData.entries.first.key),
+                    documentData: initMessageData!.entries.first.value,
+                    documentReference: initMessageData!.entries.first.key),
                 ElevatedButton.icon(
                   onPressed: () {
                     widget.onItemTapped(3);
@@ -173,7 +176,9 @@ class _InterestAlertDialogState extends State<Preview> {
                   label: Text('Show all chats'),
                 )
               ],
-            )
+            ),
+          if (chatOpen && initMessageData == null)
+            Text('we tried creating a conversation with this person but failed')
         ],
       ),
     );

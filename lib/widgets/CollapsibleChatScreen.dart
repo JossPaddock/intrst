@@ -47,11 +47,69 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
         });
       }
     });
-    if(widget.autoOpen) {
+    if (widget.autoOpen) {
       setState(() {
         _isExpanded = true;
       });
     }
+  }
+  void _showDeleteDialog(BuildContext context) {
+    final TextEditingController _controller = TextEditingController();
+    bool isCorrect = false;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Confirm Deletion"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Type 'delete for sure' to confirm."),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _controller,
+                    onChanged: (value) {
+                      setState(() {
+                        isCorrect = value.trim().toLowerCase() == "delete for sure";
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: "type here...",
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text("Cancel"),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: isCorrect
+                      ? () {
+                    Navigator.of(context).pop();
+                    //put the call to delete the message document here!!!
+                    fmu.deleteMessageDocument(widget.documentReference);
+                    setState(() {
+                    });
+                  }
+                      : null,
+                  child: const Text("Really Delete!"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget build(BuildContext context) {
@@ -66,7 +124,16 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             borderRadius: BorderRadius.circular(15),
           ),
           child: Column(children: [
-            if (widget.showNameAtTop) Text(messagesWith.join(',')),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+              IconButton(
+                icon: const Icon(Icons.delete),
+                color: Colors.brown,
+                tooltip: 'Delete messages',
+                onPressed: ()=>_showDeleteDialog(context),
+              ),
+              if (widget.showNameAtTop) Text(messagesWith.join(',')),
             if (!widget.autoOpen)
               IconButton(
                   icon:
@@ -76,6 +143,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       _isExpanded = !_isExpanded;
                     });
                   }),
+            ],),
             AnimatedContainer(
               duration: const Duration(milliseconds: 1000),
               height: _isExpanded ? 400 : 0,

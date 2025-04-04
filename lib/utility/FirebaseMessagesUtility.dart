@@ -46,10 +46,10 @@ class FirebaseMessagesUtility {
     if (messages_data.length > 1) {
       print(
           "Warning, found more than one message document. Length: ${messages_data.length}. "
-              "This should have been one, but was more because the user probably has more than "
-              "one message with the same person!!!");
+          "This should have been one, but was more because the user probably has more than "
+          "one message with the same person!!!");
     }
-    if(messages_data.isEmpty) {
+    if (messages_data.isEmpty) {
       print("warning could not find any message documents");
       return null;
     }
@@ -64,6 +64,14 @@ class FirebaseMessagesUtility {
       'created_at': FieldValue.serverTimestamp(),
     };
     await messages.add(data);
+  }
+
+  Future<void> deleteMessageDocument(DocumentReference dr) async {
+    try {
+      await dr.delete();
+    } catch (e) {
+      print("Error deleting message document: $e");
+    }
   }
 
   Future<void> sendMessage(
