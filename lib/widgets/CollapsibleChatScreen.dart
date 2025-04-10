@@ -1,8 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intrst/utility/DateTimeUtility.dart';
-import 'package:intrst/widgets/ChatBubble.dart';
-
 import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
 import 'ChatScreen.dart';
@@ -13,6 +10,7 @@ class CollapsibleChatScreen extends StatefulWidget {
   final Map<String, dynamic> documentData;
   final String uid;
   final DocumentReference documentReference;
+  final void Function()? getMessages;
   const CollapsibleChatScreen({
     super.key,
     this.showNameAtTop = true,
@@ -20,6 +18,7 @@ class CollapsibleChatScreen extends StatefulWidget {
     required this.uid,
     required this.documentData,
     required this.documentReference,
+    this.getMessages,
   });
 
   @override
@@ -43,6 +42,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       if (value != widget.uid) {
         String name = await fuu.lookUpNameByUserUid(users, value);
         setState(() {
+          print('added $name to messagesWith');
           messagesWith.add(name);
         });
       }
@@ -53,6 +53,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       });
     }
   }
+
   void _showDeleteDialog(BuildContext context) {
     final TextEditingController _controller = TextEditingController();
     bool isCorrect = false;
@@ -67,13 +68,13 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text("Type 'delete for sure' to confirm."),
+                  const Text("Type 'delete' to confirm."),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _controller,
                     onChanged: (value) {
                       setState(() {
-                        isCorrect = value.trim().toLowerCase() == "delete for sure";
+                        isCorrect = value.trim().toLowerCase() == "delete";
                       });
                     },
                     decoration: const InputDecoration(
@@ -94,13 +95,15 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                     foregroundColor: Colors.white,
                   ),
                   onPressed: isCorrect
-                      ? () {
-                    Navigator.of(context).pop();
-                    //put the call to delete the message document here!!!
-                    fmu.deleteMessageDocument(widget.documentReference);
-                    setState(() {
-                    });
-                  }
+                      ? () async {
+                          Navigator.of(context).pop();
+                          //put the call to delete the message document here!!!
+                          await fmu.deleteMessageDocument(widget.documentReference);
+                          //This insures that if we have the getMessages callback function
+                          // it will update the document data for the messaging widget
+                          widget.getMessages?.call();
+                          setState(() {});
+                        }
                       : null,
                   child: const Text("Really Delete!"),
                 ),
@@ -127,23 +130,24 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-              IconButton(
-                icon: const Icon(Icons.delete),
-                color: Colors.brown,
-                tooltip: 'Delete messages',
-                onPressed: ()=>_showDeleteDialog(context),
-              ),
-              if (widget.showNameAtTop) Text(messagesWith.join(',')),
-            if (!widget.autoOpen)
-              IconButton(
-                  icon:
-                      Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-                  onPressed: () {
-                    setState(() {
-                      _isExpanded = !_isExpanded;
-                    });
-                  }),
-            ],),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  color: Colors.grey[300],
+                  tooltip: 'Delete messages',
+                  onPressed: () => _showDeleteDialog(context),
+                ),
+                if (widget.showNameAtTop) Text(messagesWith.join(',')),
+                if (!widget.autoOpen)
+                  IconButton(
+                      icon: Icon(
+                          _isExpanded ? Icons.expand_less : Icons.expand_more),
+                      onPressed: () {
+                        setState(() {
+                          _isExpanded = !_isExpanded;
+                        });
+                      }),
+              ],
+            ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 1000),
               height: _isExpanded ? 400 : 0,

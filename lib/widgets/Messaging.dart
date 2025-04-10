@@ -30,12 +30,14 @@ class _MessagingState extends State<Messaging> {
   }
 
   Future<void> getMessages() async {
+    print('attempting to get messages');
     List<Map<DocumentReference, Map<String, dynamic>>> data =
         await fmu.getMessageDocumentsByUserUid(widget.user_uid);
     List<Map<String, dynamic>> extractedList =
         data.map((entry) => entry.values.first).toList();
     List<DocumentReference> extractedDocumentReference =
         data.map((entry) => entry.keys.first).toList();
+    print(extractedList);
     setState(() {
       messageData = extractedList;
       messageDocumentReference = extractedDocumentReference;
@@ -137,11 +139,12 @@ class _MessagingState extends State<Messaging> {
           ),
           if (selectedItems.isNotEmpty)
             TextButton(
-                onPressed: () {
+                onPressed: () async {
                   List<String> conversationParticipants =
                       selectedItems.toList();
                   conversationParticipants.add(widget.user_uid);
-                  fmu.createMessageDocument(conversationParticipants);
+                  await fmu.createMessageDocument(conversationParticipants);
+                  await getMessages();
                 },
                 child: Text('create new chat')),
           Container(
@@ -151,6 +154,7 @@ class _MessagingState extends State<Messaging> {
               itemCount: messageData.length,
               itemBuilder: (context, index) {
                 return CollapsibleChatScreen(
+                  getMessages: getMessages,
                   uid: widget.user_uid,
                   documentData: messageData[index],
                   documentReference: messageDocumentReference[index],
