@@ -30,6 +30,11 @@ class _MessagingState extends State<Messaging> {
   }
 
   Future<void> getMessages() async {
+    //clear out stale message data
+    setState(() {
+      messageData = [];
+      messageDocumentReference = [];
+    });
     print('attempting to get messages');
     List<Map<DocumentReference, Map<String, dynamic>>> data =
         await fmu.getMessageDocumentsByUserUid(widget.user_uid);
@@ -38,6 +43,7 @@ class _MessagingState extends State<Messaging> {
     List<DocumentReference> extractedDocumentReference =
         data.map((entry) => entry.keys.first).toList();
     print(extractedList);
+    print(extractedDocumentReference);
     setState(() {
       messageData = extractedList;
       messageDocumentReference = extractedDocumentReference;

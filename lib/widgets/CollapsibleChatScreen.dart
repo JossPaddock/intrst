@@ -38,15 +38,21 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   @override
   void initState() {
     super.initState();
-    widget.documentData['user_uids'].forEach((value) async {
+
+    List<Future<String>> nameFutures = [];
+    widget.documentData['user_uids'].forEach((value) {
       if (value != widget.uid) {
-        String name = await fuu.lookUpNameByUserUid(users, value);
-        setState(() {
-          print('added $name to messagesWith');
-          messagesWith.add(name);
-        });
+        nameFutures.add(fuu.lookUpNameByUserUid(users, value));
       }
     });
+
+    Future.wait(nameFutures).then((names) {
+      print(names);
+      setState(() {
+        messagesWith.addAll(names);
+      });
+    });
+
     if (widget.autoOpen) {
       setState(() {
         _isExpanded = true;
