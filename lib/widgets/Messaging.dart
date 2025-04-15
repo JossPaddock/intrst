@@ -32,6 +32,7 @@ class _MessagingState extends State<Messaging> {
     super.initState();
     _subscription = FirebaseFirestore.instance
         .collection('messages')
+        .where('user_uids', arrayContains: widget.user_uid)
         .snapshots()
         .listen((QuerySnapshot snapshot) {
       getMessages();
