@@ -35,7 +35,14 @@ class _MessagingState extends State<Messaging> {
         .where('user_uids', arrayContains: widget.user_uid)
         .snapshots()
         .listen((QuerySnapshot snapshot) {
-      getMessages();
+      final hasRelevantChange = snapshot.docChanges.any((change) =>
+      change.type == DocumentChangeType.added ||
+          change.type == DocumentChangeType.removed
+      );
+
+      if (hasRelevantChange) {
+        getMessages();
+      }
     });
     getMessages();
   }

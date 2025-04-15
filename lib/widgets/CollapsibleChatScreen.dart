@@ -201,6 +201,9 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       //todo: message input validation eg. make sure they don't send an empty message.
                       fmu.sendMessage(
                           text, widget.documentReference, widget.uid);
+                      setState(() {
+                        _send_message_controller.clear();
+                      });
                     },
                   ),
                 ),
