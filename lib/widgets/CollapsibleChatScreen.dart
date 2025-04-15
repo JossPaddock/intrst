@@ -174,7 +174,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                         }
 
                         var data =
-                            snapshot.data!.data() as Map<String, dynamic>;
+                         snapshot.data!.data() as Map<String, dynamic>;
                         return ChatScreen(
                           uid: widget.uid,
                           documentData: data,

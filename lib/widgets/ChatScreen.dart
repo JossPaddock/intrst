@@ -22,7 +22,7 @@ class ChatScreen extends StatelessWidget {
           'message_content': value['message_content'],
           'timestamp': value['timestamp'] != null
               ? (value['timestamp'] as Timestamp).toDate()
-              : null, // Assign null if timestamp is missing
+              : DateTime.now(), // Assign now if timestamp is missing
           'user_uid': value['user_uid'],
         });
       });

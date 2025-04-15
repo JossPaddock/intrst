@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/widgets/CollapsibleChatScreen.dart';
@@ -23,10 +25,23 @@ class _MessagingState extends State<Messaging> {
   List<String> searchResults = [];
   List<Map<String, dynamic>> messageData = [];
   List<DocumentReference> messageDocumentReference = [];
+
+  late final StreamSubscription _subscription;
   @override
   void initState() {
     super.initState();
+    _subscription = FirebaseFirestore.instance
+        .collection('messages')
+        .snapshots()
+        .listen((QuerySnapshot snapshot) {
+      getMessages();
+    });
     getMessages();
+  }
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 
   Future<void> getMessages() async {
@@ -48,6 +63,45 @@ class _MessagingState extends State<Messaging> {
       messageData = extractedList;
       messageDocumentReference = extractedDocumentReference;
     });
+    reorderMessagesByLatestMessageFirst();
+  }
+
+  Future<void> reorderMessagesByLatestMessageFirst() async {
+    // instead of sorting 1 by 1, lets put what we want to sort into the same pairs
+    // then do the sorting operations
+    List<MapEntry<Map<String, dynamic>, DocumentReference>> combinedList = List.generate(
+      messageData.length,
+          (index) => MapEntry(messageData[index], messageDocumentReference[index]),
+    );
+
+    DateTime getLatestMessageTimestamp(Map<String, dynamic> conversation) {
+      if (conversation.isEmpty) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+
+      var messageTimestamps = conversation.values
+          .map((message) => message['timestamp']?.toDate())
+          .whereType<DateTime>()
+          .toList();
+
+      messageTimestamps.sort((a, b) => b.compareTo(a));
+      return messageTimestamps.isEmpty ? DateTime.fromMillisecondsSinceEpoch(0) : messageTimestamps.first;
+    }
+
+    // dry principles
+    combinedList.sort((a, b) {
+      DateTime timestampA = getLatestMessageTimestamp(a.key['conversation']);
+      DateTime timestampB = getLatestMessageTimestamp(b.key['conversation']);
+      return timestampB.compareTo(timestampA); // Latest first
+    });
+
+    // but the data still needs to be seperated
+    setState(() {
+      messageData = combinedList.map((e) => e.key).toList();
+      messageDocumentReference = combinedList.map((e) => e.value).toList();
+    });
+
+    print("Success: messages reordered by the latest message first.");
   }
 
   @override
