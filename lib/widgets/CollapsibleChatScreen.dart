@@ -167,7 +167,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                         }
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Text('Loading...');
+                          return Text('');
                         }
                         if (!snapshot.hasData || !snapshot.data!.exists) {
                           return Text('No messages found');

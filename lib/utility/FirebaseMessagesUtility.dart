@@ -56,14 +56,30 @@ class FirebaseMessagesUtility {
     return messages_data[0];
   }
 
-  Future<void> createMessageDocument(List<String> userUids) async {
+  Future<bool> userUidComboAlreadyExists(List<String> userUids) async {
+    final inputKey = (userUids..sort()).join(',');
+    final allMessages = await messages.get();
+    return allMessages.docs.any((doc) =>
+    ((doc['user_uids'] as List?)?.map((d) => d.toString()).toList()?..sort())?.join(',') == inputKey
+    );
+  }
+
+  Future<bool> createMessageDocument(List<String> userUids) async {
     Map<String, Map<String, dynamic>> conversation = {};
     Map<String, dynamic> data = {
       'user_uids': userUids,
       'conversation': conversation,
       'created_at': FieldValue.serverTimestamp(),
     };
-    await messages.add(data);
+    final alreadyExists = await userUidComboAlreadyExists(userUids);
+    if(alreadyExists) {
+      print('the user tried creating a chat which already exists but was prevented');
+      return false;
+    } else {
+      await messages.add(data);
+      return true;
+    }
+
   }
 
   Future<void> deleteMessageDocument(DocumentReference dr) async {

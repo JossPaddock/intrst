@@ -68,7 +68,7 @@ class ChatScreen extends StatelessWidget {
             future: fu.lookUpNameByUserUid(users, message['user_uid']),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return ListTile(title: Text('Loading...'));
+                return ListTile(title: Text(''));
               } else if (snapshot.hasError) {
                 return ListTile(title: Text('Error'));
               } else {

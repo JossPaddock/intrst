@@ -25,6 +25,7 @@ class _MessagingState extends State<Messaging> {
   List<String> searchResults = [];
   List<Map<String, dynamic>> messageData = [];
   List<DocumentReference> messageDocumentReference = [];
+  String createNewChat = 'create new chat';
 
   late final StreamSubscription _subscription;
   @override
@@ -36,9 +37,8 @@ class _MessagingState extends State<Messaging> {
         .snapshots()
         .listen((QuerySnapshot snapshot) {
       final hasRelevantChange = snapshot.docChanges.any((change) =>
-      change.type == DocumentChangeType.added ||
-          change.type == DocumentChangeType.removed
-      );
+          change.type == DocumentChangeType.added ||
+          change.type == DocumentChangeType.removed);
 
       if (hasRelevantChange) {
         getMessages();
@@ -46,6 +46,7 @@ class _MessagingState extends State<Messaging> {
     });
     getMessages();
   }
+
   @override
   void dispose() {
     _subscription.cancel();
@@ -77,9 +78,10 @@ class _MessagingState extends State<Messaging> {
   Future<void> reorderMessagesByLatestMessageFirst() async {
     // instead of sorting 1 by 1, lets put what we want to sort into the same pairs
     // then do the sorting operations
-    List<MapEntry<Map<String, dynamic>, DocumentReference>> combinedList = List.generate(
+    List<MapEntry<Map<String, dynamic>, DocumentReference>> combinedList =
+        List.generate(
       messageData.length,
-          (index) => MapEntry(messageData[index], messageDocumentReference[index]),
+      (index) => MapEntry(messageData[index], messageDocumentReference[index]),
     );
 
     DateTime getLatestMessageTimestamp(Map<String, dynamic> conversation) {
@@ -93,7 +95,9 @@ class _MessagingState extends State<Messaging> {
           .toList();
 
       messageTimestamps.sort((a, b) => b.compareTo(a));
-      return messageTimestamps.isEmpty ? DateTime.fromMillisecondsSinceEpoch(0) : messageTimestamps.first;
+      return messageTimestamps.isEmpty
+          ? DateTime.fromMillisecondsSinceEpoch(0)
+          : messageTimestamps.first;
     }
 
     // dry principles
@@ -211,10 +215,19 @@ class _MessagingState extends State<Messaging> {
                   List<String> conversationParticipants =
                       selectedItems.toList();
                   conversationParticipants.add(widget.user_uid);
-                  await fmu.createMessageDocument(conversationParticipants);
-                  await getMessages();
+                  final createMessageResult =
+                      await fmu.createMessageDocument(conversationParticipants);
+                  if (createMessageResult) {
+                    await getMessages();
+                  } else {
+                    setState(() {createNewChat = 'chat already exists';});
+                    await Future.delayed(Duration(seconds: 1));
+                    setState(() {
+                      createNewChat = 'create new chat';
+                    });
+                  }
                 },
-                child: Text('create new chat')),
+                child: Text(createNewChat)),
           Container(
             width: 300,
             height: 600,
