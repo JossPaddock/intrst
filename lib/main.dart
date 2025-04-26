@@ -11,7 +11,7 @@ import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:intrst/widgets/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
-import  'package:intrst/widgets/Preview.dart'as custom_preview;
+import 'package:intrst/widgets/Preview.dart' as custom_preview;
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
 import 'widgets/InterestInputForm.dart';
@@ -78,7 +78,17 @@ class _MyHomePageState extends State<MyHomePage> {
   int toggleIndex = 0;
   bool mapOptionsVisibility = false;
   String _markerDraggabilityText = 'Your marker is not movable';
+  bool hasNotification = false;
+  int notificationCount = 0;
+  Timer? _notificationLoading;
 
+  Future<void> loadUserContext() async {
+    _loadNotificationCount();
+    _notificationLoading = Timer.periodic(Duration(seconds: 60), (timer) {
+      print('Attempting to load user notifications timestamp: ${DateTime.now()}');
+      _loadNotificationCount();
+    });
+  }
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
@@ -87,6 +97,7 @@ class _MyHomePageState extends State<MyHomePage> {
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
       if (user == null) {
         print('User is currently signed out!');
+        _notificationLoading?.cancel();
       } else {
         CollectionReference users =
             FirebaseFirestore.instance.collection('users');
@@ -100,6 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _uid = localUid;
         _handleUserModel(localUid);
         setState(() {});
+        loadUserContext();
       }
     });
   }
@@ -169,6 +181,28 @@ class _MyHomePageState extends State<MyHomePage> {
       markers = poiMarkers;
     });
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _notificationLoading?.cancel();
+    super.dispose();
+  }
+
+  void _loadNotificationCount() async {
+    print('attempting to load notification count');
+    int count = await fu.retrieveNotificationCount(
+        FirebaseFirestore.instance.collection('users'), _uid);
+    print('the notification count was $count');
+    setState(() {
+      if (count > 0) {
+        hasNotification = true;
+        notificationCount = count;
+      } else {
+        hasNotification = false;
+        notificationCount = 0;
+      }
+    });
   }
 
   Future<void>? handleMarkerTap(String title, String uid, bool isPoi) {
@@ -411,6 +445,9 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _signedIn = newValue;
     });
+    if(newValue) {
+      loadUserContext();
+    }
   }
 
   void _handleNameChanged(String newValue) {
@@ -498,7 +535,10 @@ class _MyHomePageState extends State<MyHomePage> {
         leading: Builder(
           builder: (BuildContext context) {
             return IconButton(
-              icon: const Icon(Icons.menu),
+              icon: Badge.count(
+                  isLabelVisible: hasNotification,
+                  count: notificationCount,
+                  child: const Icon(Icons.menu)),
               color: Colors.white,
               onPressed: () {
                 Scaffold.of(context).openDrawer();
@@ -615,7 +655,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                         (CameraPosition cameraPosition) {
                                       _onCameraMove(cameraPosition.zoom);
                                     },
-                                    cloudMapId: mapId, // Set the map style ID here
+                                    cloudMapId:
+                                        mapId, // Set the map style ID here
                                     mapToolbarEnabled: false,
                                     zoomGesturesEnabled: _zoomEnabled,
                                     gestureRecognizers: _zoomEnabled
@@ -697,53 +738,63 @@ class _MyHomePageState extends State<MyHomePage> {
                                   child: Column(children: [
                                     SizedBox(height: 10),
                                     Row(
-                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
                                         children: [
-                                      Text(_markerDraggabilityText,
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      SizedBox(width: 40,),
-                                          Container(
-                                        padding: EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                            color: Colors.blue,
-                                            borderRadius:
-                                            BorderRadius.circular(8)),
-                                        child: SizedBox(
-                                          height: 40,
-                                          width: 100,
-                                          child:
-                                          AnimatedToggleSwitch<int>.rolling(
-                                            current: toggleIndex,
-                                            values: [0, 1],
-                                            onChanged: (i) async {
-                                              print(toggleIndex);
-                                              setState(() => toggleIndex = i);
-                                              bool choice = (i == 1);
-                                              _setDraggabilityUserModel(choice);
-                                              await loadMarkers(true);
-                                              _onCameraMove(_currentZoom);
-                                              setState(() => toggleIndex = i);
-                                              print(toggleIndex);
-                                              setState(() {
-                                                _zoomEnabled = true;
-                                                if(!choice) {
-                                                  mapOptionsVisibility = false;
-                                                  _markerDraggabilityText = 'Your marker is not movable';
-                                                }
-                                                else{
-                                                  _markerDraggabilityText = 'Your marker is movable';
-                                                }
-                                              });
-                                            },
-                                            //loading: false, // for deactivating loading animation
-                                            iconBuilder: rollingIconBuilder,
-                                            style: ToggleStyle(),
-                                            height: 50,
+                                          Text(
+                                            _markerDraggabilityText,
+                                            style:
+                                                TextStyle(color: Colors.white),
                                           ),
-                                        ),
-                                      ),
-                                    ]),
+                                          SizedBox(
+                                            width: 40,
+                                          ),
+                                          Container(
+                                            padding: EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                                color: Colors.blue,
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            child: SizedBox(
+                                              height: 40,
+                                              width: 100,
+                                              child: AnimatedToggleSwitch<
+                                                  int>.rolling(
+                                                current: toggleIndex,
+                                                values: [0, 1],
+                                                onChanged: (i) async {
+                                                  print(toggleIndex);
+                                                  setState(
+                                                      () => toggleIndex = i);
+                                                  bool choice = (i == 1);
+                                                  _setDraggabilityUserModel(
+                                                      choice);
+                                                  await loadMarkers(true);
+                                                  _onCameraMove(_currentZoom);
+                                                  setState(
+                                                      () => toggleIndex = i);
+                                                  print(toggleIndex);
+                                                  setState(() {
+                                                    _zoomEnabled = true;
+                                                    if (!choice) {
+                                                      mapOptionsVisibility =
+                                                          false;
+                                                      _markerDraggabilityText =
+                                                          'Your marker is not movable';
+                                                    } else {
+                                                      _markerDraggabilityText =
+                                                          'Your marker is movable';
+                                                    }
+                                                  });
+                                                },
+                                                //loading: false, // for deactivating loading animation
+                                                iconBuilder: rollingIconBuilder,
+                                                style: ToggleStyle(),
+                                                height: 50,
+                                              ),
+                                            ),
+                                          ),
+                                        ]),
                                   ]),
                                 ),
                               ),
@@ -846,6 +897,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   ListTile(
                     title: const Text('Messages'),
+                    trailing: Badge.count(
+                      isLabelVisible: hasNotification,
+                      count: notificationCount,
+                    ),
                     selected: _selectedIndex == 3,
                     onTap: () {
                       _onItemTapped(3);
@@ -863,6 +918,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       _handleSignInChanged(false);
                       _handleNameChanged('');
                       _handleUidChanged('');
+                      setState(() {
+                        hasNotification = false;
+                        notificationCount = 0;
+                      });
                       Navigator.pop(context);
                     },
                   ),

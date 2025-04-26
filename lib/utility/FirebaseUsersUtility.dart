@@ -1,10 +1,7 @@
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intrst/utility/FirebaseMappers.dart';
 import '../models/Interest.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io';
 
 class FirebaseUsersUtility {
   Future<GeoPoint> retrieveUserLocation(
@@ -12,6 +9,50 @@ class FirebaseUsersUtility {
     QuerySnapshot querySnapshot =
         await users.where('user_uid', isEqualTo: userUid).get();
     return querySnapshot.docs.first['location'];
+  }
+
+  Future<void> updateUnreadNotificationCounts(String collectionPath) async {
+    final collection = FirebaseFirestore.instance.collection(collectionPath);
+
+    final querySnapshot = await collection.get();
+
+    for (final doc in querySnapshot.docs) {
+      final data = doc.data();
+      final List<dynamic> unreadNotifications = data['unread_notifications'] ?? [];
+
+      final Map<String, int> counts = {};
+
+      for (final notif in unreadNotifications) {
+        final parts = notif.split(':');
+        if (parts.length != 2) continue;
+
+        final docRefPath = parts[0];
+
+        if (counts.containsKey(docRefPath)) {
+          counts[docRefPath] = counts[docRefPath]! + 1;
+        } else {
+          counts[docRefPath] = 1;
+        }
+      }
+
+      await doc.reference.update({
+        'unread_notifications_count': counts,
+      });
+    }
+  }
+
+  Future<int> retrieveNotificationCount(CollectionReference users, String userUid, [String? docRef]) async{
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: userUid).get();
+    QueryDocumentSnapshot userQDS = querySnapshot.docs.first;
+    final Map<String, dynamic>? notifications =
+    userQDS.get('unread_notifications_count')?.cast<String, dynamic>();
+    if (notifications == null) return 0;
+    if (docRef != null) {
+      final value = notifications[docRef];
+      return (value is num) ? value.toInt() : 0;
+    }
+    return notifications.values.whereType<num>().fold<int>(0, (sum, value) => sum + value.toInt());
   }
 
   Future<List<String>> retrieveAllUserUid(CollectionReference users) async {

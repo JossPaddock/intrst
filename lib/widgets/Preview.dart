@@ -37,15 +37,38 @@ class _InterestAlertDialogState extends State<Preview> {
   bool chatOpen = false;
   CollectionReference messages =
       FirebaseFirestore.instance.collection('messages');
+  CollectionReference users = FirebaseFirestore.instance.collection('users');
   Map<DocumentReference, Map<String, dynamic>>? initMessageData = null;
+  bool hasNotification = false;
+  int notificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
     _fetchInitialMessageData();
+    _loadNotificationCount();
   }
 
+  void _loadNotificationCount() async{
+    while(initMessageData == null) {
+      await Future.delayed(Duration(milliseconds: 500));
+    }
+    print('attempting to load notification count');
+    int count = await fuu.retrieveNotificationCount(users, widget.uid, initMessageData!.entries.first.key.path);
+    print('the notification count was $count');
+    setState(() {
+      if(count > 0 ) {
+        hasNotification = true;
+        notificationCount = count;
+      }
+      else{
+        hasNotification = false;
+        notificationCount = 0;
+      }
+    });
+  }
+  
   void _handleAlternateUserModel(String value, String name) {
     UserModel userModel = Provider.of<UserModel>(context, listen: false);
     userModel.changeAlternateUid(value);
@@ -58,7 +81,6 @@ class _InterestAlertDialogState extends State<Preview> {
   }
 
   Future<void> _fetchNameAndButtonLabels() async {
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<Interest> interests =
         await fuu.pullInterestsForUser(users, widget.alternateUid);
     String name = await fuu.lookUpNameByUserUid(users, widget.alternateUid);
@@ -146,8 +168,10 @@ class _InterestAlertDialogState extends State<Preview> {
                     chatOpen = !chatOpen;
                   });
                 },
-                icon: Icon(Icons.chat),
-                label: Text(chatOpen ? 'Close' : 'Chat'),
+                icon: Badge.count(
+                    offset: Offset(9.0, -7.0), isLabelVisible: hasNotification,
+                  count: notificationCount, child: const Icon(Icons.chat)),
+                  label: Text(chatOpen ? 'Close' : 'Chat'),
               ),
               ElevatedButton.icon(
                 onPressed: () {

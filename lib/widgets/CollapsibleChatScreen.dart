@@ -34,6 +34,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
   CollectionReference users = FirebaseFirestore.instance.collection('users');
   Set<String> messagesWith = {};
+  bool hasNotification = false;
+  int notificationCount = 0;
 
   @override
   void initState() {
@@ -58,6 +60,22 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
         _isExpanded = true;
       });
     }
+    _loadNotificationCount();
+  }
+  void _loadNotificationCount() async{
+    print('attempting to load notification count');
+    int count = await fuu.retrieveNotificationCount(users, widget.uid, widget.documentReference.path);
+    print('the notification count was $count');
+    setState(() {
+      if(count > 0 ) {
+        hasNotification = true;
+        notificationCount = count;
+      }
+      else{
+        hasNotification = false;
+        notificationCount = 0;
+      }
+    });
   }
 
   void _showDeleteDialog(BuildContext context) {
@@ -145,8 +163,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                 if (widget.showNameAtTop) Text(messagesWith.join(',')),
                 if (!widget.autoOpen)
                   IconButton(
-                      icon: Icon(
-                          _isExpanded ? Icons.expand_less : Icons.expand_more),
+                      icon: Badge.count(isLabelVisible: hasNotification, count: notificationCount, child: Icon(
+                          _isExpanded ? Icons.expand_less : Icons.expand_more)),
                       onPressed: () {
                         setState(() {
                           _isExpanded = !_isExpanded;
@@ -204,6 +222,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       setState(() {
                         _send_message_controller.clear();
                       });
+                      fuu.updateUnreadNotificationCounts('users');
                     },
                   ),
                 ),
