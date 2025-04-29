@@ -84,8 +84,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> loadUserContext() async {
     _loadNotificationCount();
-    _notificationLoading = Timer.periodic(Duration(seconds: 60), (timer) {
-      print('Attempting to load user notifications timestamp: ${DateTime.now()}');
+    _notificationLoading = Timer.periodic(Duration(seconds: 30), (timer) {
+      print(
+          'Attempting to load user notifications timestamp: ${DateTime.now()}');
       _loadNotificationCount();
     });
   }
@@ -191,18 +192,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _loadNotificationCount() async {
     print('attempting to load notification count');
+    await fu.updateUnreadNotificationCounts('users');
     int count = await fu.retrieveNotificationCount(
         FirebaseFirestore.instance.collection('users'), _uid);
     print('the notification count was $count');
-    setState(() {
-      if (count > 0) {
-        hasNotification = true;
-        notificationCount = count;
-      } else {
-        hasNotification = false;
-        notificationCount = 0;
-      }
-    });
+    if (notificationCount != count) {
+      setState(() {
+        if (count > 0) {
+          hasNotification = true;
+          notificationCount = count;
+        } else {
+          hasNotification = false;
+          notificationCount = 0;
+        }
+      });
+    }
   }
 
   Future<void>? handleMarkerTap(String title, String uid, bool isPoi) {
@@ -445,7 +449,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _signedIn = newValue;
     });
-    if(newValue) {
+    if (newValue) {
       loadUserContext();
     }
   }

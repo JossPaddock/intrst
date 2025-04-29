@@ -11,7 +11,21 @@ class FirebaseUsersUtility {
     return querySnapshot.docs.first['location'];
   }
 
-  Future<void> updateUnreadNotificationCounts(String collectionPath) async {
+Future<void> addUnreadNotification(String collectionPath, String userUid, String docRefPath, String messageUuid) async {
+  final collection = FirebaseFirestore.instance.collection(collectionPath);
+  QuerySnapshot querySnapshot = await collection.where('user_uid', isEqualTo: userUid).get();
+  querySnapshot.docs.first.reference.update({
+    'unread_notifications': FieldValue.arrayUnion(['$docRefPath:$messageUuid'])
+  });
+  print('added to unread_notifications: $docRefPath:$messageUuid');
+}
+
+//Warning this method updates notification counts for everyone and shouldn't be called too often
+//right now it is called when anyone hits the send button ensuring it works when it needs to.
+// But it is probably working more than it should.
+  //Ideally it only runs when updateNotifications is read!
+  //the method should be made more granular so it only updates notifications for one user.
+Future<void> updateUnreadNotificationCounts(String collectionPath) async {
     final collection = FirebaseFirestore.instance.collection(collectionPath);
 
     final querySnapshot = await collection.get();

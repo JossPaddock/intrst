@@ -90,7 +90,23 @@ class FirebaseMessagesUtility {
     }
   }
 
-  Future<void> sendMessage(
+  Future<List<dynamic>> retrieveMessageDocumentUserUids(DocumentReference dr) async {
+try {
+  DocumentSnapshot docSnapshot = await dr.get();
+  if (docSnapshot.exists) {
+    final data = docSnapshot.data() as Map<String, dynamic>?;
+    if (data != null && data['user_uids'] is List) {
+      return data['user_uids'] as List<dynamic>;
+    }
+  }
+  return [];
+} catch (e) {
+  print('Error fetching user_uids: $e');
+  return [];
+}
+  }
+
+  Future<String> sendMessage(
       String message, DocumentReference dr, String user_uid) async {
     try {
       final String messageId = const Uuid().v4();
@@ -108,8 +124,10 @@ class FirebaseMessagesUtility {
       }, SetOptions(merge: true));
 
       print("User has sent message successfully.");
+      return messageId;
     } catch (e) {
       print("Error sending message: $e");
+      return 'Error';
     }
   }
 }

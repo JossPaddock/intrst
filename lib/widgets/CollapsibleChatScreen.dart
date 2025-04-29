@@ -214,14 +214,23 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(Icons.send),
-                    onPressed: () {
+                    onPressed: () async{
                       final text = _send_message_controller.text;
                       //todo: message input validation eg. make sure they don't send an empty message.
-                      fmu.sendMessage(
+                      String messageUuid = await fmu.sendMessage(
                           text, widget.documentReference, widget.uid);
                       setState(() {
                         _send_message_controller.clear();
                       });
+                      List<dynamic> userUids = await fmu.retrieveMessageDocumentUserUids(widget.documentReference);
+                      //At this point create an unread notification for the receiving user for which this message was sent
+                      for(var id in userUids) {
+                        //make sure that the id's we are notifying don't include yourself
+                        if(id is String && id != widget.uid) {
+                          await fuu.addUnreadNotification('users', id, widget.documentReference.path, messageUuid);
+                        }
+
+                      }
                       fuu.updateUnreadNotificationCounts('users');
                     },
                   ),
