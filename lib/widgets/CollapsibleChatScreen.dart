@@ -54,24 +54,34 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
         messagesWith.addAll(names);
       });
     });
+    manageAutoOpen();
+    _loadNotificationCount();
+  }
 
+  Future<void> manageAutoOpen() async {
     if (widget.autoOpen) {
+      //clear notifications for this chat
+      print('attempting to remove unread notifications');
+      await fuu.removeUnreadNotifications(
+          widget.documentReference.path, widget.uid);
+      print('finished removing unread notifications');
       setState(() {
         _isExpanded = true;
       });
+      'for the collapsibleChatScreen _isExpanded = true';
     }
-    _loadNotificationCount();
   }
-  void _loadNotificationCount() async{
+
+  void _loadNotificationCount() async {
     print('attempting to load notification count');
-    int count = await fuu.retrieveNotificationCount(users, widget.uid, widget.documentReference.path);
+    int count = await fuu.retrieveNotificationCount(
+        users, widget.uid, widget.documentReference.path);
     print('the notification count was $count');
     setState(() {
-      if(count > 0 ) {
+      if (count > 0) {
         hasNotification = true;
         notificationCount = count;
-      }
-      else{
+      } else {
         hasNotification = false;
         notificationCount = 0;
       }
@@ -122,7 +132,14 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       ? () async {
                           Navigator.of(context).pop();
                           //put the call to delete the message document here!!!
-                          await fmu.deleteMessageDocument(widget.documentReference);
+                          List<dynamic> userUids =
+                              await fmu.retrieveMessageDocumentUserUids(
+                                  widget.documentReference);
+                          await Future.wait(userUids.map((userUid) =>
+                              fuu.removeUnreadNotifications(
+                                  widget.documentReference.path, userUid)));
+                          await fmu
+                              .deleteMessageDocument(widget.documentReference);
                           //This insures that if we have the getMessages callback function
                           // it will update the document data for the messaging widget
                           widget.getMessages?.call();
@@ -163,9 +180,19 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                 if (widget.showNameAtTop) Text(messagesWith.join(',')),
                 if (!widget.autoOpen)
                   IconButton(
-                      icon: Badge.count(isLabelVisible: hasNotification, count: notificationCount, child: Icon(
-                          _isExpanded ? Icons.expand_less : Icons.expand_more)),
-                      onPressed: () {
+                      icon: Badge.count(
+                          isLabelVisible: hasNotification,
+                          count: notificationCount,
+                          child: Icon(_isExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more)),
+                      onPressed: () async {
+                        if (!_isExpanded) {
+                          //clear notifications for this chat
+                          await fuu.removeUnreadNotifications(
+                              widget.documentReference.path, widget.uid);
+                          _loadNotificationCount();
+                        }
                         setState(() {
                           _isExpanded = !_isExpanded;
                         });
@@ -192,7 +219,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                         }
 
                         var data =
-                         snapshot.data!.data() as Map<String, dynamic>;
+                            snapshot.data!.data() as Map<String, dynamic>;
                         return ChatScreen(
                           uid: widget.uid,
                           documentData: data,
@@ -214,7 +241,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(Icons.send),
-                    onPressed: () async{
+                    onPressed: () async {
                       final text = _send_message_controller.text;
                       //todo: message input validation eg. make sure they don't send an empty message.
                       String messageUuid = await fmu.sendMessage(
@@ -222,14 +249,16 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       setState(() {
                         _send_message_controller.clear();
                       });
-                      List<dynamic> userUids = await fmu.retrieveMessageDocumentUserUids(widget.documentReference);
+                      List<dynamic> userUids =
+                          await fmu.retrieveMessageDocumentUserUids(
+                              widget.documentReference);
                       //At this point create an unread notification for the receiving user for which this message was sent
-                      for(var id in userUids) {
+                      for (var id in userUids) {
                         //make sure that the id's we are notifying don't include yourself
-                        if(id is String && id != widget.uid) {
-                          await fuu.addUnreadNotification('users', id, widget.documentReference.path, messageUuid);
+                        if (id is String && id != widget.uid) {
+                          await fuu.addUnreadNotification('users', id,
+                              widget.documentReference.path, messageUuid);
                         }
-
                       }
                       fuu.updateUnreadNotificationCounts('users');
                     },

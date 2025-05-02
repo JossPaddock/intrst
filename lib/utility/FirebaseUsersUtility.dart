@@ -11,7 +11,54 @@ class FirebaseUsersUtility {
     return querySnapshot.docs.first['location'];
   }
 
-Future<void> addUnreadNotification(String collectionPath, String userUid, String docRefPath, String messageUuid) async {
+  Future<void> removeItemsContainingSubstring({
+    required String docPath,
+    required String arrayField,
+    required String substring,
+  }) async {
+    final docRef = FirebaseFirestore.instance.doc(docPath);
+
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) {
+      print('Document does not exist.');
+      return;
+    }
+
+    final data = snapshot.data();
+    if (data == null || data[arrayField] == null || data[arrayField] is! List) {
+      print('Invalid or missing array field.');
+      return;
+    }
+
+    final List<dynamic> originalArray = data[arrayField];
+    final List<String> updatedArray = originalArray
+        .where((item) =>
+    item is String && !item.toLowerCase().contains(substring.toLowerCase()))
+        .cast<String>()
+        .toList();
+
+    await docRef.update({arrayField: updatedArray});
+    print('Removed $substring from $docPath for field $arrayField.');
+  }
+
+  Future<void> removeUnreadNotifications(String docRef, String uid) async {
+    final usersCollection = FirebaseFirestore.instance.collection('users');
+    final querySnapshot = await usersCollection
+        .where('user_uid', isEqualTo: uid)
+        .get();
+    for (final doc in querySnapshot.docs) {
+      final docPath = doc.reference.path;
+      await removeItemsContainingSubstring(
+        docPath: docPath,
+        arrayField: 'unread_notifications',
+        substring: docRef,
+      );
+    }
+    await updateUnreadNotificationCounts('users');
+  }
+
+
+  Future<void> addUnreadNotification(String collectionPath, String userUid, String docRefPath, String messageUuid) async {
   final collection = FirebaseFirestore.instance.collection(collectionPath);
   QuerySnapshot querySnapshot = await collection.where('user_uid', isEqualTo: userUid).get();
   querySnapshot.docs.first.reference.update({
