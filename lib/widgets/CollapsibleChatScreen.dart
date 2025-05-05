@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intrst/utility/GeneralUtility.dart';
 import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
 import 'ChatScreen.dart';
@@ -36,6 +37,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   Set<String> messagesWith = {};
   bool hasNotification = false;
   int notificationCount = 0;
+  GeneralUtility gu = GeneralUtility();
 
   @override
   void initState() {
@@ -201,7 +203,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 1000),
-              height: _isExpanded ? 400 : 0,
+              height: _isExpanded && gu.isMobileBrowser(context) ? 200 : _isExpanded? 400 : 0,
               child: _isExpanded
                   ? StreamBuilder<DocumentSnapshot>(
                       stream: widget.documentReference

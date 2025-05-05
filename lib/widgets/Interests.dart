@@ -1,13 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intrst/utility/GeneralUtility.dart';
 import 'package:provider/provider.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intrst/widgets/InterestInputForm.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import '../models/Interest.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:html' as html;
 
 class Interests extends StatelessWidget {
   final String name;
@@ -95,6 +94,7 @@ class _CardListState extends State<CardList>
   TextEditingController _mobileLinkController = TextEditingController();
   TextEditingController _mobileSubtitleController = TextEditingController();
   late List<Interest> localInterests = widget.interests;
+  GeneralUtility gu = GeneralUtility();
 
   Future<List<Interest>> refreshInterestsForUser(String user_uid) async {
     return Interests(
@@ -149,20 +149,6 @@ class _CardListState extends State<CardList>
     } else {
       throw 'Could not launch $url';
     }
-  }
-
-  bool isMobileBrowser(BuildContext context) {
-    final userAgent = html.window.navigator.userAgent.toLowerCase();
-    bool isMobileUserAgent = userAgent.contains('iphone') ||
-        userAgent.contains('android') ||
-        userAgent.contains('ipad') ||
-        userAgent.contains('mobile');
-
-    //optionally do this as well.. mileage may vary
-    bool isSmallScreen = MediaQuery.of(context).size.width < 800 ||
-        MediaQuery.of(context).size.height < 800;
-
-    return isMobileUserAgent && isSmallScreen;
   }
 
   @override
@@ -319,7 +305,7 @@ class _CardListState extends State<CardList>
                                       icon: Icon(
                                           toggle ? Icons.save : Icons.edit),
                                       onPressed: () async {
-                                        if (!isMobileBrowser(context)) {
+                                        if (!gu.isMobileBrowser(context)) {
                                           if (toggle) {
                                             // Save changes logic
                                             CollectionReference users =
