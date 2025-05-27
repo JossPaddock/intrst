@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intrst/utility/Pick_GeneralUtility.dart';
 import 'package:intrst/utility/GeneralUtility.dart';
 import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
@@ -37,7 +38,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   Set<String> messagesWith = {};
   bool hasNotification = false;
   int notificationCount = 0;
-  GeneralUtility gu = GeneralUtility();
+  GeneralUtility gu = GeneralUtilityWeb();
 
   @override
   void initState() {

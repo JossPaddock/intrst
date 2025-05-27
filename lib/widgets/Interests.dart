@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intrst/utility/Pick_GeneralUtility.dart';
 import 'package:intrst/utility/GeneralUtility.dart';
 import 'package:provider/provider.dart';
 import 'package:intrst/models/UserModel.dart';
@@ -94,7 +95,7 @@ class _CardListState extends State<CardList>
   TextEditingController _mobileLinkController = TextEditingController();
   TextEditingController _mobileSubtitleController = TextEditingController();
   late List<Interest> localInterests = widget.interests;
-  GeneralUtility gu = GeneralUtility();
+  GeneralUtility gu = GeneralUtilityWeb();
 
   Future<List<Interest>> refreshInterestsForUser(String user_uid) async {
     return Interests(

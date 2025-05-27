@@ -70,6 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
         print('No user found for that email.');
       } else if (e.code == 'wrong-password') {
         print('Wrong password provided for that user.');
+      } else {
+        print('some login error has occured e.code: ${e.code} and e.detailMessage: ${e.message} and e.stackTrace: ${e.stackTrace.toString()}');
       }
       result = false;
     }
