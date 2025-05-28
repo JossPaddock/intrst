@@ -93,7 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
-      name: 'intrst',
+      //name: 'intrst',
       options: DefaultFirebaseOptions.currentPlatform,
     );
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
@@ -529,7 +529,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     //padding.top represents the height of the status bar which varies by device
-    double mapHeight = MediaQuery.of(context).size.height /*- MediaQuery.of(context).padding.top*/;
+    double mapHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top;
     double toolbarHeight = 56;
     return Scaffold(
       drawerEnableOpenDragGesture: false,

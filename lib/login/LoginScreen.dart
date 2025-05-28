@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
 //this is for Firebase
@@ -56,7 +57,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
       result = true;
-      FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+      if (kIsWeb) {
+        await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+        print('Web persistence set to LOCAL');
+      } else {
+        print('Skipping setPersistence on non-web platform');
+      }
       print(FirebaseAuth.instance.currentUser?.uid);
       CollectionReference users =
       FirebaseFirestore.instance.collection('users');

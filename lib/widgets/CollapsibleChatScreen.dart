@@ -180,7 +180,19 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                   tooltip: 'Delete messages',
                   onPressed: () => _showDeleteDialog(context),
                 ),
-                if (widget.showNameAtTop) Text(messagesWith.join(',')),
+                if (widget.showNameAtTop)
+                  Text(
+                    (() {
+                      final cutoff = 35;
+                      final full = messagesWith.join(', ');
+                      if (full.length <= cutoff) return full;
+
+                      final firstParts = messagesWith.map((s) => s.split(' ')[0]).join(', ');
+                      if (firstParts.length <= cutoff) return firstParts;
+
+                      return '${firstParts.substring(0, cutoff - 3)}...';
+                    })(),
+                  ),
                 if (!widget.autoOpen)
                   IconButton(
                       icon: Badge.count(
@@ -204,7 +216,11 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 1000),
-              height: _isExpanded && gu.isMobileBrowser(context) ? 200 : _isExpanded? 400 : 0,
+              height: _isExpanded && gu.isMobileBrowser(context)
+                  ? 200
+                  : _isExpanded
+                      ? 400
+                      : 0,
               child: _isExpanded
                   ? StreamBuilder<DocumentSnapshot>(
                       stream: widget.documentReference
