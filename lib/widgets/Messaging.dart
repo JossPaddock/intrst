@@ -220,7 +220,9 @@ class _MessagingState extends State<Messaging> {
                   if (createMessageResult) {
                     await getMessages();
                   } else {
-                    setState(() {createNewChat = 'chat already exists';});
+                    setState(() {
+                      createNewChat = 'chat already exists';
+                    });
                     await Future.delayed(Duration(seconds: 1));
                     setState(() {
                       createNewChat = 'create new chat';
@@ -228,9 +230,10 @@ class _MessagingState extends State<Messaging> {
                   }
                 },
                 child: Text(createNewChat)),
-          Container(
-            width: 300,
-            height: 600,
+          Expanded(
+              child: Container(
+            //width: 300,
+            //height: 351,
             child: ListView.builder(
               itemCount: messageData.length,
               itemBuilder: (context, index) {
@@ -242,7 +245,7 @@ class _MessagingState extends State<Messaging> {
                 );
               },
             ),
-          )
+          ))
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
 //this is for Firebase
@@ -56,13 +57,18 @@ class _LoginScreenState extends State<LoginScreen> {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
       result = true;
-      FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+      if (kIsWeb) {
+        await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+        print('Web persistence set to LOCAL');
+      } else {
+        print('Skipping setPersistence on non-web platform');
+      }
       print(FirebaseAuth.instance.currentUser?.uid);
       CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
+          FirebaseFirestore.instance.collection('users');
       String localUid = FirebaseAuth.instance.currentUser!.uid;
-      String name = await fu.lookUpNameByUserUid(users, localUid) ;
-      print (name);
+      String name = await fu.lookUpNameByUserUid(users, localUid);
+      print(name);
       widget.onNameChanged(name);
       widget.onUidChanged(localUid);
     } on FirebaseAuthException catch (e) {
@@ -70,6 +76,9 @@ class _LoginScreenState extends State<LoginScreen> {
         print('No user found for that email.');
       } else if (e.code == 'wrong-password') {
         print('Wrong password provided for that user.');
+      } else {
+        print(
+            'some login error has occured e.code: ${e.code} and e.detailMessage: ${e.message} and e.stackTrace: ${e.stackTrace.toString()}');
       }
       result = false;
     }
@@ -88,21 +97,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (FirebaseAuth.instance.currentUser != null) {
         print(FirebaseAuth.instance.currentUser?.uid);
         userSnapshot = FirebaseAuth.instance.currentUser;
+      } else {
+        print('the current user is null');
       }
       var firstname = data.additionalSignupData?.entries
-          .firstWhere((element) => element.key == 'firstname')
-          .value ??
+              .firstWhere((element) => element.key == 'firstname')
+              .value ??
           'Bob';
       var lastname = data.additionalSignupData?.entries
-          .firstWhere((element) => element.key == 'lastname')
-          .value ??
+              .firstWhere((element) => element.key == 'lastname')
+              .value ??
           'Watkins';
       fu.addUserToFirestore(
-          users,
-          userSnapshot!.uid,
-          firstname,
-          lastname,
-          GeoPoint(0, 0));
+          users, userSnapshot!.uid, firstname, lastname, GeoPoint(0, 0));
       widget.onNameChanged('$firstname $lastname');
       widget.onUidChanged(userSnapshot.uid);
     }
@@ -159,12 +166,22 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return FlutterLogin(
-      title: 'intrst',
+      title: '',
       //if you want a logo above the login widget, add the path to a png, eg below:
-      //logo: const AssetImage('assets/images/ecorp-lightblue.png'),
+      logo: const AssetImage('assets/intrstlogo2.20White.png'),
       onLogin: _signInUser,
       onSignup: _signupUser,
       messages: LoginMessages(signUpSuccess: 'You have signed up'),
+      theme: LoginTheme(
+        primaryColor: Color(0xFF082D38), // Overall primary color
+        accentColor: Colors
+            .amber, // Secondary color (e.g., for title text, loading icon)
+        errorColor: Colors.red, // Color for input validation errors
+        pageColorLight:
+            Color(0xFF082D38), // Light background color for the page
+        pageColorDark:
+            Colors.blueGrey[900], // Dark background color for the page
+      ),
       onSubmitAnimationCompleted: () {
         debugPrint("onSubmitAnimationCompleted: User logged in");
         widget.onSignInChanged(true);
