@@ -159,9 +159,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   static const CameraPosition _kLake = CameraPosition(
-      bearing: 192.8334901395799,
+      bearing: 0.0,
       target: LatLng(37.43296265331129, -122.08832357078792),
-      tilt: 59.440717697143555,
+      tilt: 0.0,
       zoom: 3);
 
   bool _zoomEnabled = true;
