@@ -41,8 +41,8 @@ class InterestInputFormState extends State<InterestInputForm> {
     return Consumer<UserModel>(
       builder: (context, user, child) {
         return Card(
-          child: IconButton(
-              icon: Icon(Icons.add),
+          child: TextButton(
+            child: Text('Add Interest'),
               onPressed: () async {
                 await showDialog<String>(
                   context: context,
