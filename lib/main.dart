@@ -567,7 +567,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 decoration: InputDecoration(
                   fillColor: Colors.white,
                   filled: true,
-                  hintText: 'Find interests and people',
+                  hintText: 'find interests and people',
                   border: OutlineInputBorder(
                     borderRadius:
                         BorderRadius.circular(12.0), // Adjust as needed
