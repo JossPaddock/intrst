@@ -42,16 +42,20 @@ class InterestInputFormState extends State<InterestInputForm> {
       builder: (context, user, child) {
         return Card(
           child: TextButton(
-            child: Text('Add Interest'),
+              child: Text('Add Interest'),
               onPressed: () async {
                 await showDialog<String>(
                   context: context,
                   barrierDismissible: false,
                   builder: (BuildContext context) => AlertDialog(
+                    backgroundColor: Colors.transparent,
+                    insetPadding: EdgeInsets.all(0),
                     content: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxWidth: 500,
-                        maxHeight: 250,
+                        minHeight: 380,
+                        minWidth: 999,
+                        maxWidth: 1000,
+                        maxHeight: 400,
                       ),
                       child: Form(
                         key: _formKey,
@@ -59,54 +63,64 @@ class InterestInputFormState extends State<InterestInputForm> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              TextFormField(
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter some text';
-                                  }
-                                  interest.name = value;
-                                  return null;
-                                },
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'Add a new interest.',
-                                ),
-                              ),
-                              TextFormField(
-                                maxLines: 2,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter some text';
-                                  }
-                                  interest.description = value;
-                                  return null;
-                                },
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText:
-                                      'Enter a description of the interest.',
-                                ),
-                              ),
-                              TextFormField(
-                                validator: (value) {
-                                  if (value != null && value.isNotEmpty) {
-                                    if (!hasValidUrl(value)) {
-                                      return 'Please make sure this is a valid link';
+                              Padding(
+                                padding: const EdgeInsets.only(top:20, left: 20, right: 20, bottom: 0),
+                                child: TextFormField(
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter some text';
                                     }
-                                  }
-                                  interest.link = value;
-                                  return null;
-                                },
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText:
-                                      '(Optional) Enter a link for the interest.',
+                                    interest.name = value;
+                                    return null;
+                                  },
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    hintText: 'Add a new interest.',
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 10),
+                                child: TextFormField(
+                                  maxLines: 5,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter some text';
+                                    }
+                                    interest.description = value;
+                                    return null;
+                                  },
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    hintText:
+                                        'Enter a description of the interest.',
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top:0, left: 20, right: 20, bottom: 0),
+                                child: TextFormField(
+                                  validator: (value) {
+                                    if (value != null && value.isNotEmpty) {
+                                      if (!hasValidUrl(value)) {
+                                        return 'Please make sure this is a valid link';
+                                      }
+                                    }
+                                    interest.link = value;
+                                    return null;
+                                  },
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    hintText: '(Optional) Enter a link.',
+                                  ),
                                 ),
                               ),
                               Padding(
                                   padding:
-                                      const EdgeInsets.symmetric(vertical: 20),
+                                      const EdgeInsets.symmetric(vertical: 10),
                                   child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
                                     children: [
                                       ElevatedButton(
                                         onPressed: () async {
