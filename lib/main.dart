@@ -72,6 +72,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Set<Marker> labelMarkers = {};
   Set<Marker> poiMarkers = {};
   Set<Marker> markers = {};
+  Set<Marker> searchFilteredMarkers = {};
+  List<String> searchFilteredResults = [];
+  String searchTerm = '';
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   late bool lastKnownDraggabilityState;
   bool _isLoading = false;
@@ -132,13 +135,29 @@ class _MyHomePageState extends State<MyHomePage> {
       if (zoom > level && _currentZoom < level) {
         print('load label markers');
         setState(() {
-          markers = labelMarkers;
+          if (searchTerm == '') {
+            markers = labelMarkers;
+          } else {
+            markers = labelMarkers
+                .where((value) =>
+                    searchFilteredResults.contains(value.markerId.value))
+                .toSet();
+            ;
+          }
         });
         _currentZoom = zoom;
       } else if (zoom < level && _currentZoom > level) {
         print('load poi markers');
         setState(() {
-          markers = poiMarkers;
+          if (searchTerm == '') {
+            markers = poiMarkers;
+          } else {
+            markers = poiMarkers
+                .where((value) =>
+                searchFilteredResults.contains(value.markerId.value))
+                .toSet();
+            ;
+          }
         });
         _currentZoom = zoom;
       }
@@ -147,12 +166,28 @@ class _MyHomePageState extends State<MyHomePage> {
       if (_currentZoom > level) {
         setState(() {
           markers = {};
-          markers = labelMarkers;
+          if (searchTerm == '') {
+            markers = labelMarkers;
+          } else {
+            markers = labelMarkers
+                .where((value) =>
+                searchFilteredResults.contains(value.markerId.value))
+                .toSet();
+            ;
+          }
         });
       } else {
         setState(() {
           markers = {};
-          markers = poiMarkers;
+          if (searchTerm == '') {
+            markers = poiMarkers;
+          } else {
+            markers = poiMarkers
+                .where((value) =>
+                searchFilteredResults.contains(value.markerId.value))
+                .toSet();
+            ;
+          }
         });
       }
     }
@@ -315,44 +350,52 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<bool> loadMarkers(bool loadUserMarker) async {
-    //Call this if your are dragging the marker!!
-    await Future.delayed(Duration(milliseconds: 1500));
-    setState(() {
-      //markers = {};
-      labelMarkers = {};
-      poiMarkers = {};
-    });
-    Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
-    poi = await BitmapDescriptor.bytes(imageData,
-        width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
-    //user
-    if (loadUserMarker) {
-      Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
-      BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
+    if (searchTerm == '') {
+      //Call this if your are dragging the marker!!
+      await Future.delayed(Duration(milliseconds: 1500));
+      setState(() {
+        //markers = {};
+        labelMarkers = {};
+        poiMarkers = {};
+      });
+      Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
+      poi = await BitmapDescriptor.bytes(imageData,
           width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
-      var signedInUserMarkerData =
-          await fu.lookUpNameAndLocationByUserUid(users, _uid);
-      //This is where we load the signed in users marker
-      addMarker(
-          signedInUserMarkerData[0],
-          signedInUserMarkerData[1],
-          signedInUserMarkerData[2],
-          _retrieveDraggabilityUserModel(),
-          poio,
-          _uid,
-          true);
-    }
-    print('loadMarkers is working');
-    var uids = await fu.retrieveAllUserUid(users);
-    uids.forEach((uid) async {
-      var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
-      if (uid != _uid) {
-        addMarker(markerData[0], markerData[1], markerData[2], false, poi, uid,
-            false);
+      CollectionReference users =
+          FirebaseFirestore.instance.collection('users');
+      //user
+      if (loadUserMarker) {
+        Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
+        BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
+            width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+        var signedInUserMarkerData =
+            await fu.lookUpNameAndLocationByUserUid(users, _uid);
+        //This is where we load the signed in users marker
+        addMarker(
+            signedInUserMarkerData[0],
+            signedInUserMarkerData[1],
+            signedInUserMarkerData[2],
+            _retrieveDraggabilityUserModel(),
+            poio,
+            _uid,
+            true);
       }
-    });
-    setState(() {});
+      print('loadMarkers is working');
+      var uids = await fu.retrieveAllUserUid(users);
+      uids.forEach((uid) async {
+        var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
+        if (uid != _uid) {
+          addMarker(markerData[0], markerData[1], markerData[2], false, poi,
+              uid, false);
+        }
+      });
+      setState(() {});
+    } else {
+      //any logic if search term is empty
+      /*setState(() {
+        markers = searchFilteredMarkers;
+      }); */
+    }
     return loadUserMarker;
   }
 
@@ -529,7 +572,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     //padding.top represents the height of the status bar which varies by device
-    double mapHeight = MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top;
+    double mapHeight =
+        MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top;
     double toolbarHeight = 56;
     return Scaffold(
       drawerEnableOpenDragGesture: false,
@@ -574,32 +618,38 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 onChanged: (value) async {
-                  // Perform search based on the value
+                  //we calculated this difference to determine if a user has deleted a character.
+                  var diff = value.length - searchTerm.length ;
+                  var charDeleted = (diff == -1);
+                  if(charDeleted) {
+                    print('user deleted a character from searchbar');
+                  }
                   _onCameraMove(_currentZoom);
+                  setState(() {
+                    searchTerm = value;
+                  });
+                  // Perform search based on the value
                   CollectionReference users =
                       FirebaseFirestore.instance.collection('users');
                   List<String> results =
                       await fu.searchForPeopleAndInterests(users, value, true);
+                  //_onCameraMove(_currentZoom);
                   print('these are the results of the search $results');
-                  setState(() async {
+                  setState(() {
                     // Update search results based on the value
                     print('before values');
                     for (var item in markers) {
                       print(item.markerId);
                     }
-                    markers = markers
-                        .where(
-                            (value) => results.contains(value.markerId.value))
-                        .toSet();
+                    searchFilteredMarkers = markers;
+                    searchFilteredResults = results;
                     print('after values');
                     for (var item in markers) {
                       print(item.markerId);
                     }
-                    await loadMarkers(_signedIn);
-                    if (value == "" || value == " ") {
                       _onCameraMove(_currentZoom);
-                    }
                   });
+
                 },
               ),
             ),
@@ -644,171 +694,169 @@ class _MyHomePageState extends State<MyHomePage> {
                       body: Container(
                         color: Color(0xFF082D38),
                         //child: SingleChildScrollView(
-                          child: Column(
-                            children: <Widget>[
-                              Container(
-                                height: mapOptionsVisibility
-                                    ? mapHeight - toolbarHeight - 80
-                                    : mapHeight - toolbarHeight,
-                                child: Stack(
-                                  children: [
-                                    GoogleMap(
-                                      /*onTap: (LatLng position) {
+                        child: Column(
+                          children: <Widget>[
+                            Container(
+                              height: mapOptionsVisibility
+                                  ? mapHeight - toolbarHeight - 80
+                                  : mapHeight - toolbarHeight,
+                              child: Stack(
+                                children: [
+                                  GoogleMap(
+                                    /*onTap: (LatLng position) {
                                       if (mapOptionsVisibility) {
                                         mapOptionsVisibility = false;
                                       }
                                     },*/
-                                      onCameraMove:
-                                          (CameraPosition cameraPosition) {
-                                        _onCameraMove(cameraPosition.zoom);
-                                      },
-                                      cloudMapId:
-                                          mapId, // Set the map style ID here
-                                      mapToolbarEnabled: false,
-                                      zoomGesturesEnabled: _zoomEnabled,
-                                      gestureRecognizers: _zoomEnabled
-                                          ? <Factory<
-                                              OneSequenceGestureRecognizer>>{
-                                              Factory<PanGestureRecognizer>(
-                                                  () => PanGestureRecognizer()),
-                                              Factory<ScaleGestureRecognizer>(
-                                                  () =>
-                                                      ScaleGestureRecognizer()),
-                                              Factory<TapGestureRecognizer>(
-                                                  () => TapGestureRecognizer()),
-                                              Factory<VerticalDragGestureRecognizer>(
-                                                  () =>
-                                                      VerticalDragGestureRecognizer()),
-                                            }
-                                          : <Factory<
-                                                  OneSequenceGestureRecognizer>>{}
-                                              .toSet(),
-                                      initialCameraPosition: _kLake,
-                                      zoomControlsEnabled: false,
-                                      myLocationButtonEnabled: true,
-                                      compassEnabled: true,
-                                      minMaxZoomPreference:
-                                          MinMaxZoomPreference(3.0, 900.0),
-                                      markers: markers,
-                                      onMapCreated: (GoogleMapController
-                                          controller) async {
-                                        double zoom =
-                                            await controller.getZoomLevel();
-                                        _currentZoom = zoom;
-                                        print('onMapCreated is running');
-                                        if (_controller.isCompleted) {
-                                          _controller = Completer();
-                                        }
-                                        _getLocationServiceAndPermission(
-                                            _controller);
-                                        _gotoCurrentUserLocation(
-                                            false, _signedIn);
-                                        print('callback is working');
-                                        setState(() {});
-                                        if (markers.isEmpty) {
-                                          print(
-                                              'markers is empty attempting to load markers now');
-                                          await loadMarkers(true);
-                                        }
-                                        _controller.complete(controller);
-                                      },
-                                    ),
-                                    Positioned(
-                                      bottom: 75,
-                                      right: 10,
-                                      child: FloatingActionButton(
-                                        mini: true,
-                                        onPressed: () async {
-                                          setState(() {
-                                            //_zoomEnabled = false;
-                                            mapOptionsVisibility =
-                                                !mapOptionsVisibility;
-                                          });
-                                        },
-                                        child: Icon(Icons.location_on),
-                                        backgroundColor: Colors.blue,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              //Visibility(
-                              //visible: mapOptionsVisibility,
-                              //child:
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                    right: 10,
+                                    onCameraMove:
+                                        (CameraPosition cameraPosition) {
+                                      _onCameraMove(cameraPosition.zoom);
+                                    },
+                                    cloudMapId:
+                                        mapId, // Set the map style ID here
+                                    mapToolbarEnabled: false,
+                                    zoomGesturesEnabled: _zoomEnabled,
+                                    gestureRecognizers: _zoomEnabled
+                                        ? <Factory<
+                                            OneSequenceGestureRecognizer>>{
+                                            Factory<PanGestureRecognizer>(
+                                                () => PanGestureRecognizer()),
+                                            Factory<ScaleGestureRecognizer>(
+                                                () => ScaleGestureRecognizer()),
+                                            Factory<TapGestureRecognizer>(
+                                                () => TapGestureRecognizer()),
+                                            Factory<VerticalDragGestureRecognizer>(
+                                                () =>
+                                                    VerticalDragGestureRecognizer()),
+                                          }
+                                        : <Factory<
+                                                OneSequenceGestureRecognizer>>{}
+                                            .toSet(),
+                                    initialCameraPosition: _kLake,
+                                    zoomControlsEnabled: false,
+                                    myLocationButtonEnabled: true,
+                                    compassEnabled: true,
+                                    minMaxZoomPreference:
+                                        MinMaxZoomPreference(3.0, 900.0),
+                                    markers: markers,
+                                    onMapCreated:
+                                        (GoogleMapController controller) async {
+                                      double zoom =
+                                          await controller.getZoomLevel();
+                                      _currentZoom = zoom;
+                                      print('onMapCreated is running');
+                                      if (_controller.isCompleted) {
+                                        _controller = Completer();
+                                      }
+                                      _getLocationServiceAndPermission(
+                                          _controller);
+                                      _gotoCurrentUserLocation(
+                                          false, _signedIn);
+                                      print('callback is working');
+                                      setState(() {});
+                                      if (markers.isEmpty) {
+                                        print(
+                                            'markers is empty attempting to load markers now');
+                                        await loadMarkers(true);
+                                      }
+                                      _controller.complete(controller);
+                                    },
                                   ),
-                                  child: Visibility(
-                                    visible: mapOptionsVisibility,
-                                    child: Column(children: [
-                                      SizedBox(height: 10),
-                                      Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              _markerDraggabilityText,
-                                              style: TextStyle(
-                                                  color: Colors.white),
-                                            ),
-                                            SizedBox(
-                                              width: 40,
-                                            ),
-                                            Container(
-                                              padding: EdgeInsets.all(10),
-                                              decoration: BoxDecoration(
-                                                  color: Colors.blue,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8)),
-                                              child: SizedBox(
-                                                height: 40,
-                                                width: 100,
-                                                child: AnimatedToggleSwitch<
-                                                    int>.rolling(
-                                                  current: toggleIndex,
-                                                  values: [0, 1],
-                                                  onChanged: (i) async {
-                                                    print(toggleIndex);
-                                                    setState(
-                                                        () => toggleIndex = i);
-                                                    bool choice = (i == 1);
-                                                    _setDraggabilityUserModel(
-                                                        choice);
-                                                    await loadMarkers(true);
-                                                    _onCameraMove(_currentZoom);
-                                                    setState(
-                                                        () => toggleIndex = i);
-                                                    print(toggleIndex);
-                                                    setState(() {
-                                                      _zoomEnabled = true;
-                                                      if (!choice) {
-                                                        mapOptionsVisibility =
-                                                            false;
-                                                        _markerDraggabilityText =
-                                                            'Your marker is not movable';
-                                                      } else {
-                                                        _markerDraggabilityText =
-                                                            'Your marker is movable';
-                                                      }
-                                                    });
-                                                  },
-                                                  //loading: false, // for deactivating loading animation
-                                                  iconBuilder:
-                                                      rollingIconBuilder,
-                                                  style: ToggleStyle(),
-                                                  height: 50,
-                                                ),
+                                  Positioned(
+                                    bottom: 75,
+                                    right: 10,
+                                    child: FloatingActionButton(
+                                      mini: true,
+                                      onPressed: () async {
+                                        setState(() {
+                                          //_zoomEnabled = false;
+                                          mapOptionsVisibility =
+                                              !mapOptionsVisibility;
+                                        });
+                                      },
+                                      child: Icon(Icons.location_on),
+                                      backgroundColor: Colors.blue,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            //Visibility(
+                            //visible: mapOptionsVisibility,
+                            //child:
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  right: 10,
+                                ),
+                                child: Visibility(
+                                  visible: mapOptionsVisibility,
+                                  child: Column(children: [
+                                    SizedBox(height: 10),
+                                    Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            _markerDraggabilityText,
+                                            style:
+                                                TextStyle(color: Colors.white),
+                                          ),
+                                          SizedBox(
+                                            width: 40,
+                                          ),
+                                          Container(
+                                            padding: EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                                color: Colors.blue,
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            child: SizedBox(
+                                              height: 40,
+                                              width: 100,
+                                              child: AnimatedToggleSwitch<
+                                                  int>.rolling(
+                                                current: toggleIndex,
+                                                values: [0, 1],
+                                                onChanged: (i) async {
+                                                  print(toggleIndex);
+                                                  setState(
+                                                      () => toggleIndex = i);
+                                                  bool choice = (i == 1);
+                                                  _setDraggabilityUserModel(
+                                                      choice);
+                                                  await loadMarkers(true);
+                                                  _onCameraMove(_currentZoom);
+                                                  setState(
+                                                      () => toggleIndex = i);
+                                                  print(toggleIndex);
+                                                  setState(() {
+                                                    _zoomEnabled = true;
+                                                    if (!choice) {
+                                                      mapOptionsVisibility =
+                                                          false;
+                                                      _markerDraggabilityText =
+                                                          'Your marker is not movable';
+                                                    } else {
+                                                      _markerDraggabilityText =
+                                                          'Your marker is movable';
+                                                    }
+                                                  });
+                                                },
+                                                //loading: false, // for deactivating loading animation
+                                                iconBuilder: rollingIconBuilder,
+                                                style: ToggleStyle(),
+                                                height: 50,
                                               ),
                                             ),
-                                          ]),
-                                    ]),
-                                  ),
+                                          ),
+                                        ]),
+                                  ]),
                                 ),
                               ),
-                            ],
+                            ),
+                          ],
                           //),
                         ),
                       ),
