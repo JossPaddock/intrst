@@ -46,7 +46,9 @@ class _InterestAlertDialogState extends State<Preview> {
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
-    _fetchInitialMessageData();
+    if(widget.uid.isNotEmpty && widget.alternateUid.isNotEmpty) {
+      _fetchInitialMessageData();
+    }
     _loadNotificationCount();
   }
 
@@ -136,7 +138,7 @@ class _InterestAlertDialogState extends State<Preview> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Wrap(
+          if(!chatOpen)Wrap(
             alignment: WrapAlignment.center,
             spacing: 16.0,
             runSpacing: 8.0,
@@ -153,7 +155,7 @@ class _InterestAlertDialogState extends State<Preview> {
                 .take(5)
                 .toList(),
           ),
-          SizedBox(height: 16.0),
+          if(!chatOpen)SizedBox(height: 16.0),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -161,9 +163,9 @@ class _InterestAlertDialogState extends State<Preview> {
                 onPressed: () async {
                   if (widget.signedIn) {
                   } else {
+                    Navigator.pop(context); // Close the dialog
                     widget.onItemTapped(1);
                   } //
-                  //Navigator.pop(context); // Close the dialog
                   setState(() {
                     chatOpen = !chatOpen;
                   });

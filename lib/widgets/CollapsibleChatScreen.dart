@@ -216,8 +216,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 1000),
-              height: _isExpanded && gu.isMobileBrowser(context)
-                  ? 200
+              height: _isExpanded && widget.autoOpen//gu.isMobileBrowser(context)
+                  ? 100
                   : _isExpanded
                       ? 400
                       : 0,
