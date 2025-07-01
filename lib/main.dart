@@ -210,6 +210,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void initState() {
+    print('Build mode: ${kReleaseMode ? "Release" : "NOT Release"}');
     initializeFirebase();
     _goToInitialPosition(_controller);
     _goToInitialPosition(_controllerSignedOut);
