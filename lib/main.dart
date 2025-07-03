@@ -293,7 +293,7 @@ class _MyHomePageState extends State<MyHomePage> {
           anchor: Offset(0.5, 0.5),
           position: LatLng(lat, lng),
           draggable: drag,
-          zIndex: drag ? 10 : 1,
+          zIndex: drag ? 10 : (user ? 5 : 1),
           onTap: () {
             markers = {};
             handleMarkerTap(title, uid, true);
@@ -330,7 +330,7 @@ class _MyHomePageState extends State<MyHomePage> {
             position: LatLng(lat, lng),
             backgroundColor: const Color(0x00000000),
             draggable: drag,
-            zIndex: drag ? 10 : 1,
+            zIndex: drag ? 10 : (user ? 5 : 1),
             onTap: () {
               markers = {};
               handleMarkerTap(title, uid, false);
@@ -418,7 +418,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     //do a soft check to determine if latlng is 0,0
     //if it is 0,0 update user location
-    /*final userLocation = await fu.retrieveUserLocation(
+    final userLocation = await fu.retrieveUserLocation(
         users, FirebaseAuth.instance.currentUser!.uid);
     if (userLocation == GeoPoint(0, 0)) {
       print('user location was 0,0');
@@ -453,7 +453,7 @@ class _MyHomePageState extends State<MyHomePage> {
             zoom: 12);
         controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
       }
-    } */
+    }
   }
 
   Future<void> _gotoCurrentUserLocation(
