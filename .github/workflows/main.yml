@@ -18,6 +18,9 @@ jobs:
       - name: Run flutter version to check if we have flutter
         run: flutter --version
 
+      - name: Run tests
+        run: flutter test
+
       - name: Build Flutter Web App
         run: flutter build web
 
