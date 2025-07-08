@@ -658,7 +658,7 @@ class _MyHomePageState extends State<MyHomePage> {
           Spacer(),
           Builder(
             builder: (context) => IconButton(
-              icon: Image.asset('assets/poio.png'),
+              icon: _signedIn? Image.asset('assets/poio.png'): Image.asset('assets/poi.png'),
               //color: Colors.red,
               onPressed: () {
                 _handleAlternateUserModel(_uid, _name);
@@ -866,6 +866,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       name: _name,
                       scaffoldKey: _scaffoldKey,
                       signedIn: _signedIn,
+                      onItemTapped: _onItemTapped,
                     ),
                     custom_preview.Preview(
                       uid: _uid,
@@ -1031,6 +1032,7 @@ class _MyHomePageState extends State<MyHomePage> {
             name: _name,
             scaffoldKey: _scaffoldKey,
             signedIn: _signedIn,
+            onItemTapped: _onItemTapped,
           ),
         ),
       ),
