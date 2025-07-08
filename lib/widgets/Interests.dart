@@ -13,12 +13,14 @@ class Interests extends StatelessWidget {
   final String name;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final bool signedIn;
+  final void Function(int) onItemTapped;
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
 
   Interests({
     super.key,
     required this.name,
     required this.scaffoldKey,
+    required this.onItemTapped,
     required this.signedIn,
   });
 
@@ -47,6 +49,7 @@ class Interests extends StatelessWidget {
               scaffoldKey: scaffoldKey,
               uid: user.currentUid,
               signedIn: signedIn,
+              onItemTapped: onItemTapped,
               interests: interests,
               showInputForm: user.alternateUid == user.currentUid,
               editToggles: [],
@@ -66,6 +69,7 @@ class CardList extends StatefulWidget {
     required this.uid,
     required this.signedIn,
     required this.interests,
+    required this.onItemTapped,
     required this.showInputForm,
     required this.editToggles,
   });
@@ -75,6 +79,7 @@ class CardList extends StatefulWidget {
   final String uid;
   final bool signedIn;
   final List<Interest> interests;
+  final void Function(int) onItemTapped;
   final bool showInputForm;
   final List<bool> editToggles;
 
@@ -102,6 +107,7 @@ class _CardListState extends State<CardList>
       name: widget.name,
       scaffoldKey: widget.scaffoldKey,
       signedIn: widget.signedIn,
+      onItemTapped: widget.onItemTapped,
     ).fetchSortedInterestsForUser(user_uid);
   }
 
@@ -516,6 +522,38 @@ class _CardListState extends State<CardList>
             ],
           ),
         ),
+        if (!widget.signedIn)
+          Align(
+            alignment: Alignment.center,
+            child: Card(
+              margin: EdgeInsets.all(16),
+              child: SizedBox(
+                  width: 300,
+                  height: 150,
+                  child: Column(children: [
+                    Padding(
+                      padding: EdgeInsets.all(10),
+                      child: ElevatedButton(
+                          onPressed: () {
+                            print('button pressed navigates to the sign in page');
+                            Navigator.pop(context);
+                            widget.onItemTapped(1);
+                          }, //navigate to signup page
+                          child: Text("Sign in or Sign Up"))
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Center(
+                        child: Text(
+                          'to access your interests page.',
+                          style: TextStyle(
+                            fontSize: 18,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ]))),),
         if (widget.signedIn && widget.showInputForm)
           Align(
             alignment: Alignment.bottomCenter,
