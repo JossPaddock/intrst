@@ -117,6 +117,24 @@ class _InterestAlertDialogState extends State<Preview> {
     }
   }
 
+  String formatTextByWords(String text, int wordsPerLine) {
+    final words = text.split(' ');
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < words.length; i++) {
+      buffer.write(words[i]);
+      if (i < words.length - 1) {
+        if ((i + 1) % wordsPerLine == 0) {
+          buffer.write('\n'); // Newline after every N words
+        } else {
+          buffer.write(' ');
+        }
+      }
+    }
+
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -148,7 +166,7 @@ class _InterestAlertDialogState extends State<Preview> {
                     onPressed: () {
                       _handlePreviewToInterestsWidgetFlow();
                     },
-                    child: Text(label),
+                    child: Text(formatTextByWords(label, 3), textAlign: TextAlign.center,),
                   );
                 })
                 .toList()
@@ -173,16 +191,25 @@ class _InterestAlertDialogState extends State<Preview> {
                 icon: Badge.count(
                     offset: Offset(9.0, -7.0), isLabelVisible: hasNotification,
                   count: notificationCount, child: const Icon(Icons.chat)),
-                  label: Text(chatOpen ? 'Close' : 'Chat'),
+                  label: Text(chatOpen ? 'Close' : 'Chat', style: TextStyle(fontSize: 12)),
               ),
               ElevatedButton.icon(
                 onPressed: () {
                   _handlePreviewToInterestsWidgetFlow();
                 },
                 icon: Icon(Icons.add),
-                label: Text('List all interests'),
+                label: Text('All interests', style: TextStyle(fontSize: 12)),
               ),
             ],
+          ),
+          if(!chatOpen)
+          ElevatedButton.icon(
+            onPressed: () {
+              widget.onItemTapped(3);
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.chat),
+            label: Text('Show all chats'),
           ),
           if (chatOpen && initMessageData != null)
             Column(
@@ -193,14 +220,6 @@ class _InterestAlertDialogState extends State<Preview> {
                     uid: _handleLookUpViewerOfPreviewWidget(),
                     documentData: initMessageData!.entries.first.value,
                     documentReference: initMessageData!.entries.first.key),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    widget.onItemTapped(3);
-                    Navigator.pop(context);
-                  },
-                  icon: Icon(Icons.chat),
-                  label: Text('Show all chats'),
-                )
               ],
             ),
           if (chatOpen && initMessageData == null)

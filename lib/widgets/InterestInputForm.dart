@@ -19,6 +19,7 @@ class InterestInputForm extends StatefulWidget {
 class InterestInputFormState extends State<InterestInputForm> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
+  TextEditingController _descriptionController = TextEditingController();
   Interest interest = Interest(
       name: '',
       description: '',
@@ -34,6 +35,12 @@ class InterestInputFormState extends State<InterestInputForm> {
       return false;
     }
     return true;
+  }
+
+  @override
+  void dispose() {
+    //_descriptionController.dispose(); // Clean up
+    super.dispose();
   }
 
   @override
@@ -64,7 +71,8 @@ class InterestInputFormState extends State<InterestInputForm> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(top:20, left: 20, right: 20, bottom: 0),
+                                padding: const EdgeInsets.only(
+                                    top: 20, left: 20, right: 20, bottom: 0),
                                 child: TextFormField(
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
@@ -80,25 +88,108 @@ class InterestInputFormState extends State<InterestInputForm> {
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 10),
+                                padding: const EdgeInsets.only(
+                                    left: 20, right: 20, top: 10, bottom: 10),
+                                //child: Expanded(
                                 child: TextFormField(
-                                  maxLines: 5,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter some text';
-                                    }
-                                    interest.description = value;
-                                    return null;
+                                  maxLines: 1,
+                                  readOnly: true,
+                                  controller: _descriptionController,
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: true,
+                                      builder: (BuildContext context) {
+                                        TextEditingController dialogController =
+                                            TextEditingController(
+                                                text: _descriptionController
+                                                    .text);
+                                        final FocusNode _focusNode =
+                                            FocusNode();
+                                        return StatefulBuilder(
+                                          builder: (context, setState) {
+                                            WidgetsBinding.instance
+                                                .addPostFrameCallback((_) {
+                                              if (!_focusNode.hasFocus) {
+                                                _focusNode.requestFocus();
+                                              }
+                                            });
+                                            return Dialog(
+                                              insetPadding: EdgeInsets.zero,
+                                              child: Container(
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                color: Colors.white,
+                                                child: Column(
+                                                  children: [
+                                                    AppBar(
+                                                        title: Text(''
+                                                            'Enter/edit description'),
+                                                        automaticallyImplyLeading:
+                                                            false,
+                                                        actions: [
+                                                          IconButton(
+                                                              icon: Icon(
+                                                                  Icons.check),
+                                                              onPressed: () {
+                                                                _descriptionController
+                                                                        .text =
+                                                                    dialogController
+                                                                        .text;
+                                                                interest.description =
+                                                                    dialogController
+                                                                        .text;
+                                                                Navigator.of(
+                                                                        context)
+                                                                    .pop();
+                                                              }),
+                                                        ]),
+                                                    //Expanded(
+                                                    //child:
+                                                    TextField(
+                                                      focusNode: _focusNode,
+                                                      controller:
+                                                          dialogController,
+                                                      maxLines: null,
+                                                      decoration:
+                                                          InputDecoration(
+                                                        border: InputBorder
+                                                            .none, // No visible border
+                                                        contentPadding:
+                                                            EdgeInsets
+                                                                .symmetric(
+                                                                    horizontal:
+                                                                        10.0),
+                                                      ),
+                                                    ),
+                                                    //),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                                    );
                                   },
+                                  /*validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter some text';
+                                      }
+                                      interest.description = value;
+                                      return null;
+                                    },*/
                                   decoration: InputDecoration(
                                     border: OutlineInputBorder(),
                                     hintText:
                                         'Enter a description of the interest.',
                                   ),
                                 ),
+                                //),
                               ),
                               Padding(
-                                padding: const EdgeInsets.only(top:0, left: 20, right: 20, bottom: 0),
+                                padding: const EdgeInsets.only(
+                                    top: 0, left: 20, right: 20, bottom: 0),
                                 child: TextFormField(
                                   validator: (value) {
                                     if (value != null && value.isNotEmpty) {

@@ -599,63 +599,60 @@ class _MyHomePageState extends State<MyHomePage> {
             );
           },
         ),
-        //title: Text(widget.title),
+        title:           StatefulBuilder(
+          builder: (context, setState) => SizedBox(
+            height: 48.0,
+            width: screenWidth * 0.4 >= 225 ? screenWidth * 0.4 : 225,
+            child: TextField(
+              decoration: InputDecoration(
+                fillColor: Colors.white,
+                filled: true,
+                hintText: 'find interests and people',
+                border: OutlineInputBorder(
+                  borderRadius:
+                  BorderRadius.circular(12.0), // Adjust as needed
+                ),
+              ),
+              onChanged: (value) async {
+                //we calculated this difference to determine if a user has deleted a character.
+                var diff = value.length - searchTerm.length ;
+                var charDeleted = (diff == -1);
+                if(charDeleted) {
+                  print('user deleted a character from searchbar');
+                }
+                _onCameraMove(_currentZoom);
+                setState(() {
+                  searchTerm = value;
+                });
+                // Perform search based on the value
+                CollectionReference users =
+                FirebaseFirestore.instance.collection('users');
+                List<String> results =
+                await fu.searchForPeopleAndInterests(users, value, true);
+                //_onCameraMove(_currentZoom);
+                print('these are the results of the search $results');
+                setState(() {
+                  // Update search results based on the value
+                  print('before values');
+                  for (var item in markers) {
+                    print(item.markerId);
+                  }
+                  searchFilteredMarkers = markers;
+                  searchFilteredResults = results;
+                  print('after values');
+                  for (var item in markers) {
+                    print(item.markerId);
+                  }
+                  _onCameraMove(_currentZoom);
+                });
+
+              },
+            ),
+          ),
+        ),
         backgroundColor: Color(0xFF082D38),
         actions: [
           // Add the TextField wrapped in a StatefulBuilder
-          Spacer(),
-          StatefulBuilder(
-            builder: (context, setState) => SizedBox(
-              height: 48.0,
-              width: screenWidth * 0.5,
-              child: TextField(
-                decoration: InputDecoration(
-                  fillColor: Colors.white,
-                  filled: true,
-                  hintText: 'find interests and people',
-                  border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(12.0), // Adjust as needed
-                  ),
-                ),
-                onChanged: (value) async {
-                  //we calculated this difference to determine if a user has deleted a character.
-                  var diff = value.length - searchTerm.length ;
-                  var charDeleted = (diff == -1);
-                  if(charDeleted) {
-                    print('user deleted a character from searchbar');
-                  }
-                  _onCameraMove(_currentZoom);
-                  setState(() {
-                    searchTerm = value;
-                  });
-                  // Perform search based on the value
-                  CollectionReference users =
-                      FirebaseFirestore.instance.collection('users');
-                  List<String> results =
-                      await fu.searchForPeopleAndInterests(users, value, true);
-                  //_onCameraMove(_currentZoom);
-                  print('these are the results of the search $results');
-                  setState(() {
-                    // Update search results based on the value
-                    print('before values');
-                    for (var item in markers) {
-                      print(item.markerId);
-                    }
-                    searchFilteredMarkers = markers;
-                    searchFilteredResults = results;
-                    print('after values');
-                    for (var item in markers) {
-                      print(item.markerId);
-                    }
-                      _onCameraMove(_currentZoom);
-                  });
-
-                },
-              ),
-            ),
-          ),
-          Spacer(),
           Builder(
             builder: (context) => IconButton(
               icon: _signedIn? Image.asset('assets/poio.png'): Image.asset('assets/poi.png'),
