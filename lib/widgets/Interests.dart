@@ -352,6 +352,7 @@ class _CardListState extends State<CardList>
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
+                                            SizedBox(height: 10),
                                             TextField(
                                               maxLines: 2,
                                               controller:
@@ -362,6 +363,7 @@ class _CardListState extends State<CardList>
                                                 border: OutlineInputBorder(),
                                               ),
                                             ),
+                                            SizedBox(height: 10),
                                             TextField(
                                               controller: _mobileLinkController,
                                               decoration: InputDecoration(

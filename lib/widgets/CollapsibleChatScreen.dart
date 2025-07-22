@@ -174,6 +174,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+               if(!widget.autoOpen)
                 IconButton(
                   icon: const Icon(Icons.delete),
                   color: Colors.grey[300],
@@ -215,12 +216,12 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
               ],
             ),
             AnimatedContainer(
-              duration: const Duration(milliseconds: 1000),
+              duration: const Duration(milliseconds: 600),
               height: _isExpanded && widget.autoOpen//gu.isMobileBrowser(context)
                   ? 100
                   : _isExpanded
                       ? 400
-                      : 0,
+                      : widget.autoOpen? 70 : 0,
               child: _isExpanded
                   ? StreamBuilder<DocumentSnapshot>(
                       stream: widget.documentReference
