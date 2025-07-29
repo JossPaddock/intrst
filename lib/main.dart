@@ -406,8 +406,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _getLocationServiceAndPermission(
       Completer<GoogleMapController> controllerCompleter) async {
     print('getLocationServiceAndPermission is running');
+
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     final GoogleMapController controller = await controllerCompleter.future;
+
+    // Ensure location services are enabled
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
       _serviceEnabled = await location.requestService();
@@ -416,56 +419,98 @@ class _MyHomePageState extends State<MyHomePage> {
         return;
       }
     }
-    //do a soft check to determine if latlng is 0,0
-    //if it is 0,0 update user location
+
+    // Check current permission status
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      // Request permission
+      _permissionGranted = await location.requestPermission();
+      print('1st check permission granted: $_permissionGranted');
+      // Poll for permission status to give iOS (mobile) time to update
+      int tries = 0;
+      while (_permissionGranted != PermissionStatus.granted && tries < 5) {
+        print('polling for permission try#:$tries');
+        await Future.delayed(const Duration(milliseconds: 500));
+        _permissionGranted = await location.hasPermission();
+        tries++;
+      }
+      print('after polling permission granted: $_permissionGranted');
+
+      if (_permissionGranted != PermissionStatus.granted) {
+        print('Permission not granted after request');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (BuildContext context) => ChangeNotifierProvider(
+              create: (context) => UserModel(),
+              child: const MyApp(),
+            ),
+          ),
+        );
+        setState(() {});
+        return;
+      }
+    }
+
+    // Retrieve user location from Firestore
     final userLocation = await fu.retrieveUserLocation(
         users, FirebaseAuth.instance.currentUser!.uid);
+
     if (userLocation == GeoPoint(0, 0)) {
       print('user location was 0,0');
-      _gotoCurrentUserLocation(true, true);
-      _permissionGranted = await location.hasPermission();
-      if (_permissionGranted == PermissionStatus.denied) {
-        _permissionGranted = await location.requestPermission();
-        if (_permissionGranted != PermissionStatus.granted) {
-          //todo: markers are not loading for some reason
-          //setState(() {});
-          //print('trying to reload page');
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (BuildContext context) => ChangeNotifierProvider(
-                create: (context) => UserModel(),
-                child: const MyApp(),
-              ),
-            ),
-          );
-          setState(() {});
-        } else {
-          setState(() {});
-          _gotoCurrentUserLocation(false, _signedIn);
-        }
-      } else {
-        Random random = Random();
-        double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
-        double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
-        _newPosition = CameraPosition(
-            target: LatLng(userLocation.latitude + randomNumber1,
-                userLocation.longitude + randomNumber2),
-            zoom: 12);
-        controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
-      }
+      // Update user location in Firestore and move map camera
+      await _gotoCurrentUserLocation(true, _signedIn);
+    } else {
+      // Move map camera to stored location with a small random offset
+      Random random = Random();
+      double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
+      double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
+      _newPosition = CameraPosition(
+        target: LatLng(
+          userLocation.latitude + randomNumber1,
+          userLocation.longitude + randomNumber2,
+        ),
+        zoom: 12,
+      );
+      controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
     }
   }
 
   Future<void> _gotoCurrentUserLocation(
       bool updateUserLocation, bool loadUserMarker) async {
+    print('running _gotoCurrentUserLocation method');
     Random random = Random();
     double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
     double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
     final GoogleMapController controller = await _controller.future;
-    final locationData = await location.getLocation();
+    print('about to call location.getLocation');
+    LocationData? locationData;
+    try {
+      locationData = await location.getLocation().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          print("Timeout getting location. Took more than 5 seconds.");
+          throw TimeoutException("location.getLocation() timed out");
+        },
+      );
+
+      if (locationData.latitude == null || locationData.longitude == null) {
+        print("Received null coordinates, retrying...");
+        await Future.delayed(const Duration(seconds: 1));
+        locationData = await location.getLocation();
+      }
+
+      print("Got location: ${locationData.latitude}, ${locationData.longitude}");
+
+    } catch (e) {
+      print("Error getting location: $e");
+      // Optionally show error to user or fallback
+      return;
+    }
+    print('locationData: ${locationData.latitude}');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     String localUid = FirebaseAuth.instance.currentUser!.uid;
     if (updateUserLocation) {
+      print('updating user with user_uid: $localUid location to lat: ${locationData.latitude}; long: ${locationData.longitude} in Firebase');
       fu.updateUserLocation(
           users,
           localUid,
