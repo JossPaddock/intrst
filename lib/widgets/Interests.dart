@@ -301,7 +301,7 @@ class _CardListState extends State<CardList>
                                           localInterests = updatedInterests;
                                         });
                                       }),
-                                IconButton(
+                                if(widget.showInputForm)IconButton(
                                   icon: Icon(toggle ? Icons.save : Icons.edit),
                                   onPressed: () async {
                                     if (!gu.isMobileBrowser(context)) {
