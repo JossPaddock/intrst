@@ -64,6 +64,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late PermissionStatus _permissionGranted;
   late bool _serviceEnabled;
   double _currentZoom = 10;
+  bool _markersLoading = true;
   bool _signedIn = false;
   String _name = '';
   String _uid = '';
@@ -154,7 +155,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = poiMarkers
                 .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                    searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -171,7 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = labelMarkers
                 .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                    searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -184,7 +185,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = poiMarkers
                 .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                    searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -499,8 +500,8 @@ class _MyHomePageState extends State<MyHomePage> {
         locationData = await location.getLocation();
       }
 
-      print("Got location: ${locationData.latitude}, ${locationData.longitude}");
-
+      print(
+          "Got location: ${locationData.latitude}, ${locationData.longitude}");
     } catch (e) {
       print("Error getting location: $e");
       // Optionally show error to user or fallback
@@ -510,7 +511,8 @@ class _MyHomePageState extends State<MyHomePage> {
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     String localUid = FirebaseAuth.instance.currentUser!.uid;
     if (updateUserLocation) {
-      print('updating user with user_uid: $localUid location to lat: ${locationData.latitude}; long: ${locationData.longitude} in Firebase');
+      print(
+          'updating user with user_uid: $localUid location to lat: ${locationData.latitude}; long: ${locationData.longitude} in Firebase');
       fu.updateUserLocation(
           users,
           localUid,
@@ -644,7 +646,7 @@ class _MyHomePageState extends State<MyHomePage> {
             );
           },
         ),
-        title:           StatefulBuilder(
+        title: StatefulBuilder(
           builder: (context, setState) => SizedBox(
             height: 48.0,
             width: screenWidth * 0.4 >= 225 ? screenWidth * 0.4 : 225,
@@ -654,15 +656,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 filled: true,
                 hintText: 'find interests and people',
                 border: OutlineInputBorder(
-                  borderRadius:
-                  BorderRadius.circular(12.0), // Adjust as needed
+                  borderRadius: BorderRadius.circular(12.0), // Adjust as needed
                 ),
               ),
               onChanged: (value) async {
                 //we calculated this difference to determine if a user has deleted a character.
-                var diff = value.length - searchTerm.length ;
+                var diff = value.length - searchTerm.length;
                 var charDeleted = (diff == -1);
-                if(charDeleted) {
+                if (charDeleted) {
                   print('user deleted a character from searchbar');
                 }
                 _onCameraMove(_currentZoom);
@@ -671,9 +672,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 });
                 // Perform search based on the value
                 CollectionReference users =
-                FirebaseFirestore.instance.collection('users');
+                    FirebaseFirestore.instance.collection('users');
                 List<String> results =
-                await fu.searchForPeopleAndInterests(users, value, true);
+                    await fu.searchForPeopleAndInterests(users, value, true);
                 //_onCameraMove(_currentZoom);
                 print('these are the results of the search $results');
                 setState(() {
@@ -690,7 +691,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   }
                   _onCameraMove(_currentZoom);
                 });
-
               },
             ),
           ),
@@ -700,7 +700,9 @@ class _MyHomePageState extends State<MyHomePage> {
           // Add the TextField wrapped in a StatefulBuilder
           Builder(
             builder: (context) => IconButton(
-              icon: _signedIn? Image.asset('assets/poio.png'): Image.asset('assets/poi.png'),
+              icon: _signedIn
+                  ? Image.asset('assets/poio.png')
+                  : Image.asset('assets/poi.png'),
               //color: Colors.red,
               onPressed: () {
                 _handleAlternateUserModel(_uid, _name);
@@ -802,6 +804,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             'markers is empty attempting to load markers now');
                                         await loadMarkers(true);
                                       }
+                                      _onCameraMove(_currentZoom);
                                       _controller.complete(controller);
                                     },
                                   ),
@@ -925,34 +928,56 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ][_selectedIndex]
                 : <Widget>[
-                    GoogleMap(
-                      onCameraMove: (CameraPosition cameraPosition) {
-                        _onCameraMove(cameraPosition.zoom);
-                      },
-                      cloudMapId: mapId, // Set the map style ID here
-                      zoomGesturesEnabled: _zoomEnabled,
-                      initialCameraPosition: _kLake,
-                      zoomControlsEnabled: false,
-                      minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
-                      markers: markers,
-                      onMapCreated: (GoogleMapController controller) async {
-                        double zoom = await controller.getZoomLevel();
-                        _currentZoom = zoom;
-                        print('onMapCreated is running');
-                        if (_controllerSignedOut.isCompleted) {
-                          _controllerSignedOut = Completer();
-                        }
-                        print('mapStyle should be set');
-                        print('callback is working');
-                        setState(() {});
-                        print(markers.length);
-                        await loadMarkers(false);
-                        //await Future.delayed(Duration(milliseconds: 1000));
-                        print(markers.length);
-                        _controllerSignedOut.complete(controller);
-                        setState(() {});
-                      },
-                    ),
+                    Stack(children: [
+                      GoogleMap(
+                        onCameraMove: (CameraPosition cameraPosition) {
+                          _onCameraMove(cameraPosition.zoom);
+                        },
+                        cloudMapId: mapId, // Set the map style ID here
+                        zoomGesturesEnabled: _zoomEnabled,
+                        initialCameraPosition: _kLake,
+                        zoomControlsEnabled: false,
+                        minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+                        markers: markers,
+                        onMapCreated: (GoogleMapController controller) async {
+                          double zoom = await controller.getZoomLevel();
+                          _currentZoom = zoom;
+                          print('onMapCreated is running');
+                          if (_controllerSignedOut.isCompleted) {
+                            _controllerSignedOut = Completer();
+                          }
+                          print('mapStyle should be set');
+                          print('callback is working');
+                          setState(() {});
+                          print(markers.length);
+                          await loadMarkers(false);
+                          //await Future.delayed(Duration(milliseconds: 1000));
+                          print(markers.length);
+                          _controllerSignedOut.complete(controller);
+                          _onCameraMove(_currentZoom);
+                          await Future.delayed(Duration(milliseconds: 250));
+                          setState(() {
+                            _markersLoading = false;
+                          });
+                        },
+                      ),
+                      if (_markersLoading)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 250,
+                          child: Container(
+                            color: Colors.black54,
+                            padding: EdgeInsets.all(12),
+                            child: Text(
+                              'loading markers...',
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ]),
                     LoginScreen(
                       signedIn: _signedIn,
                       onSignInChanged: _handleSignInChanged,
