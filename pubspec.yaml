@@ -29,11 +29,14 @@ dependencies:
 
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^4.0.0
-
+flutter_launcher_icons:
+  ios: true
+  image_path_ios: "assets/favicon.png"
 flutter:
   uses-material-design: true
   assets:
