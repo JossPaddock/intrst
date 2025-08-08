@@ -64,7 +64,9 @@ class _MyHomePageState extends State<MyHomePage> {
   late PermissionStatus _permissionGranted;
   late bool _serviceEnabled;
   double _currentZoom = 10;
-  bool _markersLoading = true;
+  bool _markersLoadingSignedIn = true;
+  String _markersLoadingSignedInBannerText = 'loading markers...';
+  bool _markersLoadingSignedOut = false;
   bool _signedIn = false;
   String _name = '';
   String _uid = '';
@@ -306,6 +308,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 FirebaseAuth.instance.currentUser!.uid,
                 GeoPoint(newPosition.latitude, newPosition.longitude));
             await loadMarkers(true);
+            setState(() {
+              _markersLoadingSignedIn = false;
+              _markersLoadingSignedInBannerText = 'loading markers...';
+            });
             //
           }));
     });
@@ -343,6 +349,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   FirebaseAuth.instance.currentUser!.uid,
                   GeoPoint(newPosition.latitude, newPosition.longitude));
               await loadMarkers(true);
+              setState(() {
+                _markersLoadingSignedIn = false;
+                _markersLoadingSignedInBannerText = 'loading markers...';
+              });
             }))
         .then(
       (value) {
@@ -398,6 +408,10 @@ class _MyHomePageState extends State<MyHomePage> {
         markers = searchFilteredMarkers;
       }); */
     }
+    setState(() {
+      _markersLoadingSignedIn = false;
+      _markersLoadingSignedOut = false;
+    });
     return loadUserMarker;
   }
 
@@ -425,7 +439,16 @@ class _MyHomePageState extends State<MyHomePage> {
     _permissionGranted = await location.hasPermission();
     if (_permissionGranted == PermissionStatus.denied) {
       // Request permission
+      setState(() {
+        _markersLoadingSignedInBannerText =
+            'share location to place your marker...';
+      });
       _permissionGranted = await location.requestPermission();
+      if (_permissionGranted == PermissionStatus.granted) {
+        setState(() {
+          _markersLoadingSignedInBannerText = 'placing your marker...';
+        });
+      }
       print('1st check permission granted: $_permissionGranted');
       // Poll for permission status to give iOS (mobile) time to update
       int tries = 0;
@@ -439,16 +462,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
       if (_permissionGranted != PermissionStatus.granted) {
         print('Permission not granted after request');
-        Navigator.of(context).pushReplacement(
+        /*Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (BuildContext context) => ChangeNotifierProvider(
               create: (context) => UserModel(),
               child: const MyApp(),
             ),
           ),
-        );
-        setState(() {});
-        return;
+        ); */
+        setState(() {
+          _markersLoadingSignedIn = false;
+          _markersLoadingSignedOut = false;
+        });
       }
     }
 
@@ -459,7 +484,33 @@ class _MyHomePageState extends State<MyHomePage> {
     if (userLocation == GeoPoint(0, 0)) {
       print('user location was 0,0');
       // Update user location in Firestore and move map camera
-      await _gotoCurrentUserLocation(true, _signedIn);
+      bool movedUser = await _gotoCurrentUserLocation(true, _signedIn);
+      if (!movedUser) {
+        // Move map camera to stored location with a small random offset
+        Random random = Random();
+        double lat = generateRandomNumber(-50, 50, random);
+        double long = generateRandomNumber(-180, 180, random);
+        _newPosition = CameraPosition(
+          target: LatLng(
+            lat,
+            long,
+          ),
+          zoom: 3,
+        );
+        CollectionReference users =
+            FirebaseFirestore.instance.collection('users');
+        String localUid = FirebaseAuth.instance.currentUser!.uid;
+        print(
+            'updating user with user_uid: $localUid location to lat: ${lat}; long: ${long} in Firebase');
+        fu.updateUserLocation(users, localUid, GeoPoint(lat, long));
+        await loadMarkers(true);
+        await controller
+            .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
+        setState(() {
+          _markersLoadingSignedIn = true;
+          _markersLoadingSignedInBannerText = 'click on the marker button (bottom right) to move your marker';
+        });
+      }
     } else {
       // Move map camera to stored location with a small random offset
       Random random = Random();
@@ -472,11 +523,12 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
         zoom: 12,
       );
-      controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
+      await controller
+          .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
     }
   }
 
-  Future<void> _gotoCurrentUserLocation(
+  Future<bool> _gotoCurrentUserLocation(
       bool updateUserLocation, bool loadUserMarker) async {
     print('running _gotoCurrentUserLocation method');
     Random random = Random();
@@ -505,7 +557,7 @@ class _MyHomePageState extends State<MyHomePage> {
     } catch (e) {
       print("Error getting location: $e");
       // Optionally show error to user or fallback
-      return;
+      return false;
     }
     print('locationData: ${locationData.latitude}');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
@@ -524,7 +576,12 @@ class _MyHomePageState extends State<MyHomePage> {
             locationData.longitude! + randomNumber2),
         zoom: 12);
     await loadMarkers(loadUserMarker);
-    controller.animateCamera(CameraUpdate.newCameraPosition(_newPosition));
+    await controller
+        .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
+    setState(() {
+      _markersLoadingSignedIn = false;
+    });
+    return true;
   }
 
   double generateRandomNumber(double min, double max, Random random) {
@@ -789,7 +846,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       double zoom =
                                           await controller.getZoomLevel();
                                       _currentZoom = zoom;
-                                      print('onMapCreated is running');
+                                      print('onMapCreated signedIn is running');
                                       if (_controller.isCompleted) {
                                         _controller = Completer();
                                       }
@@ -824,6 +881,23 @@ class _MyHomePageState extends State<MyHomePage> {
                                       backgroundColor: Colors.blue,
                                     ),
                                   ),
+                                  if (_markersLoadingSignedIn)
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 250,
+                                      child: Container(
+                                        color: Colors.black54,
+                                        padding: EdgeInsets.all(12),
+                                        child: Text(
+                                          _markersLoadingSignedInBannerText,
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -887,6 +961,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                                     } else {
                                                       _markerDraggabilityText =
                                                           'Your marker is movable';
+                                                      setState(() {
+                                                        _markersLoadingSignedIn = true;
+                                                        _markersLoadingSignedInBannerText = 'drag your marker to a new location...';
+                                                      });
                                                     }
                                                   });
                                                 },
@@ -940,9 +1018,12 @@ class _MyHomePageState extends State<MyHomePage> {
                         minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
                         markers: markers,
                         onMapCreated: (GoogleMapController controller) async {
+                          setState(() {
+                            _markersLoadingSignedOut = true;
+                          });
                           double zoom = await controller.getZoomLevel();
                           _currentZoom = zoom;
-                          print('onMapCreated is running');
+                          print('onMapCreated signedOut is running');
                           if (_controllerSignedOut.isCompleted) {
                             _controllerSignedOut = Completer();
                           }
@@ -957,11 +1038,11 @@ class _MyHomePageState extends State<MyHomePage> {
                           _onCameraMove(_currentZoom);
                           await Future.delayed(Duration(milliseconds: 250));
                           setState(() {
-                            _markersLoading = false;
+                            _markersLoadingSignedOut = false;
                           });
                         },
                       ),
-                      if (_markersLoading)
+                      if (_markersLoadingSignedOut)
                         Positioned(
                           left: 0,
                           right: 0,
