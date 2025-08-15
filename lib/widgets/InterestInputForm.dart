@@ -49,6 +49,9 @@ class InterestInputFormState extends State<InterestInputForm> {
       builder: (context, user, child) {
         return Card(
           child: TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: Size(MediaQuery.of(context).size.width-33, MediaQuery.of(context).size.height*.05),
+            ),
               child: Text('Add Interest'),
               onPressed: () async {
                 await showDialog<String>(

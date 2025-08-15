@@ -20,11 +20,13 @@ import 'firebase_options.dart';
 import 'package:label_marker/label_marker.dart';
 import 'package:location/location.dart';
 import 'package:animated_toggle_switch/animated_toggle_switch.dart';
+//import 'package:flutter/rendering.dart';
 
 //import is for google maps
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
+  //debugPaintSizeEnabled = false;
   runApp(
     ChangeNotifierProvider<UserModel>.value(
       value: UserModel(),
@@ -508,7 +510,7 @@ class _MyHomePageState extends State<MyHomePage> {
             .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
         setState(() {
           _markersLoadingSignedIn = true;
-          _markersLoadingSignedInBannerText = 'click on the marker button (bottom right) to move your marker';
+          _markersLoadingSignedInBannerText = 'click on the marker button (bottom right) then toggle to move your marker';
         });
       }
     } else {
@@ -1175,7 +1177,7 @@ class _MyHomePageState extends State<MyHomePage> {
       endDrawer: SizedBox(
         width: MediaQuery.of(context).size.width * 1, //<-- SEE HERE
         child: Container(
-          alignment: Alignment.topCenter,
+          alignment: Alignment.center,
           child: Interests(
             name: _name,
             scaffoldKey: _scaffoldKey,
