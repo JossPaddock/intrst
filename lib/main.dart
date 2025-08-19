@@ -92,7 +92,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> loadUserContext() async {
     _loadNotificationCount();
-    _notificationLoading = Timer.periodic(Duration(seconds: 30), (timer) {
+    _notificationLoading = Timer.periodic(Duration(seconds: 10), (timer) {
       print(
           'Attempting to load user notifications timestamp: ${DateTime.now()}');
       _loadNotificationCount();

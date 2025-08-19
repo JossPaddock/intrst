@@ -33,7 +33,8 @@ class FirebaseUsersUtility {
     final List<dynamic> originalArray = data[arrayField];
     final List<String> updatedArray = originalArray
         .where((item) =>
-    item is String && !item.toLowerCase().contains(substring.toLowerCase()))
+            item is String &&
+            !item.toLowerCase().contains(substring.toLowerCase()))
         .cast<String>()
         .toList();
 
@@ -43,9 +44,8 @@ class FirebaseUsersUtility {
 
   Future<void> removeUnreadNotifications(String docRef, String uid) async {
     final usersCollection = FirebaseFirestore.instance.collection('users');
-    final querySnapshot = await usersCollection
-        .where('user_uid', isEqualTo: uid)
-        .get();
+    final querySnapshot =
+        await usersCollection.where('user_uid', isEqualTo: uid).get();
     for (final doc in querySnapshot.docs) {
       final docPath = doc.reference.path;
       await removeItemsContainingSubstring(
@@ -57,29 +57,32 @@ class FirebaseUsersUtility {
     await updateUnreadNotificationCounts('users');
   }
 
-
-  Future<void> addUnreadNotification(String collectionPath, String userUid, String docRefPath, String messageUuid) async {
-  final collection = FirebaseFirestore.instance.collection(collectionPath);
-  QuerySnapshot querySnapshot = await collection.where('user_uid', isEqualTo: userUid).get();
-  querySnapshot.docs.first.reference.update({
-    'unread_notifications': FieldValue.arrayUnion(['$docRefPath:$messageUuid'])
-  });
-  print('added to unread_notifications: $docRefPath:$messageUuid');
-}
+  Future<void> addUnreadNotification(String collectionPath, String userUid,
+      String docRefPath, String messageUuid) async {
+    final collection = FirebaseFirestore.instance.collection(collectionPath);
+    QuerySnapshot querySnapshot =
+        await collection.where('user_uid', isEqualTo: userUid).get();
+    querySnapshot.docs.first.reference.update({
+      'unread_notifications':
+          FieldValue.arrayUnion(['$docRefPath:$messageUuid'])
+    });
+    print('added to unread_notifications: $docRefPath:$messageUuid');
+  }
 
 //Warning this method updates notification counts for everyone and shouldn't be called too often
 //right now it is called when anyone hits the send button ensuring it works when it needs to.
 // But it is probably working more than it should.
   //Ideally it only runs when updateNotifications is read!
   //the method should be made more granular so it only updates notifications for one user.
-Future<void> updateUnreadNotificationCounts(String collectionPath) async {
+  Future<void> updateUnreadNotificationCounts(String collectionPath) async {
     final collection = FirebaseFirestore.instance.collection(collectionPath);
 
     final querySnapshot = await collection.get();
 
     for (final doc in querySnapshot.docs) {
       final data = doc.data();
-      final List<dynamic> unreadNotifications = data['unread_notifications'] ?? [];
+      final List<dynamic> unreadNotifications =
+          data['unread_notifications'] ?? [];
 
       final Map<String, int> counts = {};
 
@@ -102,18 +105,22 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
     }
   }
 
-  Future<int> retrieveNotificationCount(CollectionReference users, String userUid, [String? docRef]) async{
+  Future<int> retrieveNotificationCount(
+      CollectionReference users, String userUid,
+      [String? docRef]) async {
     QuerySnapshot querySnapshot =
         await users.where('user_uid', isEqualTo: userUid).get();
     QueryDocumentSnapshot userQDS = querySnapshot.docs.first;
     final Map<String, dynamic>? notifications =
-    userQDS.get('unread_notifications_count')?.cast<String, dynamic>();
+        userQDS.get('unread_notifications_count')?.cast<String, dynamic>();
     if (notifications == null) return 0;
     if (docRef != null) {
       final value = notifications[docRef];
       return (value is num) ? value.toInt() : 0;
     }
-    return notifications.values.whereType<num>().fold<int>(0, (sum, value) => sum + value.toInt());
+    return notifications.values
+        .whereType<num>()
+        .fold<int>(0, (sum, value) => sum + value.toInt());
   }
 
   Future<List<String>> retrieveAllUserUid(CollectionReference users) async {
@@ -192,7 +199,7 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
 
   Future<void> addInterestForUser(
       CollectionReference users, Interest interest, String uid) async {
-    if(interest.link != null) {
+    if (interest.link != null) {
       print('isValidWebsite:');
       print(isValidWebsite(interest.link!!));
     }
@@ -215,34 +222,41 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
     });
   }
 
-  Future<void> updateEditedInterest(CollectionReference users, Interest oldInterest, Interest newInterest, String uid) async {
+  Future<void> updateEditedInterest(
+    CollectionReference users,
+    Interest oldInterest,
+    Interest newInterest,
+    String uid,
+  ) async {
     print('attempting to update interest: $newInterest');
-    //fire base arrayRemove and arrayUnion method calls may be more performant!!!
-    //fire base object must match directly if doing a plain array remove, but not so much with built-ins
-    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
+
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: uid).get();
 
     for (var doc in querySnapshot.docs) {
-      DocumentReference documentRef = FirebaseFirestore.instance.collection('users').doc(doc.id);
+      DocumentReference documentRef =
+          FirebaseFirestore.instance.collection('users').doc(doc.id);
 
-      Map<String, dynamic> oldInterestMap = oldInterest.mapper();
-      Map<String, dynamic> newInterestMap = newInterest.mapper();
+      List<dynamic> interests = (doc['interests'] ?? []) as List<dynamic>;
 
-      await documentRef.update({
-        'interests': FieldValue.arrayRemove([oldInterestMap])
-      });
+      // Replace the matching interest by ID
+      for (int i = 0; i < interests.length; i++) {
+        if (interests[i]['id'] == oldInterest.id) {
+          interests[i] = newInterest.mapper();
+          break;
+        }
+      }
 
-      await documentRef.update({
-        'interests': FieldValue.arrayUnion([newInterestMap])
-      });
-      if(!oldInterest.favorite && newInterest.favorite) {
-        DocumentSnapshot updatedDoc = await documentRef.get();
-        List<dynamic> interests = updatedDoc['interests'];
-        int favoriteCount = interests
-            .where((interest) => interest['favorite'] == true)
-            .length;
-        if(favoriteCount > 5) {
+      await documentRef.update({'interests': interests});
 
-          print('User has more than 5 interests!, attempting to limit favorited interests');
+      // Enforce max 5 favorites
+      if (!oldInterest.favorite && newInterest.favorite) {
+        int favoriteCount =
+            interests.where((interest) => interest['favorite'] == true).length;
+
+        if (favoriteCount > 5) {
+          print(
+              'User has more than 5 interests!, attempting to limit favorited interests');
           await limitFavoritedInterests(users, uid, 5);
         }
       }
@@ -252,10 +266,12 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
   Future<void> limitFavoritedInterests(
       CollectionReference users, String uid, int maxFavorites) async {
     print('Checking favorite interests for user with UID: $uid');
-    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: uid).get();
 
     for (var doc in querySnapshot.docs) {
-      DocumentReference documentRef = FirebaseFirestore.instance.collection('users').doc(doc.id);
+      DocumentReference documentRef =
+          FirebaseFirestore.instance.collection('users').doc(doc.id);
       DocumentSnapshot updatedDoc = await documentRef.get();
 
       List<dynamic> interests = updatedDoc['interests'];
@@ -267,18 +283,22 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
 
       // maxFavorites is the limit passed into this method
       if (favoriteInterests.length > maxFavorites) {
-        print('Too many favorites: ${favoriteInterests.length} (The max defined is: $maxFavorites)');
+        print(
+            'Too many favorites: ${favoriteInterests.length} (The max defined is: $maxFavorites)');
 
         // Sort by `favorited_timestamp` in ASCENDING order
         favoriteInterests.sort((a, b) {
-          DateTime aTimestamp = (a['favorited_timestamp'] as Timestamp).toDate();
-          DateTime bTimestamp = (b['favorited_timestamp'] as Timestamp).toDate();
+          DateTime aTimestamp =
+              (a['favorited_timestamp'] as Timestamp).toDate();
+          DateTime bTimestamp =
+              (b['favorited_timestamp'] as Timestamp).toDate();
           return aTimestamp.compareTo(bTimestamp);
         });
 
         // these are the favorites we need to now unfavorite
         int extraCount = favoriteInterests.length - maxFavorites;
-        List<Map<String, dynamic>> interestsToUnfavorite = favoriteInterests.take(extraCount).toList();
+        List<Map<String, dynamic>> interestsToUnfavorite =
+            favoriteInterests.take(extraCount).toList();
         for (var interest in interestsToUnfavorite) {
           await documentRef.update({
             'interests': FieldValue.arrayRemove([interest]),
@@ -289,7 +309,8 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
           });
         }
       } else {
-        print('Favorite interests count is within the limit already (${favoriteInterests.length}).');
+        print(
+            'Favorite interests count is within the limit already (${favoriteInterests.length}).');
       }
     }
   }
@@ -312,7 +333,7 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
     return false;
   }
 
-  Future<void> removeInterest(CollectionReference users, Interest interest, String uid) async {
+  /*Future<void> removeInterest(CollectionReference users, Interest interest, String uid) async {
     //fire base arrayRemove and arrayUnion method calls may be more performant!!!
     //fire base object must match directly if doing a plain array remove, but not so much with built-ins
     QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
@@ -325,6 +346,23 @@ Future<void> updateUnreadNotificationCounts(String collectionPath) async {
       await documentRef.update({
         'interests': FieldValue.arrayRemove([interestMap])
       });
+    }
+  }*/
+
+  Future<void> removeInterest(
+      CollectionReference users, Interest interest, String uid) async {
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: uid).get();
+
+    for (var doc in querySnapshot.docs) {
+      DocumentReference documentRef =
+          FirebaseFirestore.instance.collection('users').doc(doc.id);
+
+      List<dynamic> interests = (doc['interests'] ?? []) as List<dynamic>;
+
+      interests.removeWhere((item) => item['id'] == interest.id);
+
+      await documentRef.update({'interests': interests});
     }
   }
 
