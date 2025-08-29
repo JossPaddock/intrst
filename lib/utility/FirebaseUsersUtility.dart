@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseMappers.dart';
 import '../models/Interest.dart';
 import 'package:http/http.dart' as http;
+import 'package:restart_app/restart_app.dart';
 
 class FirebaseUsersUtility {
   Future<GeoPoint> retrieveUserLocation(
@@ -348,6 +351,100 @@ class FirebaseUsersUtility {
       });
     }
   }*/
+
+  Future<void> showReauthAndDeleteDialog(
+      BuildContext context, String user_uid) async {
+    final TextEditingController passwordController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Deletion"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                  "Please re-enter your email and password to delete your account."),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                obscureText: false,
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "Password",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text("Delete Account Forever!!!!!!!!"),
+              onPressed: () async {
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) throw Exception("No user signed in!");
+
+                  final credential = EmailAuthProvider.credential(
+                    email: emailController.text.trim(),
+                    password: passwordController.text.trim(),
+                  );
+
+                  await user.reauthenticateWithCredential(credential);
+
+                  await user.delete();
+
+                  final usersRef =
+                      FirebaseFirestore.instance.collection('users');
+
+                  final querySnapshot = await usersRef
+                      .where('user_uid', isEqualTo: user_uid)
+                      .get();
+
+                  for (var doc in querySnapshot.docs) {
+                    await doc.reference.delete();
+                    print(
+                        "Deleted document: ${doc.id} as part of account deletion");
+                  }
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            "Account deleted successfully! Sorry to see you go")),
+                  );
+                  await Future.delayed(Duration(seconds: 3));
+                  await Restart.restartApp(
+                      notificationTitle: 'User account deleted',
+                      notificationBody: 'tap here to reopen the interest app');
+                } on FirebaseAuthException catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: ${e.message}")),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> removeInterest(
       CollectionReference users, Interest interest, String uid) async {
