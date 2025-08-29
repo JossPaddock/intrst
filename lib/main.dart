@@ -987,20 +987,11 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                       ),
                     ),
-                    Interests(
-                      name: _name,
-                      scaffoldKey: _scaffoldKey,
-                      signedIn: _signedIn,
-                      onItemTapped: _onItemTapped,
-                    ),
-                    custom_preview.Preview(
-                      uid: _uid,
-                      alternateUid: _uid,
-                      scaffoldKey: _scaffoldKey,
-                      onItemTapped: _onItemTapped,
-                      signedIn: _signedIn,
-                      onDrawerOpened: () {},
-                    ),
+
+          Text('My Interests'),
+          TextButton(onPressed: (){
+            fu.showReauthAndDeleteDialog(context,_uid);
+          }, child: Text('Delete my account')),
                     Messaging(user_uid: _uid),
                     Text(
                       'Index 4: Replace this text widget with the Sign Out widget',
