@@ -77,7 +77,7 @@ class ChatScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 15, right: 15),
                     child: Text(
                       style: TextStyle(fontSize: 13.0),
-                      snapshot.data == null ? 'unknown' : snapshot.data!,
+                      snapshot.data == null || snapshot.data?.length == 1? 'deleted account' : snapshot.data!,
                       textAlign:
                           isUserMessage ? TextAlign.right : TextAlign.left,
                     ),
