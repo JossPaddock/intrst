@@ -812,6 +812,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                         mapOptionsVisibility = false;
                                       }
                                     },*/
+                                    myLocationEnabled: false,
+                                    myLocationButtonEnabled: false,
                                     onCameraMove:
                                         (CameraPosition cameraPosition) {
                                       _onCameraMove(cameraPosition.zoom);
@@ -838,7 +840,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                             .toSet(),
                                     initialCameraPosition: _kLake,
                                     zoomControlsEnabled: false,
-                                    myLocationButtonEnabled: true,
                                     compassEnabled: true,
                                     minMaxZoomPreference:
                                         MinMaxZoomPreference(3.0, 900.0),
@@ -1001,6 +1002,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 : <Widget>[
                     Stack(children: [
                       GoogleMap(
+                        myLocationEnabled: false,
+                        myLocationButtonEnabled: false,
                         onCameraMove: (CameraPosition cameraPosition) {
                           _onCameraMove(cameraPosition.zoom);
                         },
