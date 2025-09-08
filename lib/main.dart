@@ -965,7 +965,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                                           'Your marker is movable';
                                                       setState(() {
                                                         _markersLoadingSignedIn = true;
-                                                        _markersLoadingSignedInBannerText = 'drag your marker to a new location...';
+                                                        if(kIsWeb) {_markersLoadingSignedInBannerText = 'drag your marker to a new location...';}
+                                                        else{_markersLoadingSignedInBannerText = 'long press to drag your marker to a new location...';}
                                                       });
                                                     }
                                                   });
