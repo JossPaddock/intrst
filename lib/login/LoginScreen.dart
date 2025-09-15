@@ -166,6 +166,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return FlutterLogin(
+      headerWidget: kDebugMode
+          ? ElevatedButton(
+              onPressed: () {
+                _signInUser(LoginData(name: 'permanent@test.com', password: 'password'));
+                widget.onSignInChanged(true);
+                widget.onSelectedIndexChanged(0);
+              },
+              child: Text('auto login : ${FirebaseAuth.instance.currentUser?.uid}'))
+          : null,
       title: '',
       //if you want a logo above the login widget, add the path to a png, eg below:
       logo: const AssetImage('assets/intrstlogo2.20White.png'),
