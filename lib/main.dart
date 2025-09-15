@@ -101,7 +101,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> initializeFirebase() async {
     await Firebase.initializeApp(
-      //name: 'intrst',
+      name: 'intrst',
       options: DefaultFirebaseOptions.currentPlatform,
     );
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
@@ -989,7 +989,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
 
-          Text('My Interests'),
+          Text('New Feature coming in the future'),
           TextButton(onPressed: (){
             fu.showReauthAndDeleteDialog(context,_uid);
           }, child: Text('Delete my account')),
@@ -1082,7 +1082,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     },
                   ),
                   ListTile(
-                    title: const Text('My Interests'),
+                    title: const Text('Friends'),
                     selected: _selectedIndex == 1,
                     onTap: () {
                       _onItemTapped(1);
