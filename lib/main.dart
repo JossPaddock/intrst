@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
+import 'package:intrst/widgets/Account.dart';
 import 'package:intrst/widgets/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
 import 'package:intrst/widgets/Preview.dart' as custom_preview;
@@ -241,6 +243,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (notificationCount != count) {
       setState(() {
         if (count > 0) {
+          FlutterAppBadger.updateBadgeCount(count);
           hasNotification = true;
           notificationCount = count;
         } else {
@@ -510,7 +513,8 @@ class _MyHomePageState extends State<MyHomePage> {
             .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
         setState(() {
           _markersLoadingSignedIn = true;
-          _markersLoadingSignedInBannerText = 'click on the marker button (bottom right) then toggle to move your marker';
+          _markersLoadingSignedInBannerText =
+              'click on the marker button (bottom right) then toggle to move your marker';
         });
       }
     } else {
@@ -964,9 +968,15 @@ class _MyHomePageState extends State<MyHomePage> {
                                                       _markerDraggabilityText =
                                                           'Your marker is movable';
                                                       setState(() {
-                                                        _markersLoadingSignedIn = true;
-                                                        if(kIsWeb) {_markersLoadingSignedInBannerText = 'drag your marker to a new location...';}
-                                                        else{_markersLoadingSignedInBannerText = 'long press to drag your marker to a new location...';}
+                                                        _markersLoadingSignedIn =
+                                                            true;
+                                                        if (kIsWeb) {
+                                                          _markersLoadingSignedInBannerText =
+                                                              'drag your marker to a new location...';
+                                                        } else {
+                                                          _markersLoadingSignedInBannerText =
+                                                              'long press to drag your marker to a new location...';
+                                                        }
                                                       });
                                                     }
                                                   });
@@ -988,11 +998,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                       ),
                     ),
-
-          Text('New Feature coming in the future'),
-          TextButton(onPressed: (){
-            fu.showReauthAndDeleteDialog(context,_uid);
-          }, child: Text('Delete my account')),
+                    Text('New Feature coming in the future'),
+                    Account(uid: _uid),
                     Messaging(user_uid: _uid),
                     Text(
                       'Index 4: Replace this text widget with the Sign Out widget',
