@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:intrst/widgets/CollapsibleChatScreen.dart';
@@ -58,29 +59,38 @@ class _Account extends State<Account> {
             } else {
               print('fcm token is NOT available');
             }
+            NotificationSettings notifSettings = await FirebaseMessaging
+                .instance
+                .requestPermission(alert: true, badge: true, sound: true);
+            print('${notifSettings.authorizationStatus}');
+            String permissionMessage = '';
+            switch(notifSettings.authorizationStatus.name) {
+              case 'authorized' : permissionMessage = "Thank you, the intrst app can now send you notifications!";
+              case 'denied' : permissionMessage = "The intrst app is not authorized to create notifications.";
+              case 'notDetermined' : permissionMessage = "Your permission status for notifications is not determined yet";
+              case 'provisional' : permissionMessage = "The intrst app is currently authorized to post non-interrupting user notifications.";
+              default: permissionMessage = "There has been an error";
+
+            };
             await showDialog<void>(
                 context: context,
                 builder: (BuildContext context) {
                   return AlertDialog(
-
                       content: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 66),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
-                              Text(
-                                  'the APNs token is: ${apnsToken}'),
-                              Text(
-                                  'the fcm token is: ${fcmToken}'),
+                              if (kDebugMode)
+                                Text('the APNs token is: ${apnsToken}'),
+                              if (kDebugMode)
+                                Text('the fcm token is: ${fcmToken}'),
+                              Text(permissionMessage)
                             ],
                           )));
                 });
-            NotificationSettings notifSettings = await FirebaseMessaging
-                .instance
-                .requestPermission(alert: true, badge: true, sound: true);
-            print('${notifSettings.authorizationStatus}');
           },
-          child: Text('Testing push notifications')),
+          child: Text('Allow push notification permissions')),
     ]);
   }
 }
