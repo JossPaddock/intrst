@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
@@ -35,6 +36,39 @@ class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   Duration get loginTime => const Duration(milliseconds: 2250);
 
+  void askNotificationSetting() async{
+    final notificationSettings = await FirebaseMessaging.instance
+        .requestPermission(provisional: true);
+
+// For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
+    final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+    if (apnsToken != null) {
+      // APNS token is available, make FCM plugin API requests...
+      print('APNs token is available: ${apnsToken}');
+    } else {
+      print('APNs token is NOT available');
+    }
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken != null) {
+      print('fcm token is available: ${fcmToken}');
+    } else {
+      print('fcm token is NOT available');
+    }
+    NotificationSettings notifSettings = await FirebaseMessaging
+        .instance
+        .requestPermission(alert: true, badge: true, sound: true);
+    String permissionMessage = '';
+    switch(notifSettings.authorizationStatus.name) {
+      case 'authorized' : permissionMessage = "Thank you, the intrst app can now send you notifications!";
+      case 'denied' : permissionMessage = "The intrst app is not authorized to create notifications.";
+      case 'notDetermined' : permissionMessage = "Your permission status for notifications is not determined yet";
+      case 'provisional' : permissionMessage = "The intrst app is currently authorized to post non-interrupting user notifications.";
+      default: permissionMessage = "There has been an error";
+
+    };
+    print(permissionMessage);
+  }
+
   Future<String?> _signInUser(LoginData data) {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
     return Future.delayed(loginTime).then((_) async {
@@ -71,6 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       print(name);
       widget.onNameChanged(name);
       widget.onUidChanged(localUid);
+      askNotificationSetting();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         print('No user found for that email.');
@@ -112,6 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
           users, userSnapshot!.uid, firstname, lastname, GeoPoint(0, 0));
       widget.onNameChanged('$firstname $lastname');
       widget.onUidChanged(userSnapshot.uid);
+      askNotificationSetting();
     }
     return Future.delayed(loginTime).then((_) {
       return null;
