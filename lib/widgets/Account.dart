@@ -56,6 +56,7 @@ class _Account extends State<Account> {
             final fcmToken = await FirebaseMessaging.instance.getToken();
             if (fcmToken != null) {
               print('fcm token is available: ${fcmToken}');
+              fu.addFcmTokenForUser(widget.uid, fcmToken);
             } else {
               print('fcm token is NOT available');
             }
@@ -81,9 +82,9 @@ class _Account extends State<Account> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
-                              if (kDebugMode)
+                              //if (kDebugMode)
                                 Text('the APNs token is: ${apnsToken}'),
-                              if (kDebugMode)
+                              //if (kDebugMode)
                                 Text('the fcm token is: ${fcmToken}'),
                               Text(permissionMessage)
                             ],

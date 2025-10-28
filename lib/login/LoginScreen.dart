@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   Duration get loginTime => const Duration(milliseconds: 2250);
 
-  void askNotificationSetting() async{
+  void askNotificationSetting(String uid) async{
     final notificationSettings = await FirebaseMessaging.instance
         .requestPermission(provisional: true);
 
@@ -51,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {
       print('fcm token is available: ${fcmToken}');
+      fu.addFcmTokenForUser(uid, fcmToken);
     } else {
       print('fcm token is NOT available');
     }
@@ -105,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
       print(name);
       widget.onNameChanged(name);
       widget.onUidChanged(localUid);
-      askNotificationSetting();
+      askNotificationSetting(localUid);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         print('No user found for that email.');
@@ -147,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
           users, userSnapshot!.uid, firstname, lastname, GeoPoint(0, 0));
       widget.onNameChanged('$firstname $lastname');
       widget.onUidChanged(userSnapshot.uid);
-      askNotificationSetting();
+      askNotificationSetting(userSnapshot.uid);
     }
     return Future.delayed(loginTime).then((_) {
       return null;

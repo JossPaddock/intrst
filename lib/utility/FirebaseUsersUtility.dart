@@ -45,6 +45,35 @@ class FirebaseUsersUtility {
     print('Removed $substring from $docPath for field $arrayField.');
   }
 
+  Future<void> addFcmTokenForUser(String userUid, String fcmToken) async {
+    final usersCollection = FirebaseFirestore.instance.collection('users');
+print('attempting to add FCM token for user: $userUid');
+    try {
+      // Find the user document by user_uid
+      final querySnapshot =
+      await usersCollection.where('user_uid', isEqualTo: userUid).get();
+
+      if (querySnapshot.docs.isEmpty) {
+        print('No user found with uid: $userUid');
+        return;
+      }
+
+      // For each matching user (probably only one with that user uid)
+      for (final doc in querySnapshot.docs) {
+        final docRef = usersCollection.doc(doc.id);
+
+        // Use arrayUnion to add the token (avoids duplicates automatically)
+        await docRef.update({
+          'fcm_tokens': FieldValue.arrayUnion([fcmToken])
+        });
+
+        print('FCM token added for user $userUid');
+      }
+    } catch (e) {
+      print('Failed to add FCM token: $e');
+    }
+  }
+
   Future<void> removeUnreadNotifications(String docRef, String uid) async {
     final usersCollection = FirebaseFirestore.instance.collection('users');
     final querySnapshot =

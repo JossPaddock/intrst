@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -91,6 +92,29 @@ class _MyHomePageState extends State<MyHomePage> {
   bool hasNotification = false;
   int notificationCount = 0;
   Timer? _notificationLoading;
+
+  void loadFCMToken() async {
+    // You may set the permission requests to "provisional" which allows the user to choose what type
+    // of notifications they would like to receive once the user receives a notification.
+    final notificationSettings =
+        await FirebaseMessaging.instance.requestPermission(provisional: true);
+
+    // For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
+    final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+    if (apnsToken != null) {
+      // APNS token is available, make FCM plugin API requests...
+      print('APNs token is available: ${apnsToken}');
+    } else {
+      print('APNs token is NOT available');
+    }
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken != null) {
+      print('fcm token is available: ${fcmToken}');
+      fu.addFcmTokenForUser(_uid, fcmToken);
+    } else {
+      print('fcm token is NOT available');
+    }
+  }
 
   Future<void> loadUserContext() async {
     _loadNotificationCount();
@@ -225,6 +249,7 @@ class _MyHomePageState extends State<MyHomePage> {
       lastKnownDraggabilityState = _retrieveDraggabilityUserModel();
       markers = poiMarkers;
     });
+    loadFCMToken();
     super.initState();
   }
 
@@ -849,6 +874,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     markers: markers,
                                     onMapCreated:
                                         (GoogleMapController controller) async {
+                                      loadFCMToken();
                                       double zoom =
                                           await controller.getZoomLevel();
                                       _currentZoom = zoom;

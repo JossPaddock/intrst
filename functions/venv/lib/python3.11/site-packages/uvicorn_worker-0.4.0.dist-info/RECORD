@@ -1,0 +1,9 @@
+uvicorn_worker-0.4.0.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+uvicorn_worker-0.4.0.dist-info/METADATA,sha256=tMKsNxAKm0C4VR1AG6fc6STWrbgp6cvCz50ADbFD8Pc,2648
+uvicorn_worker-0.4.0.dist-info/RECORD,,
+uvicorn_worker-0.4.0.dist-info/WHEEL,sha256=qtCwoSJWgHk21S1Kb4ihdzI2rlJ1ZKaIurTj_ngOhyQ,87
+uvicorn_worker-0.4.0.dist-info/licenses/LICENSE.md,sha256=KRSLnNZf9hHIvrPhOxne1mLrueoK1PTM2vBlqxwHl6k,1497
+uvicorn_worker/__init__.py,sha256=qAaD7SXlroQ5CbW_W0sz28zV7_cqnswTH9KVSkztgJc,139
+uvicorn_worker/__pycache__/__init__.cpython-311.pyc,,
+uvicorn_worker/__pycache__/_workers.cpython-311.pyc,,
+uvicorn_worker/_workers.py,sha256=M1_kMHSr5f_37ZvQvPra0DW7diuahBnRYwWGiU2Szuc,5201
