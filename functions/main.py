@@ -110,12 +110,27 @@ def on_message_updated(
         print("No valid FCM tokens found for any receivers.")
         return
 
+    first_name = "New"
+    last_name = "Message"
+
+    try:
+            name_query = users_ref.where(filter=firestore.FieldFilter("user_uid", "in", [sender_uid]))
+            name_docs = name_query.stream()
+
+            for name_doc in name_docs:
+                user_name_data = name_doc.to_dict()
+                first_name = user_name_data.get('first_name', "New")
+                last_name = user_name_data.get('last_name', "Message")
+
+    except Exception as e:
+        print(f"Error fetching sender name")
+
     # --- Send Notifications ---
 
     # Prepare the MulticastMessage
     multicast_message = messaging.MulticastMessage(
         notification=messaging.Notification(
-            title="New Message",
+            title=f"{first_name} {last_name}",
             body=message_content
         ),
         # You could also add a 'data' payload here if the app needs it

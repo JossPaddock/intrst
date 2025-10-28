@@ -874,6 +874,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     markers: markers,
                                     onMapCreated:
                                         (GoogleMapController controller) async {
+                                      loadFCMToken();
                                       double zoom =
                                           await controller.getZoomLevel();
                                       _currentZoom = zoom;
