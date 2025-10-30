@@ -267,8 +267,8 @@ class _MyHomePageState extends State<MyHomePage> {
     print('the notification count was $count');
     if (notificationCount != count) {
       setState(() {
+        FlutterAppBadger.updateBadgeCount(count);
         if (count > 0) {
-          FlutterAppBadger.updateBadgeCount(count);
           hasNotification = true;
           notificationCount = count;
         } else {
