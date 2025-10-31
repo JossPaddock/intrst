@@ -38,7 +38,7 @@ class _Account extends State<Account> {
             fu.showReauthAndDeleteDialog(context, widget.uid);
           },
           child: Text('Delete my account')),
-      TextButton(
+      kIsWeb? SizedBox.shrink():TextButton(
           onPressed: () async {
             // You may set the permission requests to "provisional" which allows the user to choose what type
 // of notifications they would like to receive once the user receives a notification.
