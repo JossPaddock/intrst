@@ -28,8 +28,13 @@ import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 //import is for google maps
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-void main() {
+Future<void> main() async {
   //debugPaintSizeEnabled = false;
+  WidgetsFlutterBinding.ensureInitialized();
+  if(kIsWeb) {await Firebase.initializeApp(
+    //name: 'web-intrst',
+    options: DefaultFirebaseOptions.currentPlatform,
+  );}
   runApp(
     ChangeNotifierProvider<UserModel>.value(
       value: UserModel(),
