@@ -1109,7 +1109,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     decoration: BoxDecoration(
                       color: Colors.blue,
                     ),
-                    child: Text("$_name : $_uid"),
+                    child: kDebugMode? Text("$_name : $_uid"):Text("$_name"),
                   ),
                   ListTile(
                     title: const Text('Map'),
