@@ -279,6 +279,7 @@ class _MyHomePageState extends State<MyHomePage> {
         } else {
           hasNotification = false;
           notificationCount = 0;
+          FlutterAppBadger.removeBadge();
         }
       });
     }
