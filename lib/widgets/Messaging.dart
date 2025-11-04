@@ -19,6 +19,7 @@ class Messaging extends StatefulWidget {
 }
 
 class _MessagingState extends State<Messaging> {
+  int? openChatIndex;
   final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
   CollectionReference users = FirebaseFirestore.instance.collection('users');
@@ -59,7 +60,7 @@ class _MessagingState extends State<Messaging> {
     // You may set the permission requests to "provisional" which allows the user to choose what type
     // of notifications they would like to receive once the user receives a notification.
     final notificationSettings =
-    await FirebaseMessaging.instance.requestPermission(provisional: true);
+        await FirebaseMessaging.instance.requestPermission(provisional: true);
 
     // For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
     final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
@@ -256,21 +257,34 @@ class _MessagingState extends State<Messaging> {
                 },
                 child: Text(createNewChat)),
           Expanded(
-              child: Container(
-            //width: 300,
-            //height: 351,
-            child: ListView.builder(
-              itemCount: messageData.length,
-              itemBuilder: (context, index) {
+            child: Container(
+                //width: 300,
+                //height: 351,
+                child: ListView.builder(
+                  itemCount: messageData.length,
+                  itemBuilder: (context, index) {
+                if (openChatIndex != null && index != openChatIndex) {
+                  return const SizedBox.shrink();
+                }
                 return CollapsibleChatScreen(
                   getMessages: getMessages,
                   uid: widget.user_uid,
                   documentData: messageData[index],
                   documentReference: messageDocumentReference[index],
+                  onOpen: () {
+                    setState(() {
+                      openChatIndex = index;
+                    });
+                  },
+                  onClose: () {
+                    setState(() {
+                      openChatIndex = null;
+                    });
+                  },
                 );
               },
-            ),
-          ))
+            )),
+          )
         ],
       ),
     );

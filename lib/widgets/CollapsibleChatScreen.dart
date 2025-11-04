@@ -13,6 +13,8 @@ class CollapsibleChatScreen extends StatefulWidget {
   final String uid;
   final DocumentReference documentReference;
   final void Function()? getMessages;
+  final VoidCallback? onOpen;
+  final VoidCallback? onClose;
   const CollapsibleChatScreen({
     super.key,
     this.showNameAtTop = true,
@@ -21,6 +23,8 @@ class CollapsibleChatScreen extends StatefulWidget {
     required this.documentData,
     required this.documentReference,
     this.getMessages,
+    this.onOpen,
+    this.onClose,
   });
 
   @override
@@ -33,12 +37,14 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       TextEditingController();
   final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   bool _isExpanded = false;
+  bool _isLoading = false;
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
   CollectionReference users = FirebaseFirestore.instance.collection('users');
   Set<String> messagesWith = {};
   bool hasNotification = false;
   int notificationCount = 0;
   GeneralUtility gu = GeneralUtilityWeb();
+
 
   @override
   void initState() {
@@ -199,15 +205,21 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       icon: Badge.count(
                           isLabelVisible: hasNotification,
                           count: notificationCount,
-                          child: Icon(_isExpanded
+                          child: _isLoading? CircularProgressIndicator(): Icon(_isExpanded
                               ? Icons.expand_less
                               : Icons.expand_more)),
                       onPressed: () async {
                         if (!_isExpanded) {
+                          setState(() => _isLoading = true);
                           //clear notifications for this chat
                           await fuu.removeUnreadNotifications(
                               widget.documentReference.path, widget.uid);
                           _loadNotificationCount();
+                          //Tell the parent widget I am being opened.
+                          widget.onOpen?.call();
+                        } else {
+                          //Tell the parent widget that I am being closed.
+                          widget.onClose?.call();
                         }
                         setState(() {
                           _isExpanded = !_isExpanded;
@@ -216,7 +228,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
               ],
             ),
             AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
+              duration: const Duration(milliseconds: 100),
               height: _isExpanded && widget.autoOpen//gu.isMobileBrowser(context)
                   ? 100
                   : _isExpanded
@@ -237,9 +249,13 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                         if (!snapshot.hasData || !snapshot.data!.exists) {
                           return Text('No messages found');
                         }
-
                         var data =
                             snapshot.data!.data() as Map<String, dynamic>;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted && _isLoading) {
+                            setState(() => _isLoading = false);
+                          }
+                        });
                         return ChatScreen(
                           uid: widget.uid,
                           documentData: data,
