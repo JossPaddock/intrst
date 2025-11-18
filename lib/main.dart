@@ -23,6 +23,8 @@ import 'firebase_options.dart';
 import 'package:label_marker/label_marker.dart';
 import 'package:location/location.dart';
 import 'package:animated_toggle_switch/animated_toggle_switch.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 //import 'package:flutter/rendering.dart';
 
 //import is for google maps
@@ -51,6 +53,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
       debugShowCheckedModeBanner: false,
       title: appTitle,
       home: MyHomePage(title: appTitle),

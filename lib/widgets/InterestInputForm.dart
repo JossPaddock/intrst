@@ -4,6 +4,8 @@ import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../models/Interest.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'dart:convert';
 
 class InterestInputForm extends StatefulWidget {
   const InterestInputForm({
@@ -19,13 +21,21 @@ class InterestInputForm extends StatefulWidget {
 class InterestInputFormState extends State<InterestInputForm> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
-  TextEditingController _descriptionController = TextEditingController();
+
+  late QuillController _quillController;
+
   Interest interest = Interest(
       name: '',
       description: '',
       link: '',
       created_timestamp: DateTime.now(),
       updated_timestamp: DateTime.now());
+
+  @override
+  void initState() {
+    super.initState();
+    _quillController = QuillController.basic();
+  }
 
   bool hasValidUrl(String value) {
     String pattern =
@@ -37,9 +47,13 @@ class InterestInputFormState extends State<InterestInputForm> {
     return true;
   }
 
+  String _getQuillJson(QuillController controller) {
+    return jsonEncode(controller.document.toDelta().toJson());
+  }
+
   @override
   void dispose() {
-    //_descriptionController.dispose(); // Clean up
+    _quillController.dispose();
     super.dispose();
   }
 
@@ -50,26 +64,32 @@ class InterestInputFormState extends State<InterestInputForm> {
         return Card(
           child: TextButton(
             style: TextButton.styleFrom(
-              minimumSize: Size(MediaQuery.of(context).size.width-33, MediaQuery.of(context).size.height*.05),
+              minimumSize: Size(MediaQuery.of(context).size.width - 33,
+                  MediaQuery.of(context).size.height * .05),
             ),
-              child: Text('Add Interest'),
-              onPressed: () async {
-                await showDialog<String>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (BuildContext context) => AlertDialog(
-                    backgroundColor: Colors.transparent,
-                    insetPadding: EdgeInsets.all(0),
-                    content: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: 380,
-                        minWidth: 999,
-                        maxWidth: 1000,
-                        maxHeight: 400,
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Card(
+            child: Text('Add Interest'),
+            onPressed: () async {
+              // Reset the quill controller for a new interest
+              _quillController.dispose();
+              _quillController = QuillController.basic();
+
+              await showDialog<String>(
+                context: context,
+                barrierDismissible: false,
+                builder: (BuildContext context) => AlertDialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: EdgeInsets.all(0),
+                  content: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: 480,
+                      minWidth: 999,
+                      maxWidth: 1000,
+                      maxHeight: 500,
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Card(
+                        child: SingleChildScrollView(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -93,102 +113,94 @@ class InterestInputFormState extends State<InterestInputForm> {
                               Padding(
                                 padding: const EdgeInsets.only(
                                     left: 20, right: 20, top: 10, bottom: 10),
-                                //child: Expanded(
-                                child: TextFormField(
-                                  maxLines: 1,
-                                  readOnly: true,
-                                  controller: _descriptionController,
+                                child: GestureDetector(
                                   onTap: () {
                                     showDialog(
                                       context: context,
                                       barrierDismissible: true,
-                                      builder: (BuildContext context) {
-                                        TextEditingController dialogController =
-                                            TextEditingController(
-                                                text: _descriptionController
-                                                    .text);
-                                        final FocusNode _focusNode =
-                                            FocusNode();
-                                        return StatefulBuilder(
-                                          builder: (context, setState) {
-                                            WidgetsBinding.instance
-                                                .addPostFrameCallback((_) {
-                                              if (!_focusNode.hasFocus) {
-                                                _focusNode.requestFocus();
-                                              }
-                                            });
-                                            return Dialog(
-                                              insetPadding: EdgeInsets.zero,
-                                              child: Container(
-                                                width: double.infinity,
-                                                height: double.infinity,
-                                                color: Colors.white,
-                                                child: Column(
-                                                  children: [
-                                                    AppBar(
-                                                        title: Text(''
-                                                            'Enter/edit description'),
-                                                        automaticallyImplyLeading:
-                                                            false,
-                                                        actions: [
-                                                          IconButton(
-                                                              icon: Icon(
-                                                                  Icons.check),
-                                                              onPressed: () {
-                                                                _descriptionController
-                                                                        .text =
-                                                                    dialogController
-                                                                        .text;
-                                                                interest.description =
-                                                                    dialogController
-                                                                        .text;
-                                                                Navigator.of(
-                                                                        context)
-                                                                    .pop();
-                                                              }),
-                                                        ]),
-                                                    //Expanded(
-                                                    //child:
-                                                    TextField(
-                                                      focusNode: _focusNode,
-                                                      controller:
-                                                          dialogController,
-                                                      maxLines: null,
-                                                      decoration:
-                                                          InputDecoration(
-                                                        border: InputBorder
-                                                            .none, // No visible border
-                                                        contentPadding:
-                                                            EdgeInsets
-                                                                .symmetric(
-                                                                    horizontal:
-                                                                        10.0),
-                                                      ),
+                                      builder: (BuildContext dialogContext) {
+                                        return Dialog(
+                                          insetPadding: EdgeInsets.zero,
+                                          child: Container(
+                                            width: double.infinity,
+                                            height: double.infinity,
+                                            color: Colors.white,
+                                            child: Column(
+                                              children: [
+                                                AppBar(
+                                                  title: Text(
+                                                      'Enter/edit description'),
+                                                  automaticallyImplyLeading:
+                                                      false,
+                                                  actions: [
+                                                    IconButton(
+                                                      icon: Icon(Icons.check),
+                                                      onPressed: () {
+                                                        interest.description =
+                                                            _getQuillJson(
+                                                                _quillController);
+                                                        Navigator.of(
+                                                                dialogContext)
+                                                            .pop();
+                                                      },
                                                     ),
-                                                    //),
                                                   ],
                                                 ),
-                                              ),
-                                            );
-                                          },
+                                                QuillSimpleToolbar(
+                                                  controller: _quillController,
+                                                  
+                                                ),
+                                                Expanded(
+                                                  child: Container(
+                                                    padding: EdgeInsets.all(10),
+                                                    child: QuillEditor.basic(
+                                                      controller:
+                                                          _quillController,
+                                                      
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         );
                                       },
                                     );
                                   },
-                                  /*validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter some text';
-                                      }
-                                      interest.description = value;
-                                      return null;
-                                    },*/
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(),
-                                    hintText:
-                                        'Enter a description of the interest.',
+                                  child: Container(
+                                    padding: EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _quillController.document
+                                                        .toPlainText()
+                                                        .trim()
+                                                        .isEmpty
+                                                ? 'Enter a description of the interest.'
+                                                : _quillController.document
+                                                    .toPlainText()
+                                                    .trim(),
+                                            style: TextStyle(
+                                              color: _quillController.document
+                                                          .toPlainText()
+                                                          .trim()
+                                                          .isEmpty
+                                                  ? Colors.grey[600]
+                                                  : Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(Icons.edit,
+                                            color: Colors.grey[600]),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                //),
                               ),
                               Padding(
                                 padding: const EdgeInsets.only(
@@ -221,13 +233,17 @@ class InterestInputFormState extends State<InterestInputForm> {
                                           // Validate returns true if the form is valid, or false otherwise.
                                           if (_formKey.currentState!
                                               .validate()) {
+                                            // Save the description from quill
+                                            interest.description = _getQuillJson(
+                                                _quillController);
+
                                             // If the form is valid, display a snackbar for confirmation
                                             // Also make call to add interest for the given user uid (logged in user)
                                             CollectionReference users =
                                                 FirebaseFirestore.instance
                                                     .collection('users');
-                                            fu.addInterestForUser(users,
-                                                interest, user.currentUid);
+                                            fu.addInterestForUser(
+                                                users, interest, user.currentUid);
 
                                             ScaffoldMessenger.of(context)
                                                 .showSnackBar(
@@ -235,13 +251,16 @@ class InterestInputFormState extends State<InterestInputForm> {
                                                   content: Text(
                                                       'Adding new interest')),
                                             );
+
                                             // todo: future state should not delay this synchronous process but instead manage a local set of interests against the ones stored in the database
                                             await Future.delayed(
                                                 Duration(milliseconds: 500));
+
                                             UserModel userModel =
                                                 Provider.of<UserModel>(context,
                                                     listen: false);
                                             userModel.notify();
+
                                             Navigator.pop(context, 'submit');
                                           }
                                         },
@@ -260,12 +279,13 @@ class InterestInputFormState extends State<InterestInputForm> {
                         ),
                       ),
                     ),
-                    actions: <Widget>[],
                   ),
-                );
-              }),
+                  actions: <Widget>[],
+                ),
+              );
+            },
+          ),
         );
-        ;
       },
     );
   }

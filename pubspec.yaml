@@ -29,6 +29,7 @@ dependencies:
   animated_toggle_switch: ^0.8.4
   google_maps_flutter_web: ^0.5.10+1
   firebase_messaging: ^15.2.10
+  flutter_quill: ^11.5.0
 
 
 dev_dependencies:
