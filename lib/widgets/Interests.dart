@@ -140,12 +140,14 @@ class _CardListState extends State<CardList>
     final currentIds = localInterests.map((i) => i.id ?? i.name).toSet();
     final keysToRemove = <String>[];
 
+    // 1. Identify items that were deleted
     for (final existingId in _titleControllers.keys) {
       if (!currentIds.contains(existingId)) {
         keysToRemove.add(existingId);
       }
     }
 
+    // 2. Clean up deleted items
     for (final id in keysToRemove) {
       _titleControllers[id]?.dispose();
       _titleControllers.remove(id);
@@ -155,35 +157,34 @@ class _CardListState extends State<CardList>
       _linkControllers.remove(id);
     }
 
+    // 3. Create/Update items
     for (final interest in localInterests) {
       final id = interest.id ?? interest.name;
 
+      // --- Title ---
       if (!_titleControllers.containsKey(id)) {
         _titleControllers[id] = TextEditingController(text: interest.name);
-      } else {
-        final t = _titleControllers[id]!;
-        if (t.text != interest.name) t.text = interest.name;
       }
+      // REMOVED: The else block that resets text.
+      // Trust the user's edits in the controller over the old DB value.
 
-      // Quill controller for description
+      // --- Quill (Description) ---
       if (!_quillControllers.containsKey(id)) {
         _quillControllers[id] = _createQuillController(interest.description);
-      } else {
-        final currentText = _quillControllers[id]!.document.toPlainText();
-        if (currentText != interest.description) {
-          _quillControllers[id]!.dispose();
-          _quillControllers[id] = _createQuillController(interest.description);
-        }
       }
+      // *** THIS WAS THE CAUSE OF THE CRASH ***
+      // REMOVED:
+      // else {
+      //   final currentText = _quillControllers[id]!.document.toPlainText();
+      //   if (currentText != interest.description) {
+      //     _quillControllers[id]!.dispose();  <-- KILLS THE CONTROLLER WHILE TYPING
+      //     _quillControllers[id] = _createQuillController(interest.description);
+      //   }
+      // }
 
-      // link
+      // --- Link ---
       if (!_linkControllers.containsKey(id)) {
-        _linkControllers[id] =
-            TextEditingController(text: interest.link ?? '');
-      } else {
-        final l = _linkControllers[id]!;
-        final linkText = interest.link ?? '';
-        if (l.text != linkText) l.text = linkText;
+        _linkControllers[id] = TextEditingController(text: interest.link ?? '');
       }
     }
   }
@@ -530,155 +531,138 @@ class _CardListState extends State<CardList>
                                           }
                                           updateToggles(toggleKey, !toggle);
                                         } else {
-                                          // mobile path
-                                          _mobileTitleController.text =
-                                              titleController.text;
-                                          _mobileLinkController.text =
-                                              linkController.text;
+                                          // --- MOBILE PATH START ---
 
-                                          _mobileQuillController.dispose();
-                                          _mobileQuillController =
-                                              _createQuillController(
-                                                  _getQuillJson(quillController));
+                                          // 1. Setup LOCAL controllers (Do not use class-level variables for the dialog)
+                                          _mobileTitleController.text = titleController.text;
+                                          _mobileLinkController.text = linkController.text;
 
-                                          Interest dialogueInterest = Interest(
-                                              created_timestamp: DateTime.now(),
-                                              updated_timestamp: DateTime.now());
-                                          bool editCancelled = false;
+                                          // Create a fresh controller just for this dialog instance
+                                          QuillController localMobileQuillController = _createQuillController(
+                                              _getQuillJson(quillController)
+                                          );
 
                                           await showDialog<String>(
                                             context: context,
                                             barrierDismissible: false,
-                                            builder: (BuildContext context) =>
-                                                AlertDialog(
+                                            builder: (BuildContext context) => AlertDialog(
                                               content: SingleChildScrollView(
                                                 child: Column(children: [
                                                   TextField(
-                                                    controller:
-                                                        _mobileTitleController,
+                                                    controller: _mobileTitleController,
                                                     decoration: InputDecoration(
-                                                      labelText:
-                                                          'Edit title here',
-                                                      border:
-                                                          OutlineInputBorder(),
+                                                      labelText: 'Edit title here',
+                                                      border: OutlineInputBorder(),
                                                     ),
                                                   ),
                                                   SizedBox(height: 10),
                                                   Container(
-                                                    height: 250,
+                                                    height: 200, // Fixed height for editor
                                                     decoration: BoxDecoration(
-                                                      border: Border.all(
-                                                          color: Colors.grey),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              4),
+                                                      border: Border.all(color: Colors.grey),
+                                                      borderRadius: BorderRadius.circular(4),
                                                     ),
                                                     child: Column(
                                                       children: [
-                                                        QuillSimpleToolbar(
-                                                          controller:
-                                                              _mobileQuillController,
-                                                          
+                                                        // Wrap toolbar in ScrollView to prevent overflow on small screens
+                                                        SingleChildScrollView(
+                                                          scrollDirection: Axis.horizontal,
+                                                          child: QuillSimpleToolbar(
+                                                            controller: localMobileQuillController,
+                                                            config: const QuillSimpleToolbarConfig(
+                                                              showFontFamily: false, // Hide to save space
+                                                              showFontSize: false,   // Hide to save space
+                                                              showBoldButton: true,
+                                                              showItalicButton: true,
+                                                              showUnderLineButton: true,
+                                                              showListBullets: true,
+                                                              showListNumbers: true,
+                                                              // Disable others to prevent clutter/overflow
+                                                              showStrikeThrough: false,
+                                                              showAlignmentButtons: false,
+                                                              showBackgroundColorButton: false,
+                                                              showCenterAlignment: false,
+                                                              showClearFormat: false,
+                                                              showClipboardCopy: false,
+                                                              showClipboardCut: false,
+                                                              showClipboardPaste: false,
+                                                              showCodeBlock: false,
+                                                              showColorButton: false,
+                                                              showDirection: false,
+                                                              showDividers: false,
+                                                              showHeaderStyle: false,
+                                                              showIndent: false,
+                                                              showInlineCode: false,
+                                                              showJustifyAlignment: false,
+                                                              showLeftAlignment: false,
+                                                              showLineHeightButton: false,
+                                                              showLink: false,
+                                                              showListCheck: false,
+                                                              showQuote: false,
+                                                              showRedo: false,
+                                                              showRightAlignment: false,
+                                                              showSearchButton: false,
+                                                              showSmallButton: false,
+                                                              showSubscript: false,
+                                                              showSuperscript: false,
+                                                              showUndo: false,
+                                                            ),
+                                                          ),
                                                         ),
                                                         Expanded(
                                                           child: Container(
-                                                            padding:
-                                                                EdgeInsets.all(
-                                                                    8),
-                                                            child: QuillEditor
-                                                                .basic(
-                                                              controller:
-                                                                  _mobileQuillController,
-                                                              
+                                                            padding: EdgeInsets.all(8),
+                                                            child: QuillEditor.basic(
+                                                              controller: localMobileQuillController,
                                                             ),
                                                           ),
                                                         ),
                                                       ],
                                                     ),
                                                   ),
-                                                  SizedBox(height: 10),
-                                                  TextField(
-                                                    controller:
-                                                        _mobileLinkController,
-                                                    decoration: InputDecoration(
-                                                      labelText:
-                                                          'Edit link here',
-                                                      border:
-                                                          OutlineInputBorder(),
-                                                    ),
-                                                  ),
                                                 ]),
                                               ),
                                               actions: <Widget>[
-                                                Center(
-                                                  child: Row(children: <Widget>[
-                                                    IconButton(
-                                                      icon: Icon(Icons.save),
-                                                      onPressed: () {
-                                                        CollectionReference
-                                                            users =
-                                                            FirebaseFirestore
-                                                                .instance
-                                                                .collection(
-                                                                    'users');
-                                                        Interest newInterest =
-                                                            interest.copyWith(
-                                                          name:
-                                                              _mobileTitleController
-                                                                  .text,
-                                                          description: _getQuillJson(
-                                                              _mobileQuillController),
-                                                          link:
-                                                              _mobileLinkController
-                                                                  .text,
-                                                          created_timestamp:
-                                                              interest
-                                                                  .created_timestamp,
-                                                          updated_timestamp:
-                                                              DateTime.now(),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.end,
+                                                  children: [
+                                                    TextButton(
+                                                      child: Text("Done"),
+                                                      onPressed: () async {
+                                                        Navigator.pop(context, 'Done');
+                                                        CollectionReference users = FirebaseFirestore.instance.collection('users');
+
+                                                        Interest newInterest = interest.copyWith(
+                                                          name: _mobileTitleController.text,
+                                                          // Use the LOCAL controller here
+                                                          description: _getQuillJson(localMobileQuillController),
+                                                          link: _mobileLinkController.text,
+                                                          created_timestamp: interest.created_timestamp,
+                                                          updated_timestamp: DateTime.now(),
                                                         );
 
-                                                        dialogueInterest =
-                                                            newInterest;
-                                                        fu.updateEditedInterest(
+                                                        await fu.updateEditedInterest(
                                                             users,
                                                             interest,
                                                             newInterest,
                                                             widget.uid);
 
-                                                        _titleControllers[id]
-                                                                ?.text =
-                                                            _mobileTitleController
-                                                                .text;
-                                                        _linkControllers[id]
-                                                                ?.text =
-                                                            _mobileLinkController
-                                                                .text;
+                                                        List<Interest> updatedInterests = await refreshInterestsForUser(widget.uid);
 
-                                                        Navigator.pop(
-                                                            context, 'saving');
-                                                      }),
-                                                    IconButton(
-                                                        icon:
-                                                            Icon(Icons.cancel),
-                                                        onPressed: () {
-                                                          editCancelled = true;
-                                                          Navigator.pop(context,
-                                                              'cancel');
-                                                        }),
-                                                  ]),
-                                                ),
+                                                        setState(() {
+                                                          localInterests = updatedInterests;
+                                                          _syncControllersWithInterests();
+                                                        });
+                                                      },
+                                                    ),
+                                                  ],
+                                                )
                                               ],
                                             ),
                                           );
 
-                                          setState(() {
-                                            if (!editCancelled) {
-                                              localInterests[index] =
-                                                  dialogueInterest;
-                                              _syncControllersWithInterests();
-                                            }
-                                          });
+                                          // 4. Dispose of the local controller AFTER the dialog is closed
+                                          localMobileQuillController.dispose();
                                         }
                                       },
                                     ),
