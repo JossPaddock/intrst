@@ -46,9 +46,6 @@ class _InterestAlertDialogState extends State<Preview> {
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
-    if(widget.uid.isNotEmpty && widget.alternateUid.isNotEmpty) {
-      _fetchInitialMessageData();
-    }
     _loadNotificationCount();
   }
 
@@ -184,6 +181,9 @@ class _InterestAlertDialogState extends State<Preview> {
                     Navigator.pop(context); // Close the dialog
                     widget.onItemTapped(1);
                   } //
+                  if(widget.uid.isNotEmpty && widget.alternateUid.isNotEmpty) {
+                  await _fetchInitialMessageData();
+                  }
                   setState(() {
                     chatOpen = !chatOpen;
                   });
@@ -223,7 +223,7 @@ class _InterestAlertDialogState extends State<Preview> {
               ],
             ),
           if (chatOpen && initMessageData == null)
-            Text('we tried creating a conversation with this person but failed')
+            Text('You have never had a chat with this person, we are creating that chat now ')
         ],
       ),
     );
