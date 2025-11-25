@@ -30,6 +30,8 @@
 	<string>This app needs access to your location even when in the background to provide continuous services.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs access to your location to show you on the map.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We use the PhotoLibrary to upload into interest description</string>
 	<key>UIApplicationIconBadgeNumber</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
