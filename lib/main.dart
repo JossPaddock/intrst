@@ -17,6 +17,7 @@ import 'package:intrst/widgets/Messaging.dart';
 import 'package:intrst/widgets/Preview.dart' as custom_preview;
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
+import 'widgets/InterestInputForm.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:label_marker/label_marker.dart';
@@ -895,10 +896,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                       if (_controller.isCompleted) {
                                         _controller = Completer();
                                       }
-                                      /*_getLocationServiceAndPermission(
+                                      _getLocationServiceAndPermission(
                                           _controller);
                                       _gotoCurrentUserLocation(
-                                          false, _signedIn);*/
+                                          false, _signedIn);
                                       print('callback is working');
                                       setState(() {});
                                       if (markers.isEmpty) {
