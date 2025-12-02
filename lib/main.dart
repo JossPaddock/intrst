@@ -462,6 +462,31 @@ class _MyHomePageState extends State<MyHomePage> {
   //Make marker loading more reliable (work on first load)
   //loading other users markers besides logged in user(start by testing firebase utility function that gets all user uids)
 
+
+
+  Future<void> _showLocationDisclaimer(BuildContext context) async{
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Location Disclaimer"),
+          content: const Text(
+            "We respect your privacy. Your location data is used one time only "
+                "to place your marker on the map. We do not store, share, or track "
+                "your location, and we do not use your precise location — only an "
+                "approximate position is used to improve your experience.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _getLocationServiceAndPermission(
       Completer<GoogleMapController> controllerCompleter) async {
     print('getLocationServiceAndPermission is running');
@@ -896,6 +921,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       if (_controller.isCompleted) {
                                         _controller = Completer();
                                       }
+                                      await _showLocationDisclaimer(context);
                                       _getLocationServiceAndPermission(
                                           _controller);
                                       _gotoCurrentUserLocation(
