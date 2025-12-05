@@ -349,6 +349,7 @@ print('attempting to add FCM token for user: $userUid');
 
   Future<bool> isValidWebsite(String url) async {
     try {
+      if (url == '') return true;
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://$url';
       }
