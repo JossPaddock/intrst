@@ -12,12 +12,12 @@ import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:intrst/widgets/Account.dart';
-import 'package:intrst/widgets/Interests.dart';
+import 'package:intrst/widgets/Interests/Interests.dart';
+//import 'package:intrst/widgets/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
 import 'package:intrst/widgets/Preview.dart' as custom_preview;
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';
-import 'widgets/InterestInputForm.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:label_marker/label_marker.dart';
@@ -1240,7 +1240,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
       ),
       endDrawer: SizedBox(
-        width: MediaQuery.of(context).size.width * 1, //<-- SEE HERE
+        width: MediaQuery.of(context).size.width * 1,
         child: Container(
           alignment: Alignment.center,
           child: Interests(

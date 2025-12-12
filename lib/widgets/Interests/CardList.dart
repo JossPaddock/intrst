@@ -5,71 +5,18 @@ import 'package:intrst/utility/GeneralUtility.dart';
 import 'package:provider/provider.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intrst/widgets/InterestInputForm.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
-import '../models/Interest.dart';
+import '../../models/Interest.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
 
-class Interests extends StatelessWidget {
-  final String name;
-  final GlobalKey<ScaffoldState> scaffoldKey;
-  final bool signedIn;
-  final void Function(int) onItemTapped;
-  final FirebaseUsersUtility fu = FirebaseUsersUtility();
-
-  Interests({
-    super.key,
-    required this.name,
-    required this.scaffoldKey,
-    required this.onItemTapped,
-    required this.signedIn,
-  });
-
-  Future<List<Interest>> fetchSortedInterestsForUser(String user_uid) async {
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
-    List<Interest> interests = await fu.pullInterestsForUser(users, user_uid);
-    interests
-        .sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
-    return interests;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<UserModel>(builder: (context, user, child) {
-      return FutureBuilder<List<Interest>>(
-        future: fetchSortedInterestsForUser(user.alternateUid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else {
-            List<Interest> interests = snapshot.data ?? [];
-            final GlobalKey<_CardListState> cardListKey =
-                CardList.createGlobalKey();
-            return CardList(
-              key: cardListKey,
-              cardListKey: cardListKey,
-              name: user.alternateName,
-              scaffoldKey: scaffoldKey,
-              uid: user.currentUid,
-              signedIn: signedIn,
-              onItemTapped: onItemTapped,
-              interests: interests,
-              showInputForm: user.alternateUid == user.currentUid,
-              editToggles: [],
-            );
-          }
-        },
-      );
-    });
-  }
-}
+import '../interests/interests.dart';
 
 class CardList extends StatefulWidget {
-  static GlobalKey<_CardListState> createGlobalKey() =>
-      GlobalKey<_CardListState>();
+  //static GlobalKey<_CardListState> createGlobalKey() => GlobalKey<_CardListState>();
+
+  // FIX 2: Update your helper method if you use it
+  static GlobalKey<CardListState> createGlobalKey() => GlobalKey<CardListState>();
 
   const CardList({
     super.key,
@@ -84,7 +31,7 @@ class CardList extends StatefulWidget {
     required this.editToggles,
   });
 
-  final GlobalKey<_CardListState> cardListKey;
+  final GlobalKey<CardListState> cardListKey;
   final String name;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final String uid;
@@ -95,10 +42,12 @@ class CardList extends StatefulWidget {
   final List<bool> editToggles;
 
   @override
-  State<CardList> createState() => _CardListState();
+  //State<CardList> createState() => _CardListState();
+  //fix 1
+  CardListState createState() => CardListState();
 }
 
-class _CardListState extends State<CardList>
+class CardListState extends State<CardList>
     with AutomaticKeepAliveClientMixin<CardList> {
   @override
   bool get wantKeepAlive => true;
@@ -107,9 +56,10 @@ class _CardListState extends State<CardList>
   bool get isEditingAny {
     final userModel = Provider.of<UserModel>(context, listen: false);
     return localInterests.any(
-          (i) => userModel.getToggle(i.id ?? i.name) == true,
+      (i) => userModel.getToggle(i.id) == true,
     );
   }
+
   final Map<String, TextEditingController> _titleControllers = {};
   final Map<String, TextEditingController> _linkControllers = {};
   final Map<String, QuillController> _quillControllers = {};
@@ -130,13 +80,15 @@ class _CardListState extends State<CardList>
     setState(() {});
   }
 
+  Future<List<Interest>> fetchSortedInterestsForUser(String userUid) async {
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+    List<Interest> interests = await fu.pullInterestsForUser(users, userUid);
+    interests.sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
+    return interests;
+  }
+
   Future<List<Interest>> refreshInterestsForUser(String user_uid) async {
-    return Interests(
-      name: widget.name,
-      scaffoldKey: widget.scaffoldKey,
-      signedIn: widget.signedIn,
-      onItemTapped: widget.onItemTapped,
-    ).fetchSortedInterestsForUser(user_uid);
+    return fetchSortedInterestsForUser(user_uid);
   }
 
   @override
@@ -158,7 +110,7 @@ class _CardListState extends State<CardList>
   }
 
   void _syncControllersWithInterests() {
-    final currentIds = localInterests.map((i) => i.id ?? i.name).toSet();
+    final currentIds = localInterests.map((i) => i.id).toSet();
     final keysToRemove = <String>[];
 
     for (final existingId in _titleControllers.keys) {
@@ -183,7 +135,7 @@ class _CardListState extends State<CardList>
     }
 
     for (final interest in localInterests) {
-      final id = interest.id ?? interest.name;
+      final id = interest.id;
 
       if (!_titleControllers.containsKey(id)) {
         _titleControllers[id] = TextEditingController(text: interest.name);
@@ -283,181 +235,56 @@ class _CardListState extends State<CardList>
       int index,
       String id,
       String toggleKey) async {
-    if (true/*!gu.isMobileBrowser(context)*/) {
-      if (toggle) {
-        CollectionReference users =
-            FirebaseFirestore.instance.collection('users');
-        Interest newInterest = interest.copyWith(
-          name: titleController.text,
-          description: _getQuillJson(quillController),
-          link: linkController.text,
-          created_timestamp: interest.created_timestamp,
-          updated_timestamp: DateTime.now(),
-        );
-
-        await fu.updateEditedInterest(users, interest, newInterest, widget.uid);
-
-        setState(() {
-          localInterests[index] = newInterest;
-          final String oldId = id;
-          final String newId = newInterest.id ?? newInterest.name;
-
-          if (oldId != newId) {
-            final t = _titleControllers.remove(oldId);
-            final q = _quillControllers.remove(oldId);
-            final l = _linkControllers.remove(oldId);
-
-            if (t != null) {
-              _titleControllers[newId] = t..text = newInterest.name;
-            } else {
-              _titleControllers[newId] =
-                  TextEditingController(text: newInterest.name);
-            }
-
-            if (q != null) {
-              _quillControllers[newId] = q;
-            } else {
-              _quillControllers[newId] =
-                  _createQuillController(newInterest.description);
-            }
-
-            if (l != null) {
-              _linkControllers[newId] = l..text = newInterest.link ?? '';
-            } else {
-              _linkControllers[newId] =
-                  TextEditingController(text: newInterest.link ?? '');
-            }
-          } else {
-            _titleControllers[id]?.text = newInterest.name;
-            _linkControllers[id]?.text = newInterest.link ?? '';
-          }
-        });
-      }
-      updateToggles(toggleKey, !toggle);
-    } else {
-      final tempTitleController = TextEditingController(text: titleController.text);
-      final tempLinkController = TextEditingController(text: linkController.text);
-
-      QuillController localMobileQuillController =
-          _createQuillController(_getQuillJson(quillController));
-
-      await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) => AlertDialog(
-          content: SingleChildScrollView(
-            child: Column(children: [
-              TextField(
-                controller: tempTitleController,
-                decoration: InputDecoration(
-                  labelText: 'Edit title here',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 10),
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(
-                  children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: QuillSimpleToolbar(
-                        controller: localMobileQuillController,
-                        config: const QuillSimpleToolbarConfig(
-                          showFontFamily: false,
-                          showFontSize: false,
-                          showBoldButton: true,
-                          showItalicButton: true,
-                          showUnderLineButton: true,
-                          showListBullets: true,
-                          showListNumbers: true,
-                          showStrikeThrough: false,
-                          showAlignmentButtons: false,
-                          showBackgroundColorButton: false,
-                          showCenterAlignment: false,
-                          showClearFormat: false,
-                          showClipboardCopy: false,
-                          showClipboardCut: false,
-                          showClipboardPaste: false,
-                          showCodeBlock: false,
-                          showColorButton: false,
-                          showDirection: false,
-                          showDividers: false,
-                          showHeaderStyle: false,
-                          showIndent: false,
-                          showInlineCode: false,
-                          showJustifyAlignment: false,
-                          showLeftAlignment: false,
-                          showLineHeightButton: false,
-                          showLink: true,
-                          showListCheck: false,
-                          showQuote: false,
-                          showRedo: false,
-                          showRightAlignment: false,
-                          showSearchButton: false,
-                          showSmallButton: false,
-                          showSubscript: false,
-                          showSuperscript: false,
-                          showUndo: false,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        child: QuillEditor.basic(
-                          controller: localMobileQuillController,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ]),
-          ),
-          actions: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  child: Text("Done"),
-                  onPressed: () async {
-                    Navigator.pop(context, 'Done');
-                    CollectionReference users =
-                        FirebaseFirestore.instance.collection('users');
-
-                    Interest newInterest = interest.copyWith(
-                      name: _mobileTitleController.text,
-                      description: _getQuillJson(localMobileQuillController),
-                      link: _mobileLinkController.text,
-                      created_timestamp: interest.created_timestamp,
-                      updated_timestamp: DateTime.now(),
-                    );
-
-                    await fu.updateEditedInterest(
-                        users, interest, newInterest, widget.uid);
-
-                    List<Interest> updatedInterests =
-                        await refreshInterestsForUser(widget.uid);
-
-                    setState(() {
-                      localInterests = updatedInterests;
-                      _syncControllersWithInterests();
-                    });
-                  },
-                ),
-              ],
-            )
-          ],
-        ),
+    if (toggle) {
+      CollectionReference users =
+          FirebaseFirestore.instance.collection('users');
+      Interest newInterest = interest.copyWith(
+        name: titleController.text,
+        description: _getQuillJson(quillController),
+        link: linkController.text,
+        created_timestamp: interest.created_timestamp,
+        updated_timestamp: DateTime.now(),
       );
 
-      localMobileQuillController.dispose();
+      await fu.updateEditedInterest(users, interest, newInterest, widget.uid);
+
+      setState(() {
+        localInterests[index] = newInterest;
+        final String oldId = id;
+        final String newId = newInterest.id;
+
+        if (oldId != newId) {
+          final t = _titleControllers.remove(oldId);
+          final q = _quillControllers.remove(oldId);
+          final l = _linkControllers.remove(oldId);
+
+          if (t != null) {
+            _titleControllers[newId] = t..text = newInterest.name;
+          } else {
+            _titleControllers[newId] =
+                TextEditingController(text: newInterest.name);
+          }
+
+          if (q != null) {
+            _quillControllers[newId] = q;
+          } else {
+            _quillControllers[newId] =
+                _createQuillController(newInterest.description);
+          }
+
+          if (l != null) {
+            _linkControllers[newId] = l..text = newInterest.link ?? '';
+          } else {
+            _linkControllers[newId] =
+                TextEditingController(text: newInterest.link ?? '');
+          }
+        } else {
+          _titleControllers[id]?.text = newInterest.name;
+          _linkControllers[id]?.text = newInterest.link ?? '';
+        }
+      });
     }
+    updateToggles(toggleKey, !toggle);
   }
 
   @override
@@ -466,9 +293,8 @@ class _CardListState extends State<CardList>
     UserModel userModel = Provider.of<UserModel>(context);
     double deviceScreenHeight = MediaQuery.of(context).size.height;
     double maxHeight = deviceScreenHeight * 0.88;
-    final editingEntry = userModel.editToggles.entries
-        .firstWhere(
-          (e) => e.value == true,
+    final editingEntry = userModel.editToggles.entries.firstWhere(
+      (e) => e.value == true,
       orElse: () => MapEntry('', false),
     );
 
@@ -477,7 +303,7 @@ class _CardListState extends State<CardList>
 // show only the card being edited, or full list if none are being edited
     final visibleInterests = editingId.isEmpty
         ? localInterests
-        : localInterests.where((i) => (i.id ?? i.name) == editingId).toList();
+        : localInterests.where((i) => (i.id) == editingId).toList();
     //_syncControllersWithInterests();
 
     return Container(
@@ -517,8 +343,8 @@ class _CardListState extends State<CardList>
             ],
           ),
         ),
-        Expanded(child:
-        SingleChildScrollView(
+        Expanded(
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -530,7 +356,7 @@ class _CardListState extends State<CardList>
                   itemBuilder: (context, index) {
                     final interest = visibleInterests[index];
                     //Interest interest = localInterests[index];
-                    final String id = interest.id ?? interest.name;
+                    final String id = interest.id;
                     final String toggleKey = id;
                     bool toggle = userModel.getToggle(toggleKey);
 
@@ -540,18 +366,6 @@ class _CardListState extends State<CardList>
                         _createQuillController(interest.description);
                     final linkController =
                         _linkControllers[id] ?? TextEditingController();
-
-                    Future<void> helperEditing() async {
-                      await editing(
-                          interest,
-                          toggle,
-                          titleController,
-                          quillController,
-                          linkController,
-                          index,
-                          id,
-                          toggleKey);
-                    }
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(
@@ -689,8 +503,7 @@ class _CardListState extends State<CardList>
 
                                           setState(() {
                                             localInterests[index] = newInterest;
-                                            final nid = newInterest.id ??
-                                                newInterest.name;
+                                            final nid = newInterest.id;
                                             _titleControllers[nid]?.text =
                                                 newInterest.name;
                                             _linkControllers[nid]?.text =
@@ -867,45 +680,7 @@ class _CardListState extends State<CardList>
                           _syncControllersWithInterests();
                         });
                       });
-                      if (true/*!gu.isMobileBrowser(context)*/) {
-                        widget.cardListKey.currentState?.editTopMostInterest();
-                      } else {
-                        if (localInterests.isEmpty) return;
-
-                        localInterests.sort((a, b) =>
-                            b.updated_timestamp.compareTo(a.updated_timestamp));
-                        final Interest top = localInterests.first;
-                        final String topId = top.id ?? top.name;
-
-                        _syncControllersWithInterests();
-
-                        final int index = localInterests
-                            .indexWhere((i) => (i.id ?? i.name) == topId);
-                        if (index == -1) return;
-
-                        final bool toggle =
-                            Provider.of<UserModel>(context, listen: false)
-                                .getToggle(topId);
-
-                        final titleController = _titleControllers[topId] ??
-                            TextEditingController(text: top.name);
-                        final quillController = _quillControllers[topId] ??
-                            _createQuillController(top.description);
-                        final linkController = _linkControllers[topId] ??
-                            TextEditingController(text: top.link ?? '');
-
-                        await editing(
-                          top,
-                          toggle,
-                          titleController,
-                          quillController,
-                          linkController,
-                          index,
-                          topId,
-                          topId,
-                        );
-                        await forceRefresh();
-                      }
+                      widget.cardListKey.currentState?.editTopMostInterest();
                     },
                     child: Text("Add Interest")),
               ),
