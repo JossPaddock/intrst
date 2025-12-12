@@ -104,7 +104,12 @@ class _CardListState extends State<CardList>
   bool get wantKeepAlive => true;
 
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
-
+  bool get isEditingAny {
+    final userModel = Provider.of<UserModel>(context, listen: false);
+    return localInterests.any(
+          (i) => userModel.getToggle(i.id ?? i.name) == true,
+    );
+  }
   final Map<String, TextEditingController> _titleControllers = {};
   final Map<String, TextEditingController> _linkControllers = {};
   final Map<String, QuillController> _quillControllers = {};
@@ -163,11 +168,17 @@ class _CardListState extends State<CardList>
     }
 
     for (final id in keysToRemove) {
-      _titleControllers[id]?.dispose();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _titleControllers[id]?.dispose();
+      });
       _titleControllers.remove(id);
-      _quillControllers[id]?.dispose();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _quillControllers[id]?.dispose();
+      });
       _quillControllers.remove(id);
-      _linkControllers[id]?.dispose();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _linkControllers[id]?.dispose();
+      });
       _linkControllers.remove(id);
     }
 
@@ -272,7 +283,7 @@ class _CardListState extends State<CardList>
       int index,
       String id,
       String toggleKey) async {
-    if (!gu.isMobileBrowser(context)) {
+    if (true/*!gu.isMobileBrowser(context)*/) {
       if (toggle) {
         CollectionReference users =
             FirebaseFirestore.instance.collection('users');
@@ -324,8 +335,8 @@ class _CardListState extends State<CardList>
       }
       updateToggles(toggleKey, !toggle);
     } else {
-      _mobileTitleController.text = titleController.text;
-      _mobileLinkController.text = linkController.text;
+      final tempTitleController = TextEditingController(text: titleController.text);
+      final tempLinkController = TextEditingController(text: linkController.text);
 
       QuillController localMobileQuillController =
           _createQuillController(_getQuillJson(quillController));
@@ -337,7 +348,7 @@ class _CardListState extends State<CardList>
           content: SingleChildScrollView(
             child: Column(children: [
               TextField(
-                controller: _mobileTitleController,
+                controller: tempTitleController,
                 decoration: InputDecoration(
                   labelText: 'Edit title here',
                   border: OutlineInputBorder(),
@@ -453,11 +464,21 @@ class _CardListState extends State<CardList>
   Widget build(BuildContext context) {
     super.build(context);
     UserModel userModel = Provider.of<UserModel>(context);
-
     double deviceScreenHeight = MediaQuery.of(context).size.height;
     double maxHeight = deviceScreenHeight * 0.88;
+    final editingEntry = userModel.editToggles.entries
+        .firstWhere(
+          (e) => e.value == true,
+      orElse: () => MapEntry('', false),
+    );
 
-    _syncControllersWithInterests();
+    final editingId = editingEntry.key;
+
+// show only the card being edited, or full list if none are being edited
+    final visibleInterests = editingId.isEmpty
+        ? localInterests
+        : localInterests.where((i) => (i.id ?? i.name) == editingId).toList();
+    //_syncControllersWithInterests();
 
     return Container(
       alignment: Alignment.topCenter,
@@ -496,8 +517,8 @@ class _CardListState extends State<CardList>
             ],
           ),
         ),
-        Expanded(
-          child: SingleChildScrollView(
+        Expanded(child:
+        SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -505,9 +526,10 @@ class _CardListState extends State<CardList>
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
                   physics: NeverScrollableScrollPhysics(),
-                  itemCount: localInterests.length,
+                  itemCount: visibleInterests.length,
                   itemBuilder: (context, index) {
-                    Interest interest = localInterests[index];
+                    final interest = visibleInterests[index];
+                    //Interest interest = localInterests[index];
                     final String id = interest.id ?? interest.name;
                     final String toggleKey = id;
                     bool toggle = userModel.getToggle(toggleKey);
@@ -705,7 +727,7 @@ class _CardListState extends State<CardList>
                                             toggleKey);
                                       },
                                     ),
-                                  if (widget.showInputForm)
+                                  if (widget.showInputForm && !toggle)
                                     IconButton(
                                       icon: Icon(Icons.delete),
                                       onPressed: () => showDialog<String>(
@@ -845,25 +867,32 @@ class _CardListState extends State<CardList>
                           _syncControllersWithInterests();
                         });
                       });
-                      if (!gu.isMobileBrowser(context)) {
+                      if (true/*!gu.isMobileBrowser(context)*/) {
                         widget.cardListKey.currentState?.editTopMostInterest();
                       } else {
                         if (localInterests.isEmpty) return;
 
-                        localInterests.sort((a, b) => b.updated_timestamp.compareTo(a.updated_timestamp));
+                        localInterests.sort((a, b) =>
+                            b.updated_timestamp.compareTo(a.updated_timestamp));
                         final Interest top = localInterests.first;
                         final String topId = top.id ?? top.name;
 
                         _syncControllersWithInterests();
 
-                        final int index = localInterests.indexWhere((i) => (i.id ?? i.name) == topId);
+                        final int index = localInterests
+                            .indexWhere((i) => (i.id ?? i.name) == topId);
                         if (index == -1) return;
 
-                        final bool toggle = Provider.of<UserModel>(context, listen: false).getToggle(topId);
+                        final bool toggle =
+                            Provider.of<UserModel>(context, listen: false)
+                                .getToggle(topId);
 
-                        final titleController = _titleControllers[topId] ?? TextEditingController(text: top.name);
-                        final quillController = _quillControllers[topId] ?? _createQuillController(top.description);
-                        final linkController = _linkControllers[topId] ?? TextEditingController(text: top.link ?? '');
+                        final titleController = _titleControllers[topId] ??
+                            TextEditingController(text: top.name);
+                        final quillController = _quillControllers[topId] ??
+                            _createQuillController(top.description);
+                        final linkController = _linkControllers[topId] ??
+                            TextEditingController(text: top.link ?? '');
 
                         await editing(
                           top,
