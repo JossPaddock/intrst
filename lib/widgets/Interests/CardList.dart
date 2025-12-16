@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
+import '../../login/LoginScreen.dart';
 import '../../models/Interest.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
@@ -69,6 +70,58 @@ class CardListState extends State<CardList>
   late List<Interest> localInterests = widget.interests;
 
   GeneralUtility gu = GeneralUtilityWeb();
+
+  Future<void> _deleteInterestSilently(Interest interest) async {
+    final users = FirebaseFirestore.instance.collection('users');
+
+    final Interest oldInterest = Interest(
+      id: interest.id,
+      nextInterestId: interest.nextInterestId,
+      active: interest.active,
+      name: interest.name,
+      description: interest.description,
+      link: interest.link,
+      favorite: interest.favorite,
+      favorited_timestamp: interest.favorited_timestamp,
+      created_timestamp: interest.created_timestamp,
+      updated_timestamp: interest.updated_timestamp,
+    );
+
+    await fu.removeInterest(users, oldInterest, widget.uid);
+
+    setState(() {
+      _disposeControllersForId(interest.id);
+      localInterests.removeWhere((i) => i.id == interest.id);
+    });
+
+    updateToggles(interest.id, false);
+  }
+
+  Future<void> _showBlankInterestDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Missing content'),
+        content: const Text('This interest will be deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isInterestBlank({
+    required TextEditingController titleController,
+    required QuillController quillController,
+  }) {
+    final title = titleController.text.trim();
+    final description = _getQuillPlainText(quillController);
+
+    return title.isEmpty && description.isEmpty;
+  }
 
   void editTopMostInterest() {
     if (localInterests.isEmpty) return;
@@ -243,44 +296,27 @@ class CardListState extends State<CardList>
         created_timestamp: interest.created_timestamp,
         updated_timestamp: DateTime.now(),
       );
+      final isBlank = _isInterestBlank(
+        titleController: titleController,
+        quillController: quillController,
+      );
 
-      await fu.updateEditedInterest(users, interest, newInterest, widget.uid);
+      fu.updateEditedInterest(users, interest, newInterest, widget.uid);
+
+      if (isBlank) {
+        await _showBlankInterestDialog();
+        await _deleteInterestSilently(interest);
+        //return;
+      }
+
+      final updated = await refreshInterestsForUser(widget.uid);
 
       setState(() {
-        localInterests[index] = newInterest;
-        final String oldId = id;
-        final String newId = newInterest.id;
-
-        if (oldId != newId) {
-          final t = _titleControllers.remove(oldId);
-          final q = _quillControllers.remove(oldId);
-          final l = _linkControllers.remove(oldId);
-
-          if (t != null) {
-            _titleControllers[newId] = t..text = newInterest.name;
-          } else {
-            _titleControllers[newId] =
-                TextEditingController(text: newInterest.name);
-          }
-
-          if (q != null) {
-            _quillControllers[newId] = q;
-          } else {
-            _quillControllers[newId] =
-                _createQuillController(newInterest.description);
-          }
-
-          if (l != null) {
-            _linkControllers[newId] = l..text = newInterest.link ?? '';
-          } else {
-            _linkControllers[newId] =
-                TextEditingController(text: newInterest.link ?? '');
-          }
-        } else {
-          _titleControllers[id]?.text = newInterest.name;
-          _linkControllers[id]?.text = newInterest.link ?? '';
-        }
+        localInterests = updated;
+        _syncControllersWithInterests();
       });
+
+      updateToggles(toggleKey, false);
     }
     updateToggles(toggleKey, !toggle);
   }
@@ -654,7 +690,7 @@ class CardListState extends State<CardList>
                   ])),
             ),
           ),
-        if (widget.signedIn && widget.showInputForm)
+        if (widget.signedIn && widget.showInputForm && !isEditingAny)
           Column(
             children: [
               Align(
