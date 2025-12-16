@@ -10,8 +10,6 @@ import '../../models/Interest.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
 
-import '../interests/interests.dart';
-
 class CardList extends StatefulWidget {
   //static GlobalKey<_CardListState> createGlobalKey() => GlobalKey<_CardListState>();
 
