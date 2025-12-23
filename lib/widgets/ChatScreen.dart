@@ -1,23 +1,49 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:intrst/utility/DateTimeUtility.dart';
 import 'package:intrst/widgets/ChatBubble.dart';
 
 import '../utility/FirebaseUsersUtility.dart';
 
-class ChatScreen extends StatelessWidget {
-  final Map<String, dynamic> documentData;
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key, required this.uid, required this.documentData});
+
   final String uid;
-  const ChatScreen({Key? key, required this.uid, required this.documentData})
-      : super(key: key);
+  final Map<String, dynamic> documentData;
+
+  @override
+  ChatScreenState createState() {
+    return ChatScreenState();
+  }
+}
+
+class ChatScreenState extends State<ChatScreen> {
+  final ScrollController scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+   /* SchedulerBinding.instance.addPostFrameCallback((_) {
+      scrollController.jumpTo(
+        scrollController.position.maxScrollExtent,
+      );
+
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (!scrollController.hasClients) return;
+        scrollController.jumpTo(
+          scrollController.position.maxScrollExtent,
+        );
+      });
+    });*/
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ScrollController scrollController = ScrollController();
     final FirebaseUsersUtility fu = FirebaseUsersUtility();
     List<Map<String, dynamic>> messages = [];
-    if (documentData['conversation'] != null) {
-      documentData['conversation'].forEach((key, value) {
+    if (widget.documentData['conversation'] != null) {
+      widget.documentData['conversation'].forEach((key, value) {
         messages.add({
           'message_content': value['message_content'],
           'timestamp': value['timestamp'] != null
@@ -28,42 +54,26 @@ class ChatScreen extends StatelessWidget {
       });
 
       // Sort messages by timestamp in the appropriate order
-      messages.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
+      messages.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
     }
     final DateTimeUtility dtu = DateTimeUtility();
     // This code makes it so the chat screen scrolls to the bottom of the chats by
     // default each time there is a new message from any user in the chat
 
-    void scrollToBottomLoop() {
-      if (!scrollController.hasClients) return;
-
-      double currentExtent = scrollController.position.maxScrollExtent;
-      double currentOffset = scrollController.offset;
-
-      if (currentOffset < currentExtent) {
-        Future.delayed(Duration(milliseconds: 200), () {
-          scrollController.animateTo(
-            scrollController.position.maxScrollExtent,
-            duration: Duration(milliseconds: 500),
-            curve: Curves.easeOut,
-          );
-          scrollToBottomLoop(); //RECURSION Fairies!
-        });
-      }
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) => scrollToBottomLoop());
+    //WidgetsBinding.instance.addPostFrameCallback((_) => scrollToBottomLoop());
 
     return SizedBox(
       height: 300,
       width: 300,
       child: ListView.builder(
+        reverse: true, // This automatically handles sticking to the bottom
         controller: scrollController,
         itemCount: messages.length,
         itemBuilder: (context, index) {
           var message = messages[index];
           CollectionReference users =
               FirebaseFirestore.instance.collection('users');
-          var isUserMessage = message['user_uid'] == uid;
+          var isUserMessage = message['user_uid'] == widget.uid;
           return FutureBuilder<String>(
             future: fu.lookUpNameByUserUid(users, message['user_uid']),
             builder: (context, snapshot) {
@@ -77,7 +87,9 @@ class ChatScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 15, right: 15),
                     child: Text(
                       style: TextStyle(fontSize: 13.0),
-                      snapshot.data == null || snapshot.data?.length == 1? 'deleted account' : snapshot.data!,
+                      snapshot.data == null || snapshot.data?.length == 1
+                          ? 'deleted account'
+                          : snapshot.data!,
                       textAlign:
                           isUserMessage ? TextAlign.right : TextAlign.left,
                     ),
