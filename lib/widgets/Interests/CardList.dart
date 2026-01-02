@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/Pick_GeneralUtility.dart';
 import 'package:intrst/utility/GeneralUtility.dart';
@@ -10,12 +11,14 @@ import '../../login/LoginScreen.dart';
 import '../../models/Interest.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
+import '../../utility/url_validator/url_validator.dart';
 
 class CardList extends StatefulWidget {
   //static GlobalKey<_CardListState> createGlobalKey() => GlobalKey<_CardListState>();
 
   // FIX 2: Update your helper method if you use it
-  static GlobalKey<CardListState> createGlobalKey() => GlobalKey<CardListState>();
+  static GlobalKey<CardListState> createGlobalKey() =>
+      GlobalKey<CardListState>();
 
   const CardList({
     super.key,
@@ -134,7 +137,8 @@ class CardListState extends State<CardList>
   Future<List<Interest>> fetchSortedInterestsForUser(String userUid) async {
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<Interest> interests = await fu.pullInterestsForUser(users, userUid);
-    interests.sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
+    interests
+        .sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
     return interests;
   }
 
@@ -277,6 +281,38 @@ class CardListState extends State<CardList>
     });
   }
 
+  Future<void> _showInvalidLinkDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Invalid link'),
+        content: const Text(
+          'The link you entered does not appear to be reachable. '
+              'Please try fix it before saving.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String normalizeUrl(String input) {
+    String url = input.trim();
+
+    if (url.isEmpty) return url;
+
+    // If user entered google.com
+    if (!url.startsWith('http://www.') && !url.startsWith('https://www.')) {
+      url = 'https://www.$url';
+    }
+
+    return url;
+  }
+
   Future<void> editing(
       Interest interest,
       bool toggle,
@@ -300,7 +336,13 @@ class CardListState extends State<CardList>
         titleController: titleController,
         quillController: quillController,
       );
-
+      if(!kIsWeb) {
+        final isValid = await isUrlResolvable(normalizeUrl(linkController.text));
+        if (!isValid) {
+          await _showInvalidLinkDialog();
+          return;
+        }
+      }
       fu.updateEditedInterest(users, interest, newInterest, widget.uid);
 
       if (isBlank) {
@@ -424,15 +466,26 @@ class CardListState extends State<CardList>
                                     : Text(
                                         interest.name,
                                         style: TextStyle(
-                                          color: Colors.blue,
-                                          decoration: TextDecoration.underline,
-                                        ),
+                                            color: interest.link == ""
+                                                ? Colors.black
+                                                : Colors.blue,
+                                            decoration: interest.link == ""
+                                                ? TextDecoration.none
+                                                : TextDecoration.underline),
                                       ),
                               ),
-                              SizedBox(height: 8),
+                              SizedBox(height: 4),
                               toggle
                                   ? Column(
                                       children: [
+                                        TextField(
+                                          controller: linkController,
+                                          decoration: InputDecoration(
+                                            labelText: 'Edit link here',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
                                         Container(
                                           decoration: BoxDecoration(
                                             border:
@@ -497,20 +550,16 @@ class CardListState extends State<CardList>
                                             ],
                                           ),
                                         ),
-                                        SizedBox(height: 8),
-                                        /*TextField(
-                                    controller: linkController,
-                                    decoration: InputDecoration(
-                                      labelText: 'Edit link here',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),*/
                                       ],
                                     )
                                   : Container(
                                       padding: EdgeInsets.all(8),
                                       child: QuillEditor.basic(
+                                        focusNode:
+                                            FocusNode(canRequestFocus: false),
                                         controller: quillController,
+                                        config: QuillEditorConfig(
+                                            showCursor: false),
                                       ),
                                     ),
                               Row(
