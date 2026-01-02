@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:intrst/widgets/CollapsibleChatScreen.dart';
 import 'package:provider/provider.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import '../models/Interest.dart';
 import '../models/UserModel.dart';
 import '../utility/FirebaseMessagesUtility.dart';
@@ -30,7 +30,7 @@ class Preview extends StatefulWidget {
 }
 
 class _InterestAlertDialogState extends State<Preview> {
-  List<String> _buttonLabels = [];
+  List<List<String>> _buttonLabels = [];
   String _name = '';
   FirebaseUsersUtility fuu = FirebaseUsersUtility();
   FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
@@ -49,25 +49,25 @@ class _InterestAlertDialogState extends State<Preview> {
     _loadNotificationCount();
   }
 
-  void _loadNotificationCount() async{
-    while(initMessageData == null) {
+  void _loadNotificationCount() async {
+    while (initMessageData == null) {
       await Future.delayed(Duration(milliseconds: 500));
     }
     print('attempting to load notification count');
-    int count = await fuu.retrieveNotificationCount(users, widget.uid, initMessageData!.entries.first.key.path);
+    int count = await fuu.retrieveNotificationCount(
+        users, widget.uid, initMessageData!.entries.first.key.path);
     print('the notification count was $count');
     setState(() {
-      if(count > 0 ) {
+      if (count > 0) {
         hasNotification = true;
         notificationCount = count;
-      }
-      else{
+      } else {
         hasNotification = false;
         notificationCount = 0;
       }
     });
   }
-  
+
   void _handleAlternateUserModel(String value, String name) {
     UserModel userModel = Provider.of<UserModel>(context, listen: false);
     userModel.changeAlternateUid(value);
@@ -83,7 +83,9 @@ class _InterestAlertDialogState extends State<Preview> {
     List<Interest> interests =
         await fuu.pullInterestsForUser(users, widget.alternateUid);
     String name = await fuu.lookUpNameByUserUid(users, widget.alternateUid);
-    List<String> labels = interests.map((interest) => interest.name).toList();
+    List<List<String>> labels = interests
+        .map((interest) => [interest.name, interest.link ?? ""])
+        .toList();
     setState(() {
       _buttonLabels = labels;
       _name = name;
@@ -132,6 +134,18 @@ class _InterestAlertDialogState extends State<Preview> {
     return buffer.toString();
   }
 
+  Future<void> _launchUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'http://' + url;
+    }
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -153,24 +167,42 @@ class _InterestAlertDialogState extends State<Preview> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if(!chatOpen)Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 16.0,
-            runSpacing: 8.0,
-            children: _buttonLabels
-                .map((label) {
-                  return ElevatedButton(
-                    onPressed: () {
-                      _handlePreviewToInterestsWidgetFlow();
-                    },
-                    child: Text(formatTextByWords(label, 3), textAlign: TextAlign.center,),
-                  );
-                })
-                .toList()
-                .take(5)
-                .toList(),
-          ),
-          if(!chatOpen)SizedBox(height: 16.0),
+          if (!chatOpen)
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 16.0,
+              runSpacing: 8.0,
+              children: _buttonLabels
+                  .map((label) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        //_handlePreviewToInterestsWidgetFlow();
+                      },
+                      child: GestureDetector(
+                        onTap: () {
+                          if(label.last == "") {
+                            _handlePreviewToInterestsWidgetFlow();
+                          }
+                          _launchUrl(label.last);
+                        },
+                        child: Text(
+                          formatTextByWords(label.first, 3),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color:
+                                  label.last == "" ? Colors.black : Colors.blue,
+                              decoration: label.last == ""
+                                  ? TextDecoration.none
+                                  : TextDecoration.underline),
+                        ),
+                      ),
+                    );
+                  })
+                  .toList()
+                  .take(5)
+                  .toList(),
+            ),
+          if (!chatOpen) SizedBox(height: 16.0),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -181,17 +213,20 @@ class _InterestAlertDialogState extends State<Preview> {
                     Navigator.pop(context); // Close the dialog
                     widget.onItemTapped(1);
                   } //
-                  if(widget.uid.isNotEmpty && widget.alternateUid.isNotEmpty) {
-                  await _fetchInitialMessageData();
+                  if (widget.uid.isNotEmpty && widget.alternateUid.isNotEmpty) {
+                    await _fetchInitialMessageData();
                   }
                   setState(() {
                     chatOpen = !chatOpen;
                   });
                 },
                 icon: Badge.count(
-                    offset: Offset(9.0, -7.0), isLabelVisible: hasNotification,
-                  count: notificationCount, child: const Icon(Icons.chat)),
-                  label: Text(chatOpen ? 'Close' : 'Chat', style: TextStyle(fontSize: 12)),
+                    offset: Offset(9.0, -7.0),
+                    isLabelVisible: hasNotification,
+                    count: notificationCount,
+                    child: const Icon(Icons.chat)),
+                label: Text(chatOpen ? 'Close' : 'Chat',
+                    style: TextStyle(fontSize: 12)),
               ),
               ElevatedButton.icon(
                 onPressed: () {
@@ -202,15 +237,15 @@ class _InterestAlertDialogState extends State<Preview> {
               ),
             ],
           ),
-          if(!chatOpen)
-          ElevatedButton.icon(
-            onPressed: () {
-              widget.onItemTapped(3);
-              Navigator.pop(context);
-            },
-            icon: Icon(Icons.chat),
-            label: Text('Show all chats'),
-          ),
+          if (!chatOpen)
+            ElevatedButton.icon(
+              onPressed: () {
+                widget.onItemTapped(3);
+                Navigator.pop(context);
+              },
+              icon: Icon(Icons.chat),
+              label: Text('Show all chats'),
+            ),
           if (chatOpen && initMessageData != null)
             Column(
               children: [
@@ -223,7 +258,8 @@ class _InterestAlertDialogState extends State<Preview> {
               ],
             ),
           if (chatOpen && initMessageData == null)
-            Text('You have never had a chat with this person, we are creating that chat now ')
+            Text(
+                'You have never had a chat with this person, we are creating that chat now ')
         ],
       ),
     );
