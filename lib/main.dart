@@ -604,6 +604,56 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<bool> _gotoCurrentUserLocationFast(
+      bool updateUserLocation, bool loadUserMarker) async {
+    final GoogleMapController controller = await _controller.future;
+    LocationData? locationData;
+
+    try {
+      locationData = await location.getLocation().timeout(
+        const Duration(milliseconds: 500),
+        //onTimeout: () => null,
+      );
+
+      if (locationData == null) {
+        await location.changeSettings(accuracy: LocationAccuracy.balanced);
+        locationData = await location.getLocation();
+      }
+
+      if (locationData.latitude == null) return false;
+
+      _newPosition = CameraPosition(
+        target: LatLng(locationData.latitude!, locationData.longitude!),
+        zoom: 12,
+      );
+
+      await controller.animateCamera(
+        CameraUpdate.newCameraPosition(_newPosition),
+      );
+
+      if (updateUserLocation) {
+        String localUid = FirebaseAuth.instance.currentUser!.uid;
+        CollectionReference users = FirebaseFirestore.instance.collection('users');
+        fu.updateUserLocation(
+          users,
+          localUid,
+          GeoPoint(locationData.latitude!, locationData.longitude!),
+        );
+      }
+
+      await loadMarkers(loadUserMarker);
+
+      if (mounted) {
+        setState(() => _markersLoadingSignedIn = false);
+      }
+
+      return true;
+    } catch (e) {
+      print("Error: $e");
+      return false;
+    }
+  }
+
   Future<bool> _gotoCurrentUserLocation(
       bool updateUserLocation, bool loadUserMarker) async {
     print('running _gotoCurrentUserLocation method');
@@ -956,7 +1006,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                             .toSet(),
                                     initialCameraPosition: _kLake,
                                     zoomControlsEnabled: false,
-                                    myLocationButtonEnabled: true,
+                                    myLocationButtonEnabled: false,
                                     compassEnabled: true,
                                     minMaxZoomPreference:
                                         MinMaxZoomPreference(3.0, 900.0),
@@ -986,6 +1036,18 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _onCameraMove(_currentZoom);
                                       _controller.complete(controller);
                                     },
+                                  ),
+                                  Positioned(
+                                    bottom: 130,
+                                    right: 10,
+                                    child: FloatingActionButton(
+                                      mini: true,
+                                      backgroundColor: Colors.white,
+                                      onPressed: () {
+                                        _gotoCurrentUserLocationFast(true, _signedIn);
+                                      },
+                                      child: Icon(Icons.my_location, color: Colors.blue),
+                                    ),
                                   ),
                                   Positioned(
                                     bottom: 75,
