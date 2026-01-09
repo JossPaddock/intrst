@@ -162,7 +162,7 @@ class _MessagingState extends State<Messaging> {
               ),
               onChanged: (value) async {
                 List<String> results =
-                    await fuu.searchForPeopleAndInterests(users, value, false);
+                    await fuu.searchForPeopleAndInterestsReturnUIDs(users, value, false);
                 if (results.contains(widget.user_uid)) {
                   results.remove(widget.user_uid);
                 }

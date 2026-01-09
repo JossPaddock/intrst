@@ -33,10 +33,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 Future<void> main() async {
   //debugPaintSizeEnabled = false;
   WidgetsFlutterBinding.ensureInitialized();
-  if(kIsWeb) {await Firebase.initializeApp(
-    //name: 'web-intrst',
-    options: DefaultFirebaseOptions.currentPlatform,
-  );}
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      //name: 'web-intrst',
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   runApp(
     ChangeNotifierProvider<UserModel>.value(
       value: UserModel(),
@@ -88,6 +90,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _signedIn = false;
   String _name = '';
   String _uid = '';
+  late final TextEditingController _searchController;
+  late final FocusNode _searchFocusNode;
   int _selectedIndex = 0;
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
   Set<Marker> labelMarkers = {};
@@ -264,12 +268,16 @@ class _MyHomePageState extends State<MyHomePage> {
     });
     loadFCMToken();
     super.initState();
+    _searchController = TextEditingController();
+    _searchFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
     _notificationLoading?.cancel();
     super.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
   }
 
   void _loadNotificationCount() async {
@@ -462,9 +470,7 @@ class _MyHomePageState extends State<MyHomePage> {
   //Make marker loading more reliable (work on first load)
   //loading other users markers besides logged in user(start by testing firebase utility function that gets all user uids)
 
-
-
-  Future<void> _showLocationDisclaimer(BuildContext context) async{
+  Future<void> _showLocationDisclaimer(BuildContext context) async {
     await showDialog(
       context: context,
       builder: (context) {
@@ -472,9 +478,9 @@ class _MyHomePageState extends State<MyHomePage> {
           title: const Text("Location Disclaimer"),
           content: const Text(
             "We respect your privacy. Your location data is used one time only "
-                "to place your marker on the map. We do not store, share, or track "
-                "your location, and we do not use your precise location — only an "
-                "approximate position is used to improve your experience.",
+            "to place your marker on the map. We do not store, share, or track "
+            "your location, and we do not use your precise location — only an "
+            "approximate position is used to improve your experience.",
           ),
           actions: [
             TextButton(
@@ -777,47 +783,91 @@ class _MyHomePageState extends State<MyHomePage> {
           builder: (context, setState) => SizedBox(
             height: 48.0,
             width: screenWidth * 0.4 >= 225 ? screenWidth * 0.4 : 225,
-            child: TextField(
-              decoration: InputDecoration(
-                fillColor: Colors.white,
-                filled: true,
-                hintText: 'find interests and people',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0), // Adjust as needed
-                ),
-              ),
-              onChanged: (value) async {
-                //we calculated this difference to determine if a user has deleted a character.
+            child: RawAutocomplete<String>(
+              textEditingController: _searchController,
+              focusNode: _searchFocusNode,
+              optionsBuilder: (TextEditingValue textEditingValue) async {
+                final value = textEditingValue.text;
+
+                if (value.isEmpty) {
+                  return const Iterable<String>.empty();
+                }
+
                 var diff = value.length - searchTerm.length;
                 var charDeleted = (diff == -1);
                 if (charDeleted) {
                   print('user deleted a character from searchbar');
                 }
-                _onCameraMove(_currentZoom);
+
                 setState(() {
                   searchTerm = value;
                 });
-                // Perform search based on the value
+
                 CollectionReference users =
                     FirebaseFirestore.instance.collection('users');
+
+                List<String> uid_results = await fu
+                    .searchForPeopleAndInterestsReturnUIDs(users, value, true);
+
                 List<String> results =
                     await fu.searchForPeopleAndInterests(users, value, true);
-                //_onCameraMove(_currentZoom);
-                print('these are the results of the search $results');
+
                 setState(() {
-                  // Update search results based on the value
-                  print('before values');
-                  for (var item in markers) {
-                    print(item.markerId);
-                  }
                   searchFilteredMarkers = markers;
-                  searchFilteredResults = results;
-                  print('after values');
-                  for (var item in markers) {
-                    print(item.markerId);
-                  }
+                  searchFilteredResults = uid_results;
                   _onCameraMove(_currentZoom);
                 });
+
+                return results;
+              },
+              fieldViewBuilder: (
+                context,
+                textEditingController,
+                focusNode,
+                onFieldSubmitted,
+              ) {
+                return TextField(
+                  controller: textEditingController,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    fillColor: Colors.white,
+                    filled: true,
+                    hintText: 'find interests and people',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                  ),
+                );
+              },
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width - 32,
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (context, index) {
+                          final option = options.elementAt(index);
+                          return ListTile(
+                            title: Text(option),
+                            onTap: () => onSelected(option),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+              onSelected: (selection) {
+                setState(() {
+                  searchTerm = selection;
+                });
+                print('Selected: $selection');
               },
             ),
           ),
@@ -1144,7 +1194,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     decoration: BoxDecoration(
                       color: Colors.blue,
                     ),
-                    child: kDebugMode? Text("$_name : $_uid"):Text("$_name"),
+                    child: kDebugMode ? Text("$_name : $_uid") : Text("$_name"),
                   ),
                   ListTile(
                     title: const Text('Map'),
