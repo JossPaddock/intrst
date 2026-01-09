@@ -47,11 +47,11 @@ class FirebaseUsersUtility {
 
   Future<void> addFcmTokenForUser(String userUid, String fcmToken) async {
     final usersCollection = FirebaseFirestore.instance.collection('users');
-print('attempting to add FCM token for user: $userUid');
+    print('attempting to add FCM token for user: $userUid');
     try {
       // Find the user document by user_uid
       final querySnapshot =
-      await usersCollection.where('user_uid', isEqualTo: userUid).get();
+          await usersCollection.where('user_uid', isEqualTo: userUid).get();
 
       if (querySnapshot.docs.isEmpty) {
         print('No user found with uid: $userUid');
@@ -519,16 +519,45 @@ print('attempting to add FCM token for user: $userUid');
     return interests;
   }
 
-  bool searchInterests(String data, String searchTerm) {
+  bool searchInterests(String data, String searchTerm,
+      {bool includeDescription = false}) {
+    String fieldPattern = includeDescription ? 'name|description' : 'name';
+
     RegExp regex = RegExp(
-      r'(name|description):\s*[^,}]*' + RegExp.escape(searchTerm),
+      r'(' + fieldPattern + r'):\s*[^,}]*' + RegExp.escape(searchTerm),
       caseSensitive: false,
     );
 
     return regex.hasMatch(data);
   }
 
-  Future<List<String>> searchForPeopleAndInterests(
+  String getMatchedInterest(String data, String searchTerm,
+      {bool includeDescription = false}) {
+    // 1. Create a pattern that handles both names and the nested "insert" fields in descriptions
+    String fieldPattern = includeDescription ? 'name|insert' : 'name';
+
+    RegExp regex = RegExp(
+      r'(' + fieldPattern + r'):\s*("?)(.*?)\2(?=[,}\]])',
+      caseSensitive: false,
+      dotAll: true, // Allows matching across newlines if description has them
+    );
+
+    // 2. Use allMatches to check EVERY instance in the data
+    final matches = regex.allMatches(data);
+
+    for (final match in matches) {
+      if (match.groupCount >= 3) {
+        String value = match.group(3)!.trim();
+        if (value.toLowerCase().contains(searchTerm.toLowerCase())) {
+          return value; // Return the first one that actually matches your search
+        }
+      }
+    }
+
+    return '';
+  }
+
+  Future<List<String>> searchForPeopleAndInterestsReturnUIDs(
       CollectionReference users, String query, bool includeInterests) async {
     Set<String> resultingUids = {};
     if (query != " " && query != "") {
@@ -552,4 +581,93 @@ print('attempting to add FCM token for user: $userUid');
     }
     return resultingUids.toList();
   }
+
+  Future<List<String>> searchForPeopleAndInterests(
+      CollectionReference users, String query, bool includeInterests) async {
+    Set<String> resultingNames = {};
+
+    if (query.trim().isEmpty) return [];
+
+    QuerySnapshot querySnapshotFull = await users.get();
+
+    for (var doc in querySnapshotFull.docs) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+      String firstname = data['first_name'] ?? '';
+      String lastname = data['last_name'] ?? '';
+      String fullName = '$firstname $lastname'.trim();
+
+      if (fullName.toLowerCase().contains(query.toLowerCase())) {
+        resultingNames.add(fullName);
+      }
+
+      if (includeInterests && data['interests'] != null) {
+        if (searchInterests(data.toString(), query) && includeInterests) {
+          print(getMatchedInterest(data.toString(), query));
+          resultingNames.add(getMatchedInterest(data.toString(), query));
+        }
+      }
+    }
+    resultingNames = keepOnlyLongest(resultingNames);
+    var ordered = reorderByQuery(resultingNames, query);
+    ordered = dedupeIgnoreCase(ordered);
+    return ordered.take(5).toList();
+  }
+
+  Set<String> keepOnlyLongest(Set<String> input) {
+    final sorted = input.toList()..sort((a, b) => b.length.compareTo(a.length));
+
+    final result = <String>[];
+
+    for (final current in sorted) {
+      final isContained = result.any(
+        (kept) => kept.contains(current),
+      );
+
+      if (!isContained) {
+        result.add(current);
+      }
+    }
+
+    return result.toSet();
+  }
+
+  List<String> reorderByQuery(Set<String> input, String query) {
+    final q = query.toLowerCase();
+
+    int score(String s) {
+      final value = s.toLowerCase();
+
+      if (value == q) return 100;
+      if (value.startsWith(q)) return 80;
+      if (value.contains(q)) return 50;
+      if (RegExp(q).hasMatch(value)) return 20;
+      return 0;
+    }
+
+    final list = input.toList();
+
+    list.sort((a, b) {
+      final scoreDiff = score(b).compareTo(score(a));
+      if (scoreDiff != 0) return scoreDiff;
+
+      return a.length.compareTo(b.length);
+    });
+    return list;
+  }
+
+  List<String> dedupeIgnoreCase(List<String> input) {
+    final seen = <String>{};
+    final result = <String>[];
+
+    for (final item in input) {
+      final key = item.toLowerCase();
+      if (seen.add(key)) {
+        result.add(item); // keep first occurrence
+      }
+    }
+
+    return result;
+  }
+
 }
