@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -11,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
+import 'package:intrst/utility/BackendIntegration.dart';
 import 'package:intrst/widgets/Account.dart';
 import 'package:intrst/widgets/Interests/Interests.dart';
 //import 'package:intrst/widgets/Interests.dart';
@@ -611,9 +613,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       locationData = await location.getLocation().timeout(
-        const Duration(milliseconds: 500),
-        //onTimeout: () => null,
-      );
+            const Duration(milliseconds: 500),
+            //onTimeout: () => null,
+          );
 
       if (locationData == null) {
         await location.changeSettings(accuracy: LocationAccuracy.balanced);
@@ -630,16 +632,6 @@ class _MyHomePageState extends State<MyHomePage> {
       await controller.animateCamera(
         CameraUpdate.newCameraPosition(_newPosition),
       );
-
-      if (updateUserLocation) {
-        String localUid = FirebaseAuth.instance.currentUser!.uid;
-        CollectionReference users = FirebaseFirestore.instance.collection('users');
-        fu.updateUserLocation(
-          users,
-          localUid,
-          GeoPoint(locationData.latitude!, locationData.longitude!),
-        );
-      }
 
       await loadMarkers(loadUserMarker);
 
@@ -861,13 +853,42 @@ class _MyHomePageState extends State<MyHomePage> {
 
                 List<String> results =
                     await fu.searchForPeopleAndInterests(users, value, true);
+                List<String> interests = await fu.listInterests();
+                print("interests: $interests");
 
                 setState(() {
                   searchFilteredMarkers = markers;
                   searchFilteredResults = uid_results;
                   _onCameraMove(_currentZoom);
                 });
+                var input = value;
+                var options = interests;
 
+                  if (results.isEmpty) {
+                    print('No results! Calling LLM for more options');
+
+                    // 1. Initialize the new client
+                    BackendIntegration gptclient = BackendIntegration();
+
+                    try {
+                      // 2. Call the new generateResponse method and await it directly
+                      final response = await gptclient.createResponse(
+                        model: "gpt-4o",
+                        input: "You are an autocomplete semantic gap-filler.\n\nYour task is to map a user's search query to the most relevant existing autocomplete entries, even when the query does not exactly match any entry.\n\nRules:\n- You MUST return only items that appear EXACTLY in the provided list.\n- Do NOT invent, modify, or paraphrase entries.\n- Use semantic similarity such as shared activity type, environment, or user intent.\n- Prefer broader or closely related categories over loosely associated topics.\n- Rank results from most relevant to least relevant.\n- Return a maximum of 5 results.\n- Output must be a valid JSON stringified array.\n- Do NOT include explanations, comments, or additional text.\n\nNegative rules:\n- Do NOT add new concepts.\n- Do NOT include items with weak or indirect relevance.\n- If nothing is relevant, return an empty array: [].\n\nExample:\nInput:\nQuery: \"painting\"\nOptions: [\"art\", \"skiing\", \"podcasts\"]\n\nOutput:\n[\"art\"]\n\nNow process the following input:\n\nQuery: \"$input\"\nOptions: $options",
+                      );
+
+                      // 3. Use the new helper which now returns List<String> instead of a String
+                      // We no longer need jsonDecode(answer) because the helper does it for us.
+                      results = gptclient.extractAutocompleteEntries(response);
+
+                      print("LLM results: $results");
+                    } catch (e) {
+                      print('Error calling backend: $e');
+                    } finally {
+                      // 4. Always close the client to prevent memory leaks
+                      gptclient.dispose();
+                    }
+                  }
                 return results;
               },
               fieldViewBuilder: (
@@ -1044,9 +1065,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                       mini: true,
                                       backgroundColor: Colors.white,
                                       onPressed: () {
-                                        _gotoCurrentUserLocationFast(true, _signedIn);
+                                        _gotoCurrentUserLocationFast(
+                                            true, _signedIn);
                                       },
-                                      child: Icon(Icons.my_location, color: Colors.blue),
+                                      child: Icon(Icons.my_location,
+                                          color: Colors.blue),
                                     ),
                                   ),
                                   Positioned(

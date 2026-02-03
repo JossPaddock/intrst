@@ -582,6 +582,31 @@ class FirebaseUsersUtility {
     return resultingUids.toList();
   }
 
+  Future<List<String>> listInterests() async {
+    final querySnapshot =
+    await FirebaseFirestore.instance.collection('users').get();
+
+    final List<String> interestNames = [];
+
+    for (final doc in querySnapshot.docs) {
+      final data = doc.data();
+
+      if (data.containsKey('interests') && data['interests'] is List) {
+        final List interests = data['interests'];
+
+        for (final interest in interests) {
+          if (interest is Map<String, dynamic> &&
+              interest.containsKey('name') &&
+              interest['name'] is String) {
+            interestNames.add(interest['name']);
+          }
+        }
+      }
+    }
+
+    return interestNames;
+  }
+
   Future<List<String>> searchForPeopleAndInterests(
       CollectionReference users, String query, bool includeInterests) async {
     Set<String> resultingNames = {};
@@ -608,28 +633,9 @@ class FirebaseUsersUtility {
         }
       }
     }
-    resultingNames = keepOnlyLongest(resultingNames);
     var ordered = reorderByQuery(resultingNames, query);
     ordered = dedupeIgnoreCase(ordered);
     return ordered.take(5).toList();
-  }
-
-  Set<String> keepOnlyLongest(Set<String> input) {
-    final sorted = input.toList()..sort((a, b) => b.length.compareTo(a.length));
-
-    final result = <String>[];
-
-    for (final current in sorted) {
-      final isContained = result.any(
-        (kept) => kept.contains(current),
-      );
-
-      if (!isContained) {
-        result.add(current);
-      }
-    }
-
-    return result.toSet();
   }
 
   List<String> reorderByQuery(Set<String> input, String query) {
@@ -653,7 +659,12 @@ class FirebaseUsersUtility {
 
       return a.length.compareTo(b.length);
     });
-    return list;
+    return list.where((current) {
+      final pattern = RegExp(r'\b' + RegExp.escape(current) + r'\b', caseSensitive: false);
+
+      return !list.any((other) =>
+      other != current && pattern.hasMatch(other));
+    }).toList();
   }
 
   List<String> dedupeIgnoreCase(List<String> input) {
