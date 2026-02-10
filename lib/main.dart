@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -107,7 +108,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoading = false;
   int toggleIndex = 0;
   bool mapOptionsVisibility = false;
-  String _markerDraggabilityText = 'Your marker is not movable';
+  String _markerDraggabilityText = 'not movable';
   bool hasNotification = false;
   int notificationCount = 0;
   Timer? _notificationLoading;
@@ -116,7 +117,7 @@ class _MyHomePageState extends State<MyHomePage> {
     // You may set the permission requests to "provisional" which allows the user to choose what type
     // of notifications they would like to receive once the user receives a notification.
     final notificationSettings =
-        await FirebaseMessaging.instance.requestPermission(provisional: true);
+    await FirebaseMessaging.instance.requestPermission(provisional: true);
 
     // For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
     final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
@@ -155,7 +156,7 @@ class _MyHomePageState extends State<MyHomePage> {
         _notificationLoading?.cancel();
       } else {
         CollectionReference users =
-            FirebaseFirestore.instance.collection('users');
+        FirebaseFirestore.instance.collection('users');
         print('User is signed in!');
         _signedIn = true;
         _selectedIndex = 0;
@@ -176,7 +177,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
 
   Completer<GoogleMapController> _controllerSignedOut =
-      Completer<GoogleMapController>();
+  Completer<GoogleMapController>();
 
   void _onCameraMove(double zoom) {
     double level = 10.5;
@@ -190,7 +191,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = labelMarkers
                 .where((value) =>
-                    searchFilteredResults.contains(value.markerId.value))
+                searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -204,7 +205,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = poiMarkers
                 .where((value) =>
-                    searchFilteredResults.contains(value.markerId.value))
+                searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -221,7 +222,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = labelMarkers
                 .where((value) =>
-                    searchFilteredResults.contains(value.markerId.value))
+                searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -234,7 +235,7 @@ class _MyHomePageState extends State<MyHomePage> {
           } else {
             markers = poiMarkers
                 .where((value) =>
-                    searchFilteredResults.contains(value.markerId.value))
+                searchFilteredResults.contains(value.markerId.value))
                 .toSet();
             ;
           }
@@ -377,39 +378,39 @@ class _MyHomePageState extends State<MyHomePage> {
 
     labelMarkers
         .addLabelMarker(LabelMarker(
-            icon: BitmapDescriptor.defaultMarker,
-            label: title,
-            textStyle: TextStyle(
-              color: color,
-              fontSize: 27.0,
-              letterSpacing: 1.0,
-              fontFamily: 'Roboto Bold',
-            ),
-            markerId: MarkerId(uid),
-            //maybe someday this offset below will work. It should!
-            anchor: Offset(0.5, 0.5),
-            position: LatLng(lat, lng),
-            backgroundColor: const Color(0x00000000),
-            draggable: drag,
-            zIndex: drag ? 10 : (user ? 5 : 1),
-            onTap: () {
-              markers = {};
-              handleMarkerTap(title, uid, false);
-              setState(() {});
-            },
-            onDragEnd: (LatLng newPosition) async {
-              fu.updateUserLocation(
-                  FirebaseFirestore.instance.collection('users'),
-                  FirebaseAuth.instance.currentUser!.uid,
-                  GeoPoint(newPosition.latitude, newPosition.longitude));
-              await loadMarkers(true);
-              setState(() {
-                _markersLoadingSignedIn = false;
-                _markersLoadingSignedInBannerText = 'loading markers...';
-              });
-            }))
+        icon: BitmapDescriptor.defaultMarker,
+        label: title,
+        textStyle: TextStyle(
+          color: color,
+          fontSize: 27.0,
+          letterSpacing: 1.0,
+          fontFamily: 'Roboto Bold',
+        ),
+        markerId: MarkerId(uid),
+        //maybe someday this offset below will work. It should!
+        anchor: Offset(0.5, 0.5),
+        position: LatLng(lat, lng),
+        backgroundColor: const Color(0x00000000),
+        draggable: drag,
+        zIndex: drag ? 10 : (user ? 5 : 1),
+        onTap: () {
+          markers = {};
+          handleMarkerTap(title, uid, false);
+          setState(() {});
+        },
+        onDragEnd: (LatLng newPosition) async {
+          fu.updateUserLocation(
+              FirebaseFirestore.instance.collection('users'),
+              FirebaseAuth.instance.currentUser!.uid,
+              GeoPoint(newPosition.latitude, newPosition.longitude));
+          await loadMarkers(true);
+          setState(() {
+            _markersLoadingSignedIn = false;
+            _markersLoadingSignedInBannerText = 'loading markers...';
+          });
+        }))
         .then(
-      (value) {
+          (value) {
         setState(() {});
       },
     );
@@ -428,14 +429,14 @@ class _MyHomePageState extends State<MyHomePage> {
       poi = await BitmapDescriptor.bytes(imageData,
           width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
       CollectionReference users =
-          FirebaseFirestore.instance.collection('users');
+      FirebaseFirestore.instance.collection('users');
       //user
       if (loadUserMarker) {
         Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
         BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
             width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
         var signedInUserMarkerData =
-            await fu.lookUpNameAndLocationByUserUid(users, _uid);
+        await fu.lookUpNameAndLocationByUserUid(users, _uid);
         //This is where we load the signed in users marker
         addMarker(
             signedInUserMarkerData[0],
@@ -480,9 +481,9 @@ class _MyHomePageState extends State<MyHomePage> {
           title: const Text("Location Disclaimer"),
           content: const Text(
             "We respect your privacy. Your location data is used one time only "
-            "to place your marker on the map. We do not store, share, or track "
-            "your location, and we do not use your precise location — only an "
-            "approximate position is used to improve your experience.",
+                "to place your marker on the map. We do not store, share, or track "
+                "your location, and we do not use your precise location — only an "
+                "approximate position is used to improve your experience.",
           ),
           actions: [
             TextButton(
@@ -518,7 +519,7 @@ class _MyHomePageState extends State<MyHomePage> {
       // Request permission
       setState(() {
         _markersLoadingSignedInBannerText =
-            'share location to place your marker...';
+        'share location to place your marker...';
       });
       _permissionGranted = await location.requestPermission();
       if (_permissionGranted == PermissionStatus.granted) {
@@ -575,7 +576,7 @@ class _MyHomePageState extends State<MyHomePage> {
           zoom: 3,
         );
         CollectionReference users =
-            FirebaseFirestore.instance.collection('users');
+        FirebaseFirestore.instance.collection('users');
         String localUid = FirebaseAuth.instance.currentUser!.uid;
         print(
             'updating user with user_uid: $localUid location to lat: ${lat}; long: ${long} in Firebase');
@@ -586,7 +587,7 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _markersLoadingSignedIn = true;
           _markersLoadingSignedInBannerText =
-              'click on the marker button (bottom right) then toggle to move your marker';
+          'click on the marker button (bottom right) then toggle to move your marker';
         });
       }
     } else {
@@ -613,9 +614,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       locationData = await location.getLocation().timeout(
-            const Duration(milliseconds: 500),
-            //onTimeout: () => null,
-          );
+        const Duration(milliseconds: 500),
+        //onTimeout: () => null,
+      );
 
       if (locationData == null) {
         await location.changeSettings(accuracy: LocationAccuracy.balanced);
@@ -771,7 +772,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   static const TextStyle optionStyle =
-      TextStyle(fontSize: 30, fontWeight: FontWeight.bold);
+  TextStyle(fontSize: 30, fontWeight: FontWeight.bold);
 
   Widget rollingIconBuilder(int? value, bool foreground) {
     return Icon(iconDataByValue(value));
@@ -782,13 +783,80 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   IconData iconDataByValue(int? value) => switch (value) {
-        0 => Icons.disabled_by_default,
-        _ => Icons.swipe,
-      };
+    0 => Icons.disabled_by_default,
+    _ => Icons.swipe,
+  };
 
   Widget sizeIconBuilder(BuildContext context,
       AnimatedToggleProperties<int> local, GlobalToggleProperties<int> global) {
     return iconBuilder(local.value);
+  }
+
+  Future<void> moveCameraToUserLocation({
+    double zoom = 12,
+    bool animate = true,
+  }) async {
+    if (_uid.isEmpty) return;
+
+    final users = FirebaseFirestore.instance.collection('users');
+
+    final GeoPoint point = await fu.retrieveUserLocation(users, _uid);
+
+    final LatLng target = LatLng(point.latitude, point.longitude);
+
+    final GoogleMapController controller = await _controller.future;
+
+    final CameraUpdate update = CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: target,
+        zoom: zoom,
+      ),
+    );
+
+    if (animate) {
+      await controller.animateCamera(update);
+    } else {
+      await controller.moveCamera(update);
+    }
+  }
+
+  Future<void> moveUserMarkerToCurrentLocation() async {
+    if (_uid.isEmpty) return;
+
+    try {
+      final LocationData locationData = await location.getLocation();
+
+      if (locationData.latitude == null || locationData.longitude == null) {
+        return;
+      }
+
+      final LatLng newLatLng = LatLng(
+        locationData.latitude!,
+        locationData.longitude!,
+      );
+
+      final users = FirebaseFirestore.instance.collection('users');
+
+      fu.updateUserLocation(
+        users,
+        _uid,
+        GeoPoint(newLatLng.latitude, newLatLng.longitude),
+      );
+
+      await loadMarkers(true);
+
+      final GoogleMapController controller = await _controller.future;
+      await controller.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: newLatLng,
+            zoom: 12,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error moving user marker: $e');
+    }
   }
 
   @override
@@ -798,6 +866,9 @@ class _MyHomePageState extends State<MyHomePage> {
     double mapHeight =
         MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top;
     double toolbarHeight = 56;
+    // Updated bottom bar height - doubled from 80 to 160
+    double bottomBarHeight = 164;
+
     return Scaffold(
       drawerEnableOpenDragGesture: false,
       endDrawerEnableOpenDragGesture: false,
@@ -830,6 +901,16 @@ class _MyHomePageState extends State<MyHomePage> {
               focusNode: _searchFocusNode,
               optionsBuilder: (TextEditingValue textEditingValue) async {
                 final value = textEditingValue.text;
+                if (value.isEmpty) {
+                  setState(() {
+                    searchTerm = '';
+                    searchFilteredResults = [];
+                    searchFilteredMarkers = {};
+                    _onCameraMove(_currentZoom); // reapply full marker set
+                  });
+
+                  return const Iterable<String>.empty();
+                }
 
                 if (value.isEmpty) {
                   return const Iterable<String>.empty();
@@ -846,13 +927,13 @@ class _MyHomePageState extends State<MyHomePage> {
                 });
 
                 CollectionReference users =
-                    FirebaseFirestore.instance.collection('users');
+                FirebaseFirestore.instance.collection('users');
 
                 List<String> uid_results = await fu
                     .searchForPeopleAndInterestsReturnUIDs(users, value, true);
 
                 List<String> results =
-                    await fu.searchForPeopleAndInterests(users, value, true);
+                await fu.searchForPeopleAndInterests(users, value, true);
                 List<String> interests = await fu.listInterests();
                 print("interests: $interests");
 
@@ -864,39 +945,40 @@ class _MyHomePageState extends State<MyHomePage> {
                 var input = value;
                 var options = interests;
 
-                  if (results.isEmpty) {
-                    print('No results! Calling LLM for more options');
+                if (results.isEmpty) {
+                  print('No results! Calling LLM for more options');
 
-                    // 1. Initialize the new client
-                    BackendIntegration gptclient = BackendIntegration();
+                  // 1. Initialize the new client
+                  BackendIntegration gptclient = BackendIntegration();
 
-                    try {
-                      // 2. Call the new generateResponse method and await it directly
-                      final response = await gptclient.createResponse(
-                        model: "gpt-4o",
-                        input: "You are an autocomplete semantic gap-filler.\n\nYour task is to map a user's search query to the most relevant existing autocomplete entries, even when the query does not exactly match any entry.\n\nRules:\n- You MUST return only items that appear EXACTLY in the provided list.\n- Do NOT invent, modify, or paraphrase entries.\n- Use semantic similarity such as shared activity type, environment, or user intent.\n- Prefer broader or closely related categories over loosely associated topics.\n- Rank results from most relevant to least relevant.\n- Return a maximum of 5 results.\n- Output must be a valid JSON stringified array.\n- Do NOT include explanations, comments, or additional text.\n\nNegative rules:\n- Do NOT add new concepts.\n- Do NOT include items with weak or indirect relevance.\n- If nothing is relevant, return an empty array: [].\n\nExample:\nInput:\nQuery: \"painting\"\nOptions: [\"art\", \"skiing\", \"podcasts\"]\n\nOutput:\n[\"art\"]\n\nNow process the following input:\n\nQuery: \"$input\"\nOptions: $options",
-                      );
+                  try {
+                    // 2. Call the new generateResponse method and await it directly
+                    final response = await gptclient.createResponse(
+                      model: "gpt-4o",
+                      input:
+                      "You are an autocomplete semantic gap-filler.\n\nYour task is to map a user's search query to the most relevant existing autocomplete entries, even when the query does not exactly match any entry.\n\nRules:\n- You MUST return only items that appear EXACTLY in the provided list.\n- Do NOT invent, modify, or paraphrase entries.\n- Use semantic similarity such as shared activity type, environment, or user intent.\n- Prefer broader or closely related categories over loosely associated topics.\n- Rank results from most relevant to least relevant.\n- Return a maximum of 5 results.\n- Output must be a valid JSON stringified array.\n- Do NOT include explanations, comments, or additional text.\n\nNegative rules:\n- Do NOT add new concepts.\n- Do NOT include items with weak or indirect relevance.\n- If nothing is relevant, return an empty array: [].\n\nExample:\nInput:\nQuery: \"painting\"\nOptions: [\"art\", \"skiing\", \"podcasts\"]\n\nOutput:\n[\"art\"]\n\nNow process the following input:\n\nQuery: \"$input\"\nOptions: $options",
+                    );
 
-                      // 3. Use the new helper which now returns List<String> instead of a String
-                      // We no longer need jsonDecode(answer) because the helper does it for us.
-                      results = gptclient.extractAutocompleteEntries(response);
+                    // 3. Use the new helper which now returns List<String> instead of a String
+                    // We no longer need jsonDecode(answer) because the helper does it for us.
+                    results = gptclient.extractAutocompleteEntries(response);
 
-                      print("LLM results: $results");
-                    } catch (e) {
-                      print('Error calling backend: $e');
-                    } finally {
-                      // 4. Always close the client to prevent memory leaks
-                      gptclient.dispose();
-                    }
+                    print("LLM results: $results");
+                  } catch (e) {
+                    print('Error calling backend: $e');
+                  } finally {
+                    // 4. Always close the client to prevent memory leaks
+                    gptclient.dispose();
                   }
+                }
                 return results;
               },
               fieldViewBuilder: (
-                context,
-                textEditingController,
-                focusNode,
-                onFieldSubmitted,
-              ) {
+                  context,
+                  textEditingController,
+                  focusNode,
+                  onFieldSubmitted,
+                  ) {
                 return TextField(
                   controller: textEditingController,
                   focusNode: focusNode,
@@ -964,415 +1046,429 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         child: _isLoading
             ? Container(
-                color: Colors.black.withOpacity(0.5),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(
-                        height: 10,
-                      ),
-                      Text(
-                        'Changing draggability',
-                        style: TextStyle(color: Colors.white, fontSize: 20),
-                      )
-                    ],
-                  ),
+          color: Colors.black.withOpacity(0.5),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(
+                  height: 10,
                 ),
-              )
+                Text(
+                  'Changing draggability',
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                )
+              ],
+            ),
+          ),
+        )
             : _signedIn // _signedInGoogleMap
-                ? <Widget>[
-                    Scaffold(
-                      body: Container(
-                        color: Color(0xFF082D38),
-                        //child: SingleChildScrollView(
-                        child: Column(
-                          children: <Widget>[
-                            Container(
-                              height: mapOptionsVisibility
-                                  ? mapHeight - toolbarHeight - 80
-                                  : mapHeight - toolbarHeight,
-                              child: Stack(
-                                children: [
-                                  GoogleMap(
-                                    /*onTap: (LatLng position) {
+            ? <Widget>[
+          Scaffold(
+            body: Container(
+              color: Color(0xFF082D38),
+              //child: SingleChildScrollView(
+              child: Column(
+                children: <Widget>[
+                  Container(
+                    height: mapOptionsVisibility
+                        ? mapHeight - toolbarHeight - bottomBarHeight
+                        : mapHeight - toolbarHeight,
+                    child: Stack(
+                      children: [
+                        GoogleMap(
+                          /*onTap: (LatLng position) {
                                       if (mapOptionsVisibility) {
                                         mapOptionsVisibility = false;
                                       }
                                     },*/
-                                    onCameraMove:
-                                        (CameraPosition cameraPosition) {
-                                      _onCameraMove(cameraPosition.zoom);
-                                    },
-                                    cloudMapId:
-                                        mapId, // Set the map style ID here
-                                    mapToolbarEnabled: false,
-                                    zoomGesturesEnabled: _zoomEnabled,
-                                    gestureRecognizers: _zoomEnabled
-                                        ? <Factory<
-                                            OneSequenceGestureRecognizer>>{
-                                            Factory<PanGestureRecognizer>(
-                                                () => PanGestureRecognizer()),
-                                            Factory<ScaleGestureRecognizer>(
-                                                () => ScaleGestureRecognizer()),
-                                            Factory<TapGestureRecognizer>(
-                                                () => TapGestureRecognizer()),
-                                            Factory<VerticalDragGestureRecognizer>(
-                                                () =>
-                                                    VerticalDragGestureRecognizer()),
-                                          }
-                                        : <Factory<
-                                                OneSequenceGestureRecognizer>>{}
-                                            .toSet(),
-                                    initialCameraPosition: _kLake,
-                                    zoomControlsEnabled: false,
-                                    myLocationButtonEnabled: false,
-                                    compassEnabled: true,
-                                    minMaxZoomPreference:
-                                        MinMaxZoomPreference(3.0, 900.0),
-                                    markers: markers,
-                                    onMapCreated:
-                                        (GoogleMapController controller) async {
-                                      loadFCMToken();
-                                      double zoom =
-                                          await controller.getZoomLevel();
-                                      _currentZoom = zoom;
-                                      print('onMapCreated signedIn is running');
-                                      if (_controller.isCompleted) {
-                                        _controller = Completer();
-                                      }
-                                      await _showLocationDisclaimer(context);
-                                      _getLocationServiceAndPermission(
-                                          _controller);
-                                      _gotoCurrentUserLocation(
-                                          false, _signedIn);
-                                      print('callback is working');
-                                      setState(() {});
-                                      if (markers.isEmpty) {
-                                        print(
-                                            'markers is empty attempting to load markers now');
-                                        await loadMarkers(true);
-                                      }
-                                      _onCameraMove(_currentZoom);
-                                      _controller.complete(controller);
-                                    },
-                                  ),
-                                  Positioned(
-                                    bottom: 130,
-                                    right: 10,
-                                    child: FloatingActionButton(
-                                      mini: true,
-                                      backgroundColor: Colors.white,
-                                      onPressed: () {
-                                        _gotoCurrentUserLocationFast(
-                                            true, _signedIn);
-                                      },
-                                      child: Icon(Icons.my_location,
-                                          color: Colors.blue),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 75,
-                                    right: 10,
-                                    child: FloatingActionButton(
-                                      mini: true,
-                                      onPressed: () async {
-                                        setState(() {
-                                          //_zoomEnabled = false;
-                                          mapOptionsVisibility =
-                                              !mapOptionsVisibility;
-                                        });
-                                      },
-                                      child: Icon(Icons.location_on),
-                                      backgroundColor: Colors.blue,
-                                    ),
-                                  ),
-                                  if (_markersLoadingSignedIn)
-                                    Positioned(
-                                      left: 0,
-                                      right: 0,
-                                      bottom: 250,
-                                      child: Container(
-                                        color: Colors.black54,
-                                        padding: EdgeInsets.all(12),
-                                        child: Text(
-                                          _markersLoadingSignedInBannerText,
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            //Visibility(
-                            //visible: mapOptionsVisibility,
-                            //child:
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  right: 10,
-                                ),
-                                child: Visibility(
-                                  visible: mapOptionsVisibility,
-                                  child: Column(children: [
-                                    SizedBox(height: 10),
-                                    Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            _markerDraggabilityText,
-                                            style:
-                                                TextStyle(color: Colors.white),
-                                          ),
-                                          SizedBox(
-                                            width: 40,
-                                          ),
-                                          Container(
-                                            padding: EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                                color: Colors.blue,
-                                                borderRadius:
-                                                    BorderRadius.circular(8)),
-                                            child: SizedBox(
-                                              height: 40,
-                                              width: 100,
-                                              child: AnimatedToggleSwitch<
-                                                  int>.rolling(
-                                                current: toggleIndex,
-                                                values: [0, 1],
-                                                onChanged: (i) async {
-                                                  print(toggleIndex);
-                                                  setState(
-                                                      () => toggleIndex = i);
-                                                  bool choice = (i == 1);
-                                                  _setDraggabilityUserModel(
-                                                      choice);
-                                                  await loadMarkers(true);
-                                                  _onCameraMove(_currentZoom);
-                                                  setState(
-                                                      () => toggleIndex = i);
-                                                  print(toggleIndex);
-                                                  setState(() {
-                                                    _zoomEnabled = true;
-                                                    if (!choice) {
-                                                      mapOptionsVisibility =
-                                                          false;
-                                                      _markerDraggabilityText =
-                                                          'Your marker is not movable';
-                                                    } else {
-                                                      _markerDraggabilityText =
-                                                          'Your marker is movable';
-                                                      setState(() {
-                                                        _markersLoadingSignedIn =
-                                                            true;
-                                                        if (kIsWeb) {
-                                                          _markersLoadingSignedInBannerText =
-                                                              'drag your marker to a new location...';
-                                                        } else {
-                                                          _markersLoadingSignedInBannerText =
-                                                              'long press to drag your marker to a new location...';
-                                                        }
-                                                      });
-                                                    }
-                                                  });
-                                                },
-                                                //loading: false, // for deactivating loading animation
-                                                iconBuilder: rollingIconBuilder,
-                                                style: ToggleStyle(),
-                                                height: 50,
-                                              ),
-                                            ),
-                                          ),
-                                        ]),
-                                  ]),
-                                ),
-                              ),
-                            ),
-                          ],
-                          //),
-                        ),
-                      ),
-                    ),
-                    Text('New Feature coming in the future'),
-                    Account(uid: _uid),
-                    Messaging(user_uid: _uid),
-                    Text(
-                      'Index 4: Replace this text widget with the Sign Out widget',
-                      style: optionStyle,
-                    ),
-                  ][_selectedIndex]
-                : <Widget>[
-                    Stack(children: [
-                      GoogleMap(
-                        onCameraMove: (CameraPosition cameraPosition) {
-                          _onCameraMove(cameraPosition.zoom);
-                        },
-                        cloudMapId: mapId, // Set the map style ID here
-                        zoomGesturesEnabled: _zoomEnabled,
-                        initialCameraPosition: _kLake,
-                        zoomControlsEnabled: false,
-                        minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
-                        markers: markers,
-                        onMapCreated: (GoogleMapController controller) async {
-                          setState(() {
-                            _markersLoadingSignedOut = true;
-                          });
-                          double zoom = await controller.getZoomLevel();
-                          _currentZoom = zoom;
-                          print('onMapCreated signedOut is running');
-                          if (_controllerSignedOut.isCompleted) {
-                            _controllerSignedOut = Completer();
+                          onCameraMove:
+                              (CameraPosition cameraPosition) {
+                            _onCameraMove(cameraPosition.zoom);
+                          },
+                          cloudMapId:
+                          mapId, // Set the map style ID here
+                          mapToolbarEnabled: false,
+                          zoomGesturesEnabled: _zoomEnabled,
+                          gestureRecognizers: _zoomEnabled
+                              ? <Factory<
+                              OneSequenceGestureRecognizer>>{
+                            Factory<PanGestureRecognizer>(
+                                    () => PanGestureRecognizer()),
+                            Factory<ScaleGestureRecognizer>(
+                                    () => ScaleGestureRecognizer()),
+                            Factory<TapGestureRecognizer>(
+                                    () => TapGestureRecognizer()),
+                            Factory<VerticalDragGestureRecognizer>(
+                                    () =>
+                                    VerticalDragGestureRecognizer()),
                           }
-                          print('mapStyle should be set');
-                          print('callback is working');
-                          setState(() {});
-                          print(markers.length);
-                          await loadMarkers(false);
-                          //await Future.delayed(Duration(milliseconds: 1000));
-                          print(markers.length);
-                          _controllerSignedOut.complete(controller);
-                          _onCameraMove(_currentZoom);
-                          await Future.delayed(Duration(milliseconds: 250));
-                          setState(() {
-                            _markersLoadingSignedOut = false;
-                          });
-                        },
-                      ),
-                      if (_markersLoadingSignedOut)
+                              : <Factory<
+                              OneSequenceGestureRecognizer>>{}
+                              .toSet(),
+                          initialCameraPosition: _kLake,
+                          zoomControlsEnabled: false,
+                          myLocationButtonEnabled: false,
+                          compassEnabled: true,
+                          minMaxZoomPreference:
+                          MinMaxZoomPreference(3.0, 900.0),
+                          markers: markers,
+                          onMapCreated:
+                              (GoogleMapController controller) async {
+                            loadFCMToken();
+                            double zoom =
+                            await controller.getZoomLevel();
+                            _currentZoom = zoom;
+                            print('onMapCreated signedIn is running');
+                            if (_controller.isCompleted) {
+                              _controller = Completer();
+                            }
+                            await _showLocationDisclaimer(context);
+                            _getLocationServiceAndPermission(
+                                _controller);
+                            _gotoCurrentUserLocation(
+                                false, _signedIn);
+                            print('callback is working');
+                            setState(() {});
+                            if (markers.isEmpty) {
+                              print(
+                                  'markers is empty attempting to load markers now');
+                              await loadMarkers(true);
+                            }
+                            _onCameraMove(_currentZoom);
+                            _controller.complete(controller);
+                          },
+                        ),
                         Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 250,
-                          child: Container(
-                            color: Colors.black54,
-                            padding: EdgeInsets.all(12),
-                            child: Text(
-                              'loading markers...',
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 16),
-                              textAlign: TextAlign.center,
-                            ),
+                          bottom: kIsWeb? 130 : 70,
+                          right: 10,
+                          child: FloatingActionButton(
+                            mini: true,
+                            backgroundColor: Colors.white,
+                            onPressed: () {
+                              _gotoCurrentUserLocationFast(
+                                  true, _signedIn);
+                            },
+                            child: Icon(Icons.my_location,
+                                color: Colors.blue),
                           ),
                         ),
-                    ]),
-                    LoginScreen(
-                      signedIn: _signedIn,
-                      onSignInChanged: _handleSignInChanged,
-                      onSelectedIndexChanged: _onItemTapped,
-                      onNameChanged: _handleNameChanged,
-                      onUidChanged: _handleUidChanged,
+                        Positioned(
+                          bottom: kIsWeb? 75 : 15,
+                          right: 10,
+                          child: FloatingActionButton(
+                            mini: true,
+                            onPressed: () async {
+                              setState(() {
+                                //_zoomEnabled = false;
+                                mapOptionsVisibility =
+                                !mapOptionsVisibility;
+                              });
+                              if (mapOptionsVisibility) {
+                                moveCameraToUserLocation();
+                              }
+                            },
+                            child: Icon(Icons.location_on),
+                            backgroundColor: Colors.blue,
+                          ),
+                        ),
+                        if (_markersLoadingSignedIn)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 250,
+                            child: Container(
+                              color: Colors.black54,
+                              padding: EdgeInsets.all(12),
+                              child: Text(
+                                _markersLoadingSignedInBannerText,
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ][_selectedIndex],
+                  ),
+                  // Updated bottom bar with title and larger height
+                  Visibility(
+                    visible: mapOptionsVisibility,
+                    child: Container(
+                      height: bottomBarHeight,
+                      width: double.infinity,
+                      color: Color(0xFF082D38),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Title at the top
+                          Text(
+                            'Marker Settings',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          // Toggle switch and status text
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Toggle switch
+                              SizedBox(
+                                height: 40,
+                                width: 100,
+                                child: AnimatedToggleSwitch<int>.rolling(
+                                  current: toggleIndex,
+                                  values: [0, 1],
+                                  onChanged: (i) async {
+                                    print(toggleIndex);
+                                    setState(() => toggleIndex = i);
+                                    bool choice = (i == 1);
+                                    _setDraggabilityUserModel(choice);
+                                    await loadMarkers(true);
+                                    _onCameraMove(_currentZoom);
+                                    setState(() => toggleIndex = i);
+                                    print(toggleIndex);
+                                    setState(() {
+                                      _zoomEnabled = true;
+                                      if (!choice) {
+                                        mapOptionsVisibility = false;
+                                        _markerDraggabilityText = 'not movable';
+                                      } else {
+                                        _markerDraggabilityText = 'movable';
+                                        setState(() {
+                                          _markersLoadingSignedIn = true;
+                                          if (kIsWeb) {
+                                            _markersLoadingSignedInBannerText =
+                                            'drag your marker to a new location...';
+                                          } else {
+                                            _markersLoadingSignedInBannerText =
+                                            'long press to drag your marker to a new location...';
+                                          }
+                                        });
+                                      }
+                                    });
+                                  },
+                                  iconBuilder: rollingIconBuilder,
+                                  style: ToggleStyle(),
+                                  height: 50,
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              // Text label
+                              Text(
+                                _markerDraggabilityText,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+                          // Button on its own row, centered
+                          ElevatedButton(
+                            onPressed: () {
+                              moveUserMarkerToCurrentLocation();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                            child: Text(
+                              "move to my exact location",
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                //),
+              ),
+            ),
+          ),
+          Text('New Feature coming in the future'),
+          Account(uid: _uid),
+          Messaging(user_uid: _uid),
+          Text(
+            'Index 4: Replace this text widget with the Sign Out widget',
+            style: optionStyle,
+          ),
+        ][_selectedIndex]
+            : <Widget>[
+          Stack(children: [
+            GoogleMap(
+              onCameraMove: (CameraPosition cameraPosition) {
+                _onCameraMove(cameraPosition.zoom);
+              },
+              cloudMapId: mapId, // Set the map style ID here
+              zoomGesturesEnabled: _zoomEnabled,
+              initialCameraPosition: _kLake,
+              zoomControlsEnabled: false,
+              minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
+              markers: markers,
+              onMapCreated: (GoogleMapController controller) async {
+                setState(() {
+                  _markersLoadingSignedOut = true;
+                });
+                double zoom = await controller.getZoomLevel();
+                _currentZoom = zoom;
+                print('onMapCreated signedOut is running');
+                if (_controllerSignedOut.isCompleted) {
+                  _controllerSignedOut = Completer();
+                }
+                print('mapStyle should be set');
+                print('callback is working');
+                setState(() {});
+                print(markers.length);
+                await loadMarkers(false);
+                //await Future.delayed(Duration(milliseconds: 1000));
+                print(markers.length);
+                _controllerSignedOut.complete(controller);
+                _onCameraMove(_currentZoom);
+                await Future.delayed(Duration(milliseconds: 250));
+                setState(() {
+                  _markersLoadingSignedOut = false;
+                });
+              },
+            ),
+            if (_markersLoadingSignedOut)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 250,
+                child: Container(
+                  color: Colors.black54,
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'loading markers...',
+                    style:
+                    TextStyle(color: Colors.white, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ]),
+          LoginScreen(
+            signedIn: _signedIn,
+            onSignInChanged: _handleSignInChanged,
+            onSelectedIndexChanged: _onItemTapped,
+            onNameChanged: _handleNameChanged,
+            onUidChanged: _handleUidChanged,
+          ),
+        ][_selectedIndex],
       ),
       drawer: Drawer(
         child: _signedIn
             ? ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  DrawerHeader(
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                    ),
-                    child: kDebugMode ? Text("$_name : $_uid") : Text("$_name"),
-                  ),
-                  ListTile(
-                    title: const Text('Map'),
-                    selected: _selectedIndex == 0,
-                    onTap: () {
-                      _onItemTapped(0);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('Friends'),
-                    selected: _selectedIndex == 1,
-                    onTap: () {
-                      _onItemTapped(1);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('Account'),
-                    selected: _selectedIndex == 2,
-                    onTap: () {
-                      _onItemTapped(2);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('Messages'),
-                    trailing: Badge.count(
-                      isLabelVisible: hasNotification,
-                      count: notificationCount,
-                    ),
-                    selected: _selectedIndex == 3,
-                    onTap: () {
-                      _onItemTapped(3);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('Sign Out'),
-                    selected: _selectedIndex == 0,
-                    onTap: () {
-                      markers = {};
-                      setState(() {});
-                      _onItemTapped(0);
-                      FirebaseAuth.instance.signOut();
-                      _handleSignInChanged(false);
-                      _handleNameChanged('');
-                      _handleUidChanged('');
-                      setState(() {
-                        hasNotification = false;
-                        notificationCount = 0;
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
-              )
-            : ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  SizedBox(
-                    height: 75,
-                    child: DrawerHeader(
-                      decoration: BoxDecoration(
-                        color: Color(0xFF082D38),
-                      ),
-                      child: Text(
-                        "$_name : $_uid",
-                        style: TextStyle(
-                            color: Colors.white), // Set your desired color),
-                      ),
-                    ),
-                  ),
-                  ListTile(
-                    title: const Text('Map'),
-                    selected: _selectedIndex == 0,
-                    onTap: () {
-                      _onItemTapped(0);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  ListTile(
-                    title: const Text('Sign In'),
-                    selected: _selectedIndex == 1,
-                    onTap: () {
-                      markers = {};
-                      setState(() {});
-                      _onItemTapped(1);
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.blue,
               ),
+              child: kDebugMode ? Text("$_name : $_uid") : Text("$_name"),
+            ),
+            ListTile(
+              title: const Text('Map'),
+              selected: _selectedIndex == 0,
+              onTap: () {
+                _onItemTapped(0);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Friends'),
+              selected: _selectedIndex == 1,
+              onTap: () {
+                _onItemTapped(1);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Account'),
+              selected: _selectedIndex == 2,
+              onTap: () {
+                _onItemTapped(2);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Messages'),
+              trailing: Badge.count(
+                isLabelVisible: hasNotification,
+                count: notificationCount,
+              ),
+              selected: _selectedIndex == 3,
+              onTap: () {
+                _onItemTapped(3);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Sign Out'),
+              selected: _selectedIndex == 0,
+              onTap: () {
+                markers = {};
+                setState(() {});
+                _onItemTapped(0);
+                FirebaseAuth.instance.signOut();
+                _handleSignInChanged(false);
+                _handleNameChanged('');
+                _handleUidChanged('');
+                setState(() {
+                  hasNotification = false;
+                  notificationCount = 0;
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        )
+            : ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            SizedBox(
+              height: 75,
+              child: DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Color(0xFF082D38),
+                ),
+                child: Text(
+                  "$_name : $_uid",
+                  style: TextStyle(
+                      color: Colors.white), // Set your desired color),
+                ),
+              ),
+            ),
+            ListTile(
+              title: const Text('Map'),
+              selected: _selectedIndex == 0,
+              onTap: () {
+                _onItemTapped(0);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Sign In'),
+              selected: _selectedIndex == 1,
+              onTap: () {
+                markers = {};
+                setState(() {});
+                _onItemTapped(1);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
       ),
       endDrawer: SizedBox(
         width: MediaQuery.of(context).size.width * 1,
