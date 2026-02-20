@@ -194,7 +194,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return earthRadius * c;
   }
 
-  double _getVisualProximityThreshold(double zoom) {
+  /*double _getVisualProximityThreshold(double zoom) {
     // examples of how the formula works according to ai:
     // zoom level 3, markers ~1000km apart considered "close"
     // zoom level 10, markers ~10km apart considered "close"
@@ -210,13 +210,40 @@ class _MyHomePageState extends State<MyHomePage> {
 
     threshold = threshold.clamp(minThreshold, maxThreshold);
 
-    print('At zoom $zoom, proximity threshold is ${threshold.toStringAsFixed(0)} meters');
+    print('At zoom $zoom, proximity threshold is ${threshold} meters');
     return threshold;
+  }*/
+
+  double _getVisualProximityThreshold(double zoom) {
+    switch (zoom.floor()) {
+      case 3: return 900000;
+      case 4: return 350000;
+      case 5: return 90000;
+      case 6: return 87664.062;
+      case 7: return 43832.031;
+      case 8: return 21916.016;
+      case 9: return 10958;
+      case 10: return 5479;
+      case 11: return 2739;
+      case 12: return 1369;
+      case 13: return 684;
+      case 14: return 342;
+      case 15: return 171;
+      case 16: return 85;
+      case 17: return 42;
+      case 18: return 21;
+      case 19: return 10;
+      case 20: return 10;
+      case 21: return 10;
+      default:
+        if (zoom < 3) return 701312.5;
+        return 10;
+    }
   }
 
   Set<String> _getMarkersToShowAsLabels(double currentZoom) {
-    const double minLabelZoom = 8.0;
-    const double alwaysLabelDistance = 10000; // 10km for always label markers distances
+    const double minLabelZoom = 2.0;
+    const double alwaysLabelDistance = 1000000; // 10km for always label markers distances
 
     Set<String> showAsLabels = {};
 
@@ -244,6 +271,7 @@ class _MyHomePageState extends State<MyHomePage> {
       }
 
       if (minDistanceToAnyMarker > alwaysLabelDistance) {
+        print('loner markers' + markerPositions[i].value.toString());
         showAsLabels.add(markerPositions[i].key);
       } else if (currentZoom >= minLabelZoom && minDistanceToAnyMarker >= proximityThreshold) {
         showAsLabels.add(markerPositions[i].key);
@@ -255,7 +283,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _onCameraMove(double zoom) {
-    const double minLabelZoom = 8.0;
+    const double minLabelZoom = 2.0;
 
     Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom);
 
@@ -555,8 +583,7 @@ class _MyHomePageState extends State<MyHomePage> {
           if (drawerOpened != true) {
             _zoomEnabled = true;
           }
-          markers = isPoi ? poiMarkers : labelMarkers;
-          setState(() {});
+          _onCameraMove(_currentZoom);
         });
       }
     }
