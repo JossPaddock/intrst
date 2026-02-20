@@ -17,7 +17,7 @@ Future<bool> isUrlResolvable(String url) async {
       response = await request.close();
     }
 
-    return response.statusCode >= 200 && response.statusCode < 400;
+    return response.statusCode < 400;
   } catch (_) {
     return false;
   } finally {
