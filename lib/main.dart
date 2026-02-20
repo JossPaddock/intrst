@@ -179,70 +179,322 @@ class _MyHomePageState extends State<MyHomePage> {
   Completer<GoogleMapController> _controllerSignedOut =
   Completer<GoogleMapController>();
 
+  double _calculateDistance(LatLng point1, LatLng point2) {
+    const double earthRadius = 6371000;
+
+    double lat1Rad = point1.latitude * pi / 180;
+    double lat2Rad = point2.latitude * pi / 180;
+    double deltaLat = (point2.latitude - point1.latitude) * pi / 180;
+    double deltaLng = (point2.longitude - point1.longitude) * pi / 180;
+
+    double a = sin(deltaLat / 2) * sin(deltaLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) *
+            sin(deltaLng / 2) * sin(deltaLng / 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  /*double _getVisualProximityThreshold(double zoom) {
+    // examples of how the formula works according to ai:
+    // zoom level 3, markers ~1000km apart considered "close"
+    // zoom level 10, markers ~10km apart considered "close"
+    // zoom level 15, markers ~300m apart considered "close"
+    // zoom level 20, markers ~10m apart considered "close"
+    const double labelAggressiveness = 0.07;
+    // This formula creates an exponential relationship
+    // don't do it with out Shubh!! You can adjust the base value (40075000) and exponent to tune behavior (don't do it with out Shubh!!)
+    double threshold = (40075000 * labelAggressiveness) / pow(2, zoom - 1); // Earth's circumference / 2^(zoom-1)
+
+    const double minThreshold = 10; // in meters
+    const double maxThreshold = 10000000; // 100km
+
+    threshold = threshold.clamp(minThreshold, maxThreshold);
+
+    print('At zoom $zoom, proximity threshold is ${threshold} meters');
+    return threshold;
+  }*/
+
+  double _getVisualProximityThreshold(double zoom) {
+    switch (zoom.floor()) {
+      case 3: return 900000;
+      case 4: return 350000;
+      case 5: return 90000;
+      case 6: return 87664.062;
+      case 7: return 43832.031;
+      case 8: return 21916.016;
+      case 9: return 10958;
+      case 10: return 5479;
+      case 11: return 2739;
+      case 12: return 1369;
+      case 13: return 684;
+      case 14: return 342;
+      case 15: return 171;
+      case 16: return 85;
+      case 17: return 42;
+      case 18: return 21;
+      case 19: return 10;
+      case 20: return 10;
+      case 21: return 10;
+      default:
+        if (zoom < 3) return 701312.5;
+        return 10;
+    }
+  }
+
+  Set<String> _getMarkersToShowAsLabels(double currentZoom) {
+    const double minLabelZoom = 2.0;
+    const double alwaysLabelDistance = 1000000; // 10km for always label markers distances
+
+    Set<String> showAsLabels = {};
+
+    double proximityThreshold = _getVisualProximityThreshold(currentZoom);
+
+    List<MapEntry<String, LatLng>> markerPositions = [];
+    for (var marker in poiMarkers) {
+      markerPositions.add(MapEntry(marker.markerId.value, marker.position));
+    }
+
+    for (int i = 0; i < markerPositions.length; i++) {
+      double minDistanceToAnyMarker = double.infinity;
+
+      for (int j = 0; j < markerPositions.length; j++) {
+        if (i != j) {
+          double distance = _calculateDistance(
+            markerPositions[i].value,
+            markerPositions[j].value,
+          );
+
+          if (distance < minDistanceToAnyMarker) {
+            minDistanceToAnyMarker = distance;
+          }
+        }
+      }
+
+      if (minDistanceToAnyMarker > alwaysLabelDistance) {
+        print('loner markers' + markerPositions[i].value.toString());
+        showAsLabels.add(markerPositions[i].key);
+      } else if (currentZoom >= minLabelZoom && minDistanceToAnyMarker >= proximityThreshold) {
+        showAsLabels.add(markerPositions[i].key);
+      }
+    }
+
+    print('At zoom $currentZoom: ${showAsLabels.length} markers shown as labels, ${markerPositions.length - showAsLabels.length} as POI');
+    return showAsLabels;
+  }
+
   void _onCameraMove(double zoom) {
-    double level = 10.5;
+    const double minLabelZoom = 2.0;
+
+    Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom);
+
+    setState(() {
+      markers = {};
+
+      if (searchTerm == '') {
+        if (zoom < minLabelZoom) {
+          markers = poiMarkers;
+        } else {
+          markers.addAll(
+              labelMarkers.where((marker) => showAsLabels.contains(marker.markerId.value))
+          );
+          markers.addAll(
+              poiMarkers.where((marker) => !showAsLabels.contains(marker.markerId.value))
+          );
+        }
+      } else {
+        if (zoom < minLabelZoom) {
+          markers = poiMarkers
+              .where((marker) => searchFilteredResults.contains(marker.markerId.value))
+              .toSet();
+        } else {
+          markers.addAll(
+              labelMarkers.where((marker) =>
+              searchFilteredResults.contains(marker.markerId.value) &&
+                  showAsLabels.contains(marker.markerId.value))
+          );
+          markers.addAll(
+              poiMarkers.where((marker) =>
+              searchFilteredResults.contains(marker.markerId.value) &&
+                  !showAsLabels.contains(marker.markerId.value))
+          );
+        }
+      }
+    });
+
+    _currentZoom = zoom;
+  }
+
+/*
+  Set<String> _getProximityRestrictedMarkers(double currentZoom) {
+    const double proximityThreshold = 2000;
+    const double baseZoomLevel = 10.5;
+    const double proximityZoomLevel = 14.0;
+
+    Set<String> restrictedMarkers = {};
+
+    if (currentZoom <= baseZoomLevel || currentZoom >= proximityZoomLevel) {
+      return restrictedMarkers;
+    }
+
+    List<MapEntry<String, LatLng>> markerPositions = [];
+    for (var marker in poiMarkers) {
+      markerPositions.add(MapEntry(marker.markerId.value, marker.position));
+    }
+
+    for (int i = 0; i < markerPositions.length; i++) {
+      bool hasCloseNeighbor = false;
+
+      for (int j = 0; j < markerPositions.length; j++) {
+        if (i != j) {
+          double distance = _calculateDistance(
+            markerPositions[i].value,
+            markerPositions[j].value,
+          );
+
+          if (distance < proximityThreshold) {
+            hasCloseNeighbor = true;
+            break;
+          }
+        }
+      }
+
+      if (hasCloseNeighbor) {
+        restrictedMarkers.add(markerPositions[i].key);
+      }
+    }
+
+    return restrictedMarkers;
+  }
+
+  void _onCameraMove(double zoom) {
+    double baseLevel = 10.5;
+    double proximityLevel = 13.0;
+
     if (_currentZoom != zoom) {
-      //print('$_currentZoom + $zoom');
-      if (zoom > level && _currentZoom < level) {
-        print('load label markers');
+      Set<String> proximityRestricted = _getProximityRestrictedMarkers(zoom);
+
+      if (zoom > baseLevel && _currentZoom < baseLevel) {
+        setState(() {
+          if (searchTerm == '') {
+            markers = labelMarkers
+                .where((marker) => !proximityRestricted.contains(marker.markerId.value))
+                .toSet();
+            markers.addAll(
+                poiMarkers.where((marker) => proximityRestricted.contains(marker.markerId.value))
+            );
+          } else {
+            markers = labelMarkers
+                .where((value) =>
+            searchFilteredResults.contains(value.markerId.value) &&
+                !proximityRestricted.contains(value.markerId.value))
+                .toSet();
+            markers.addAll(
+                poiMarkers.where((value) =>
+                searchFilteredResults.contains(value.markerId.value) &&
+                    proximityRestricted.contains(value.markerId.value))
+            );
+          }
+        });
+        _currentZoom = zoom;
+      } else if (zoom > proximityLevel && _currentZoom < proximityLevel) {
+        print('load all label markers (proximity threshold passed)');
         setState(() {
           if (searchTerm == '') {
             markers = labelMarkers;
           } else {
             markers = labelMarkers
-                .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                .where((value) => searchFilteredResults.contains(value.markerId.value))
                 .toSet();
-            ;
           }
         });
         _currentZoom = zoom;
-      } else if (zoom < level && _currentZoom > level) {
+      } else if (zoom < proximityLevel && _currentZoom > proximityLevel) {
+        print('applying proximity check when zooming out');
+        setState(() {
+          Set<String> restricted = _getProximityRestrictedMarkers(zoom);
+          if (searchTerm == '') {
+            markers = labelMarkers
+                .where((marker) => !restricted.contains(marker.markerId.value))
+                .toSet();
+            markers.addAll(
+                poiMarkers.where((marker) => restricted.contains(marker.markerId.value))
+            );
+          } else {
+            markers = labelMarkers
+                .where((value) =>
+            searchFilteredResults.contains(value.markerId.value) &&
+                !restricted.contains(value.markerId.value))
+                .toSet();
+            markers.addAll(
+                poiMarkers.where((value) =>
+                searchFilteredResults.contains(value.markerId.value) &&
+                    restricted.contains(value.markerId.value))
+            );
+          }
+        });
+        _currentZoom = zoom;
+      } else if (zoom < baseLevel && _currentZoom > baseLevel) {
         print('load poi markers');
         setState(() {
           if (searchTerm == '') {
             markers = poiMarkers;
           } else {
             markers = poiMarkers
-                .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                .where((value) => searchFilteredResults.contains(value.markerId.value))
                 .toSet();
-            ;
           }
         });
         _currentZoom = zoom;
       }
     } else {
-      //the following conditions are critical for resetting after search updates
-      if (_currentZoom > level) {
+      Set<String> proximityRestricted = _getProximityRestrictedMarkers(_currentZoom);
+
+      if (_currentZoom > proximityLevel) {
         setState(() {
-          markers = {};
           if (searchTerm == '') {
             markers = labelMarkers;
           } else {
             markers = labelMarkers
-                .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                .where((value) => searchFilteredResults.contains(value.markerId.value))
                 .toSet();
-            ;
+          }
+        });
+      } else if (_currentZoom > baseLevel) {
+        setState(() {
+          if (searchTerm == '') {
+            markers = labelMarkers
+                .where((marker) => !proximityRestricted.contains(marker.markerId.value))
+                .toSet();
+            markers.addAll(
+                poiMarkers.where((marker) => proximityRestricted.contains(marker.markerId.value))
+            );
+          } else {
+            markers = labelMarkers
+                .where((value) =>
+            searchFilteredResults.contains(value.markerId.value) &&
+                !proximityRestricted.contains(value.markerId.value))
+                .toSet();
+            markers.addAll(
+                poiMarkers.where((value) =>
+                searchFilteredResults.contains(value.markerId.value) &&
+                    proximityRestricted.contains(value.markerId.value))
+            );
           }
         });
       } else {
         setState(() {
-          markers = {};
           if (searchTerm == '') {
             markers = poiMarkers;
           } else {
             markers = poiMarkers
-                .where((value) =>
-                searchFilteredResults.contains(value.markerId.value))
+                .where((value) => searchFilteredResults.contains(value.markerId.value))
                 .toSet();
-            ;
           }
         });
       }
     }
-  }
+  }*/
 
   static const CameraPosition _kLake = CameraPosition(
       bearing: 0.0,
@@ -332,8 +584,7 @@ class _MyHomePageState extends State<MyHomePage> {
           if (drawerOpened != true) {
             _zoomEnabled = true;
           }
-          markers = isPoi ? poiMarkers : labelMarkers;
-          setState(() {});
+          _onCameraMove(_currentZoom);
         });
       }
     }
