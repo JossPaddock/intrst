@@ -9,9 +9,9 @@ extension _HomeLocationLogic on _MyHomePageState {
           title: const Text("Location Disclaimer"),
           content: const Text(
             "We respect your privacy. Your location data is used one time only "
-                "to place your marker on the map. We do not store, share, or track "
-                "your location, and we do not use your precise location — only an "
-                "approximate position is used to improve your experience.",
+            "to place your marker on the map. We do not store, share, or track "
+            "your location, and we do not use your precise location — only an "
+            "approximate position is used to improve your experience.",
           ),
           actions: [
             TextButton(
@@ -47,7 +47,7 @@ extension _HomeLocationLogic on _MyHomePageState {
       // Request permission
       setState(() {
         _markersLoadingSignedInBannerText =
-        'share location to place your marker...';
+            'share location to place your marker...';
       });
       _permissionGranted = await location.requestPermission();
       if (_permissionGranted == PermissionStatus.granted) {
@@ -104,7 +104,7 @@ extension _HomeLocationLogic on _MyHomePageState {
           zoom: 3,
         );
         CollectionReference users =
-        FirebaseFirestore.instance.collection('users');
+            FirebaseFirestore.instance.collection('users');
         String localUid = FirebaseAuth.instance.currentUser!.uid;
         print(
             'updating user with user_uid: $localUid location to lat: ${lat}; long: ${long} in Firebase');
@@ -115,7 +115,7 @@ extension _HomeLocationLogic on _MyHomePageState {
         setState(() {
           _markersLoadingSignedIn = true;
           _markersLoadingSignedInBannerText =
-          'click on the marker button (bottom right) then toggle to move your marker';
+              'click on the marker button (bottom right) then toggle to move your marker';
         });
       }
     } else {
@@ -142,9 +142,9 @@ extension _HomeLocationLogic on _MyHomePageState {
 
     try {
       locationData = await location.getLocation().timeout(
-        const Duration(milliseconds: 500),
-        //onTimeout: () => null,
-      );
+            const Duration(milliseconds: 500),
+            //onTimeout: () => null,
+          );
 
       if (locationData == null) {
         await location.changeSettings(accuracy: LocationAccuracy.balanced);
@@ -238,8 +238,8 @@ extension _HomeLocationLogic on _MyHomePageState {
   Future<void> _goToInitialPosition(
       Completer<GoogleMapController> completerController) async {
     final GoogleMapController controller = await completerController.future;
-    await controller.animateCamera(
-        CameraUpdate.newCameraPosition(_MyHomePageState._kLake));
+    await controller
+        .animateCamera(CameraUpdate.newCameraPosition(_MyHomePageState._kLake));
   }
 
   Future<void> moveCameraToUserLocation({
@@ -254,6 +254,32 @@ extension _HomeLocationLogic on _MyHomePageState {
 
     final LatLng target = LatLng(point.latitude, point.longitude);
 
+    final GoogleMapController controller = await _controller.future;
+
+    final CameraUpdate update = CameraUpdate.newCameraPosition(
+      CameraPosition(
+        target: target,
+        zoom: zoom,
+      ),
+    );
+
+    if (animate) {
+      await controller.animateCamera(update);
+    } else {
+      await controller.moveCamera(update);
+    }
+  }
+
+  Future<void> moveCameraToSpecificUser(
+    String targetUid, {
+    double zoom = 12,
+    bool animate = true,
+  }) async {
+    if (targetUid.isEmpty) return;
+
+    final users = FirebaseFirestore.instance.collection('users');
+    final GeoPoint point = await fu.retrieveUserLocation(users, targetUid);
+    final LatLng target = LatLng(point.latitude, point.longitude);
     final GoogleMapController controller = await _controller.future;
 
     final CameraUpdate update = CameraUpdate.newCameraPosition(

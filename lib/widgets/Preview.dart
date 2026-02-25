@@ -41,12 +41,16 @@ class _InterestAlertDialogState extends State<Preview> {
   Map<DocumentReference, Map<String, dynamic>>? initMessageData = null;
   bool hasNotification = false;
   int notificationCount = 0;
+  bool _isFollowing = false;
+  bool _followStateLoading = false;
+  bool _followActionLoading = false;
 
   @override
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
     _loadNotificationCount();
+    _loadFollowState();
   }
 
   void _loadNotificationCount() async {
@@ -102,6 +106,51 @@ class _InterestAlertDialogState extends State<Preview> {
     }
     setState(() {
       initMessageData = data;
+    });
+  }
+
+  Future<void> _loadFollowState() async {
+    if (!widget.signedIn ||
+        widget.uid.isEmpty ||
+        widget.alternateUid.isEmpty ||
+        widget.uid == widget.alternateUid) {
+      return;
+    }
+
+    setState(() {
+      _followStateLoading = true;
+    });
+
+    final isFollowing =
+        await fuu.isFollowingUser(users, widget.uid, widget.alternateUid);
+    if (!mounted) return;
+
+    setState(() {
+      _isFollowing = isFollowing;
+      _followStateLoading = false;
+    });
+  }
+
+  Future<void> _toggleFollowState() async {
+    if (!widget.signedIn) {
+      Navigator.pop(context);
+      widget.onItemTapped(1);
+      return;
+    }
+
+    if (widget.uid == widget.alternateUid) return;
+
+    setState(() {
+      _followActionLoading = true;
+    });
+
+    final nowFollowing =
+        await fuu.toggleFollowUser(users, widget.uid, widget.alternateUid);
+    if (!mounted) return;
+
+    setState(() {
+      _isFollowing = nowFollowing;
+      _followActionLoading = false;
     });
   }
 
@@ -180,7 +229,7 @@ class _InterestAlertDialogState extends State<Preview> {
                       },
                       child: GestureDetector(
                         onTap: () {
-                          if(label.last == "") {
+                          if (label.last == "") {
                             _handlePreviewToInterestsWidgetFlow();
                           }
                           _launchUrl(label.last);
@@ -203,8 +252,10 @@ class _InterestAlertDialogState extends State<Preview> {
                   .toList(),
             ),
           if (!chatOpen) SizedBox(height: 16.0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8.0,
+            runSpacing: 8.0,
             children: [
               ElevatedButton.icon(
                 onPressed: () async {
@@ -235,6 +286,25 @@ class _InterestAlertDialogState extends State<Preview> {
                 icon: Icon(Icons.add),
                 label: Text('All interests', style: TextStyle(fontSize: 12)),
               ),
+              if (widget.signedIn && widget.uid != widget.alternateUid)
+                ElevatedButton.icon(
+                  onPressed: (_followStateLoading || _followActionLoading)
+                      ? null
+                      : _toggleFollowState,
+                  icon: _followActionLoading
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(_isFollowing
+                          ? Icons.person_remove
+                          : Icons.person_add),
+                  label: Text(
+                    _isFollowing ? 'Unfollow' : 'Follow',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
             ],
           ),
           if (!chatOpen)

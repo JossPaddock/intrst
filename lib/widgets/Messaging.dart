@@ -11,8 +11,10 @@ class Messaging extends StatefulWidget {
   const Messaging({
     super.key,
     required this.user_uid,
+    this.openWithUserUid,
   });
   final String user_uid;
+  final String? openWithUserUid;
 
   @override
   _MessagingState createState() => _MessagingState();
@@ -28,6 +30,8 @@ class _MessagingState extends State<Messaging> {
   List<Map<String, dynamic>> messageData = [];
   List<DocumentReference> messageDocumentReference = [];
   String createNewChat = 'create new chat';
+  String? _openedChatForUid;
+  bool _openingRequestedChat = false;
 
   late final StreamSubscription _subscription;
   @override
@@ -48,6 +52,15 @@ class _MessagingState extends State<Messaging> {
     });
     getMessages();
     loadFCMToken();
+  }
+
+  @override
+  void didUpdateWidget(covariant Messaging oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.openWithUserUid != widget.openWithUserUid) {
+      _openedChatForUid = null;
+      _maybeOpenRequestedChat();
+    }
   }
 
   @override
@@ -99,6 +112,52 @@ class _MessagingState extends State<Messaging> {
       messageDocumentReference = extractedDocumentReference;
     });
     reorderMessagesByLatestMessageFirst();
+    await _maybeOpenRequestedChat();
+  }
+
+  int _findConversationIndexForUser(String otherUid) {
+    for (int i = 0; i < messageData.length; i++) {
+      final participants = (messageData[i]['user_uids'] as List?)
+              ?.map((value) => value.toString())
+              .toList() ??
+          <String>[];
+
+      if (participants.contains(widget.user_uid) &&
+          participants.contains(otherUid)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  Future<void> _maybeOpenRequestedChat() async {
+    final targetUid = widget.openWithUserUid;
+    if (targetUid == null ||
+        targetUid.isEmpty ||
+        targetUid == widget.user_uid ||
+        _openedChatForUid == targetUid ||
+        _openingRequestedChat) {
+      return;
+    }
+
+    _openingRequestedChat = true;
+    try {
+      int index = _findConversationIndexForUser(targetUid);
+      if (index == -1) {
+        await fmu.createMessageDocument([widget.user_uid, targetUid]);
+        await getMessages();
+        index = _findConversationIndexForUser(targetUid);
+      }
+
+      if (index != -1 && mounted) {
+        setState(() {
+          openChatIndex = index;
+        });
+        _openedChatForUid = targetUid;
+      }
+    } finally {
+      _openingRequestedChat = false;
+    }
   }
 
   Future<void> reorderMessagesByLatestMessageFirst() async {
@@ -161,8 +220,8 @@ class _MessagingState extends State<Messaging> {
                 ),
               ),
               onChanged: (value) async {
-                List<String> results =
-                    await fuu.searchForPeopleAndInterestsReturnUIDs(users, value, false);
+                List<String> results = await fuu
+                    .searchForPeopleAndInterestsReturnUIDs(users, value, false);
                 if (results.contains(widget.user_uid)) {
                   results.remove(widget.user_uid);
                 }
@@ -261,8 +320,8 @@ class _MessagingState extends State<Messaging> {
                 //width: 300,
                 //height: 351,
                 child: ListView.builder(
-                  itemCount: messageData.length,
-                  itemBuilder: (context, index) {
+              itemCount: messageData.length,
+              itemBuilder: (context, index) {
                 if (openChatIndex != null && index != openChatIndex) {
                   return const SizedBox.shrink();
                 }

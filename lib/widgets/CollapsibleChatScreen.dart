@@ -45,7 +45,6 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   int notificationCount = 0;
   GeneralUtility gu = GeneralUtilityWeb();
 
-
   @override
   void initState() {
     super.initState();
@@ -180,13 +179,13 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-               if(!widget.autoOpen)
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  color: Colors.grey[300],
-                  tooltip: 'Delete messages',
-                  onPressed: () => _showDeleteDialog(context),
-                ),
+                if (!widget.autoOpen)
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    color: Colors.grey[300],
+                    tooltip: 'Delete messages',
+                    onPressed: () => _showDeleteDialog(context),
+                  ),
                 if (widget.showNameAtTop)
                   Text(
                     (() {
@@ -194,7 +193,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       final full = messagesWith.join(', ');
                       if (full.length <= cutoff) return full;
 
-                      final firstParts = messagesWith.map((s) => s.split(' ')[0]).join(', ');
+                      final firstParts =
+                          messagesWith.map((s) => s.split(' ')[0]).join(', ');
                       if (firstParts.length <= cutoff) return firstParts;
 
                       return '${firstParts.substring(0, cutoff - 3)}...';
@@ -205,9 +205,11 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       icon: Badge.count(
                           isLabelVisible: hasNotification,
                           count: notificationCount,
-                          child: _isLoading? CircularProgressIndicator(): Icon(_isExpanded
-                              ? Icons.expand_less
-                              : Icons.expand_more)),
+                          child: _isLoading
+                              ? CircularProgressIndicator()
+                              : Icon(_isExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more)),
                       onPressed: () async {
                         if (!_isExpanded) {
                           setState(() => _isLoading = true);
@@ -229,11 +231,14 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 100),
-              height: _isExpanded && widget.autoOpen//gu.isMobileBrowser(context)
-                  ? 100
-                  : _isExpanded
-                      ? 400
-                      : widget.autoOpen? 70 : 0,
+              height:
+                  _isExpanded && widget.autoOpen //gu.isMobileBrowser(context)
+                      ? 100
+                      : _isExpanded
+                          ? 400
+                          : widget.autoOpen
+                              ? 70
+                              : 0,
               child: _isExpanded
                   ? StreamBuilder<DocumentSnapshot>(
                       stream: widget.documentReference
@@ -294,6 +299,11 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                         if (id is String && id != widget.uid) {
                           await fuu.addUnreadNotification('users', id,
                               widget.documentReference.path, messageUuid);
+                          await fuu.createMessageActivity(
+                            senderUid: widget.uid,
+                            recipientUid: id,
+                            messageContent: text,
+                          );
                         }
                       }
                       fuu.updateUnreadNotificationCounts('users');

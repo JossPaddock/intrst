@@ -5,7 +5,7 @@ extension _HomeUserLogic on _MyHomePageState {
     // You may set the permission requests to "provisional" which allows the user to choose what type
     // of notifications they would like to receive once the user receives a notification.
     final notificationSettings =
-    await FirebaseMessaging.instance.requestPermission(provisional: true);
+        await FirebaseMessaging.instance.requestPermission(provisional: true);
 
     // For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
     final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
@@ -44,7 +44,7 @@ extension _HomeUserLogic on _MyHomePageState {
         _notificationLoading?.cancel();
       } else {
         CollectionReference users =
-        FirebaseFirestore.instance.collection('users');
+            FirebaseFirestore.instance.collection('users');
         print('User is signed in!');
         _signedIn = true;
         _selectedIndex = 0;
@@ -122,9 +122,38 @@ extension _HomeUserLogic on _MyHomePageState {
     UserModel().changeAlternateName(name);
   }
 
+  Future<void> _openInterestsForUserFromFeed(
+      String targetUid, String targetName) async {
+    _handleAlternateUserModel(targetUid, targetName);
+    _onItemTapped(0);
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  void _openMessagesForUserFromFeed(String targetUid, String targetName) {
+    _handleAlternateUserModel(targetUid, targetName);
+    setState(() {
+      _openMessagesWithUserUid = targetUid;
+      _selectedIndex = 3;
+    });
+  }
+
+  Future<void> _openUserOnMapFromFeed(
+      String targetUid, String targetName) async {
+    _handleAlternateUserModel(targetUid, targetName);
+    _onItemTapped(0);
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    await moveCameraToSpecificUser(targetUid, zoom: 13.5);
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      if (index != 3) {
+        _openMessagesWithUserUid = null;
+      }
     });
   }
 

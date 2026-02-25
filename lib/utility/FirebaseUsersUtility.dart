@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseMappers.dart';
+import 'dart:math' as math;
 import '../models/Interest.dart';
 import 'package:http/http.dart' as http;
 import 'package:restart_app/restart_app.dart';
@@ -191,11 +193,275 @@ class FirebaseUsersUtility {
       'last_name': lastName,
       'interests': [],
       'location': geoPoint,
+      'following_uids': [],
+      'unread_notifications': [],
+      'unread_notifications_count': <String, int>{},
     };
     users
         .add(userData)
         .then((value) => print("User added to Firestore"))
         .catchError((error) => print("Failed to add user: $error"));
+  }
+
+  Future<List<String>> retrieveFollowingUids(
+      CollectionReference users, String userUid) async {
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return [];
+    }
+
+    final Map<String, dynamic> data =
+        querySnapshot.docs.first.data() as Map<String, dynamic>;
+    return (data['following_uids'] as List?)
+            ?.map((value) => value.toString())
+            .where((value) => value.isNotEmpty)
+            .toList() ??
+        [];
+  }
+
+  Future<bool> isFollowingUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    if (userUid.isEmpty || targetUid.isEmpty || userUid == targetUid) {
+      return false;
+    }
+    final followingUids = await retrieveFollowingUids(users, userUid);
+    return followingUids.contains(targetUid);
+  }
+
+  Future<void> followUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    if (userUid.isEmpty || targetUid.isEmpty || userUid == targetUid) {
+      return;
+    }
+
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return;
+    }
+
+    await querySnapshot.docs.first.reference.update({
+      'following_uids': FieldValue.arrayUnion([targetUid]),
+    });
+  }
+
+  Future<void> unfollowUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    if (userUid.isEmpty || targetUid.isEmpty || userUid == targetUid) {
+      return;
+    }
+
+    QuerySnapshot querySnapshot =
+        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return;
+    }
+
+    await querySnapshot.docs.first.reference.update({
+      'following_uids': FieldValue.arrayRemove([targetUid]),
+    });
+  }
+
+  Future<bool> toggleFollowUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    final alreadyFollowing = await isFollowingUser(users, userUid, targetUid);
+    if (alreadyFollowing) {
+      await unfollowUser(users, userUid, targetUid);
+      return false;
+    }
+
+    await followUser(users, userUid, targetUid);
+    return true;
+  }
+
+  Future<List<String>> retrieveFollowerUids(String actorUid) async {
+    if (actorUid.isEmpty) return [];
+
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('following_uids', arrayContains: actorUid)
+        .get();
+
+    final followerUids = querySnapshot.docs
+        .map((doc) => (doc.data() as Map<String, dynamic>)['user_uid'])
+        .whereType<String>()
+        .where((uid) => uid.isNotEmpty && uid != actorUid)
+        .toSet()
+        .toList();
+
+    return followerUids;
+  }
+
+  Future<void> _createActivityForUsers({
+    required String type,
+    required String actorUid,
+    required String actorName,
+    required List<String> targetUids,
+    String? interestId,
+    String? interestName,
+    String? messageContent,
+  }) async {
+    if (targetUids.isEmpty || actorUid.isEmpty) {
+      return;
+    }
+
+    final payload = <String, dynamic>{
+      'type': type,
+      'actor_uid': actorUid,
+      'actor_name': actorName,
+      'target_uids': targetUids.toSet().toList(),
+      'created_at': FieldValue.serverTimestamp(),
+    };
+
+    if (interestId != null && interestId.isNotEmpty) {
+      payload['interest_id'] = interestId;
+    }
+    if (interestName != null && interestName.isNotEmpty) {
+      payload['interest_name'] = interestName;
+    }
+    if (messageContent != null && messageContent.isNotEmpty) {
+      payload['message_content'] = messageContent;
+    }
+
+    await FirebaseFirestore.instance.collection('activity_feed').add(payload);
+  }
+
+  Future<void> createInterestCreatedActivity({
+    required String actorUid,
+    required Interest interest,
+  }) async {
+    final users = FirebaseFirestore.instance.collection('users');
+    final followers = await retrieveFollowerUids(actorUid);
+    if (followers.isEmpty) return;
+
+    final actorName = await lookUpNameByUserUid(users, actorUid);
+    await _createActivityForUsers(
+      type: 'interest_created',
+      actorUid: actorUid,
+      actorName: actorName,
+      targetUids: followers,
+      interestId: interest.id,
+      interestName: interest.name,
+    );
+  }
+
+  Future<void> createInterestUpdatedActivity({
+    required String actorUid,
+    required Interest oldInterest,
+    required Interest newInterest,
+    int minChangedCharacters = 10,
+  }) async {
+    final oldText = _flattenInterestForDiff(oldInterest);
+    final newText = _flattenInterestForDiff(newInterest);
+    final changedCharacterCount =
+        _calculateChangedCharacterCount(oldText, newText);
+
+    if (changedCharacterCount <= minChangedCharacters) {
+      return;
+    }
+
+    final users = FirebaseFirestore.instance.collection('users');
+    final followers = await retrieveFollowerUids(actorUid);
+    if (followers.isEmpty) return;
+
+    final actorName = await lookUpNameByUserUid(users, actorUid);
+    await _createActivityForUsers(
+      type: 'interest_updated',
+      actorUid: actorUid,
+      actorName: actorName,
+      targetUids: followers,
+      interestId: newInterest.id,
+      interestName: newInterest.name,
+    );
+  }
+
+  Future<void> createMessageActivity({
+    required String senderUid,
+    required String recipientUid,
+    required String messageContent,
+  }) async {
+    if (senderUid.isEmpty ||
+        recipientUid.isEmpty ||
+        senderUid == recipientUid ||
+        messageContent.trim().isEmpty) {
+      return;
+    }
+
+    final users = FirebaseFirestore.instance.collection('users');
+    final actorName = await lookUpNameByUserUid(users, senderUid);
+    await _createActivityForUsers(
+      type: 'message_sent',
+      actorUid: senderUid,
+      actorName: actorName,
+      targetUids: [recipientUid],
+      messageContent: _truncateMessagePreview(messageContent),
+    );
+  }
+
+  String _truncateMessagePreview(String messageContent, {int maxLength = 140}) {
+    final trimmed = messageContent.trim().replaceAll('\n', ' ');
+    if (trimmed.length <= maxLength) return trimmed;
+    return '${trimmed.substring(0, maxLength)}...';
+  }
+
+  String _flattenInterestForDiff(Interest interest) {
+    final plainDescription =
+        _extractPlainTextFromQuillJson(interest.description);
+    return '${interest.name.trim()}\n$plainDescription\n${interest.link?.trim() ?? ''}';
+  }
+
+  String _extractPlainTextFromQuillJson(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return '';
+
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is List) {
+        final buffer = StringBuffer();
+        for (final operation in decoded) {
+          if (operation is Map<String, dynamic> &&
+              operation['insert'] is String) {
+            buffer.write(operation['insert'] as String);
+          }
+        }
+        return buffer.toString().trim();
+      }
+    } catch (_) {
+      // fall through to raw text
+    }
+    return text;
+  }
+
+  int _calculateChangedCharacterCount(String source, String target) {
+    if (source == target) return 0;
+    if (source.isEmpty) return target.length;
+    if (target.isEmpty) return source.length;
+
+    List<int> previous =
+        List<int>.generate(target.length + 1, (index) => index);
+    List<int> current = List<int>.filled(target.length + 1, 0);
+
+    for (int i = 1; i <= source.length; i++) {
+      current[0] = i;
+      for (int j = 1; j <= target.length; j++) {
+        final substitutionCost =
+            source.codeUnitAt(i - 1) == target.codeUnitAt(j - 1) ? 0 : 1;
+        current[j] = math.min(
+          math.min(
+            current[j - 1] + 1,
+            previous[j] + 1,
+          ),
+          previous[j - 1] + substitutionCost,
+        );
+      }
+
+      final swap = previous;
+      previous = current;
+      current = swap;
+    }
+
+    return previous[target.length];
   }
 
   Future<String> lookUpNameByUserUid(
@@ -237,7 +503,7 @@ class FirebaseUsersUtility {
     }
     QuerySnapshot querySnapshot =
         await users.where('user_uid', isEqualTo: uid).get();
-    querySnapshot.docs.forEach((doc) async {
+    for (final doc in querySnapshot.docs) {
       DocumentReference documentRef =
           FirebaseFirestore.instance.collection('users').doc(doc.id);
       DocumentSnapshot documentSnapshot = await documentRef.get();
@@ -251,7 +517,9 @@ class FirebaseUsersUtility {
       } else {
         print('UH OH Could not find the doc');
       }
-    });
+    }
+
+    await createInterestCreatedActivity(actorUid: uid, interest: interest);
   }
 
   Future<void> updateEditedInterest(
@@ -293,6 +561,13 @@ class FirebaseUsersUtility {
         }
       }
     }
+
+    await createInterestUpdatedActivity(
+      actorUid: uid,
+      oldInterest: oldInterest,
+      newInterest: newInterest,
+      minChangedCharacters: 10,
+    );
   }
 
   Future<void> limitFavoritedInterests(
@@ -584,7 +859,7 @@ class FirebaseUsersUtility {
 
   Future<List<String>> listInterests() async {
     final querySnapshot =
-    await FirebaseFirestore.instance.collection('users').get();
+        await FirebaseFirestore.instance.collection('users').get();
 
     final List<String> interestNames = [];
 
@@ -660,10 +935,10 @@ class FirebaseUsersUtility {
       return a.length.compareTo(b.length);
     });
     return list.where((current) {
-      final pattern = RegExp(r'\b' + RegExp.escape(current) + r'\b', caseSensitive: false);
+      final pattern =
+          RegExp(r'\b' + RegExp.escape(current) + r'\b', caseSensitive: false);
 
-      return !list.any((other) =>
-      other != current && pattern.hasMatch(other));
+      return !list.any((other) => other != current && pattern.hasMatch(other));
     }).toList();
   }
 
@@ -680,5 +955,4 @@ class FirebaseUsersUtility {
 
     return result;
   }
-
 }
