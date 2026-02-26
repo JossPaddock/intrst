@@ -314,7 +314,7 @@ class _FollowingFeedState extends State<FollowingFeed> {
             });
 
             if (entries.isEmpty) {
-              return const Center(child: Text('No activity yet.'));
+              return const Center(child: Text('No activity yet. Make sure your advanced feed settings are configured to your liking and check back later!'));
             }
 
             return Stack(
