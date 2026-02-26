@@ -23,6 +23,12 @@ class _FollowingFeedState extends State<FollowingFeed> {
   late Stream<QuerySnapshot> _currentUserStream;
   late Stream<QuerySnapshot> _activityStream;
 
+  bool _isSelfProfileStatisticEventType(String type) {
+    return type == 'longest_streak_milestone' ||
+        type == 'messages_sent_milestone' ||
+        type == 'messages_received_milestone';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -100,12 +106,6 @@ class _FollowingFeedState extends State<FollowingFeed> {
                 .toSet() ??
             <String>{};
 
-        if (followingUids.isEmpty) {
-          return const Center(
-            child: Text('Follow people to see their activity here.'),
-          );
-        }
-
         return StreamBuilder<QuerySnapshot>(
           stream: _activityStream,
           builder: (context, activitySnapshot) {
@@ -122,7 +122,12 @@ class _FollowingFeedState extends State<FollowingFeed> {
                     .map((doc) => doc.data() as Map<String, dynamic>)
                     .where((data) {
                   final actorUid = (data['actor_uid'] ?? '').toString();
-                  return followingUids.contains(actorUid);
+                  final type = (data['type'] ?? '').toString();
+                  if (followingUids.contains(actorUid)) {
+                    return true;
+                  }
+                  return actorUid == widget.userUid &&
+                      _isSelfProfileStatisticEventType(type);
                 }).toList() ??
                 [];
 
@@ -134,9 +139,7 @@ class _FollowingFeedState extends State<FollowingFeed> {
             });
 
             if (entries.isEmpty) {
-              return const Center(
-                child: Text('No activity yet from people you follow.'),
-              );
+              return const Center(child: Text('No activity yet.'));
             }
 
             return ListView.builder(
@@ -212,6 +215,20 @@ class _FollowingFeedState extends State<FollowingFeed> {
                         ),
                       ],
                     );
+                    break;
+                  case 'longest_streak_milestone':
+                  case 'messages_sent_milestone':
+                  case 'messages_received_milestone':
+                    final feedMessage =
+                        (item['feed_message'] ?? '').toString().trim();
+                    if (feedMessage.isEmpty) {
+                      action = const SizedBox.shrink();
+                    } else {
+                      action = Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(feedMessage),
+                      );
+                    }
                     break;
                   default:
                     action = const SizedBox.shrink();

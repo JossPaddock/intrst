@@ -25,6 +25,14 @@ extension _HomeUserLogic on _MyHomePageState {
   }
 
   Future<void> loadUserContext() async {
+    if (_uid.trim().isNotEmpty) {
+      try {
+        await fu.ensureProfileStatisticsDefaults(
+            FirebaseFirestore.instance.collection('users'), _uid);
+      } catch (e) {
+        print('Failed to initialize profile statistics defaults: $e');
+      }
+    }
     _loadNotificationCount();
     _notificationLoading = Timer.periodic(Duration(seconds: 10), (timer) {
       print(
@@ -44,12 +52,14 @@ extension _HomeUserLogic on _MyHomePageState {
         _notificationLoading?.cancel();
         _hasPerformedInitialSignedInMapSetup = false;
         _pendingMapFocusUserUid = null;
+        _lastTrackedUsageDayKey = '';
       } else {
         CollectionReference users =
             FirebaseFirestore.instance.collection('users');
         print('User is signed in!');
         _signedIn = true;
         _hasPerformedInitialSignedInMapSetup = false;
+        _lastTrackedUsageDayKey = '';
         _selectedIndex = 0;
         String localUid = FirebaseAuth.instance.currentUser!.uid;
         setState(() {});
@@ -90,6 +100,7 @@ extension _HomeUserLogic on _MyHomePageState {
       if (!newValue) {
         _hasPerformedInitialSignedInMapSetup = false;
         _pendingMapFocusUserUid = null;
+        _lastTrackedUsageDayKey = '';
       }
     });
     if (newValue) {
@@ -145,6 +156,7 @@ extension _HomeUserLogic on _MyHomePageState {
       _openMessagesWithUserUid = targetUid;
       _selectedIndex = 3;
     });
+    _trackSignedInUsageAction();
   }
 
   Future<void> _openUserOnMapFromFeed(
@@ -166,6 +178,24 @@ extension _HomeUserLogic on _MyHomePageState {
         _pendingMapFocusUserUid = null;
       }
     });
+    _trackSignedInUsageAction();
+  }
+
+  Future<void> _trackSignedInUsageAction() async {
+    if (!_signedIn || _uid.trim().isEmpty) return;
+    final now = DateTime.now().toLocal();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    final dayKey = '${now.year}-$month-$day';
+    if (_lastTrackedUsageDayKey == dayKey) return;
+
+    _lastTrackedUsageDayKey = dayKey;
+    try {
+      await fu.recordAppUsageAction(
+          FirebaseFirestore.instance.collection('users'), _uid);
+    } catch (_) {
+      _lastTrackedUsageDayKey = '';
+    }
   }
 
   void _showLoadingIndicator() {

@@ -245,6 +245,7 @@ extension _HomeUiLogic on _MyHomePageState {
                                     onCameraMove:
                                         (CameraPosition cameraPosition) {
                                       _onCameraMove(cameraPosition.zoom);
+                                      _trackSignedInUsageAction();
                                     },
                                     cloudMapId:
                                         mapId, // Set the map style ID here

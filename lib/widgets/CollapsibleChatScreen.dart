@@ -287,9 +287,13 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       //todo: message input validation eg. make sure they don't send an empty message.
                       String messageUuid = await fmu.sendMessage(
                           text, widget.documentReference, widget.uid);
+                      if (messageUuid == 'Error') {
+                        return;
+                      }
                       setState(() {
                         _send_message_controller.clear();
                       });
+                      await fuu.incrementSentMessageCount(users, widget.uid, 1);
                       List<dynamic> userUids =
                           await fmu.retrieveMessageDocumentUserUids(
                               widget.documentReference);
@@ -297,6 +301,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       for (var id in userUids) {
                         //make sure that the id's we are notifying don't include yourself
                         if (id is String && id != widget.uid) {
+                          await fuu.incrementReceivedMessageCount(users, id, 1);
                           await fuu.addUnreadNotification('users', id,
                               widget.documentReference.path, messageUuid);
                           await fuu.createMessageActivity(

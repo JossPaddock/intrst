@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 
+// change this to true to show the admin controls to plus or minus profile stats, or false to hide.
+const bool kShowProfileStatsAdminControls = false;
+
 class Account extends StatefulWidget {
   const Account({
     super.key,
@@ -23,6 +26,7 @@ class _Account extends State<Account> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   bool _isSavingName = false;
+  bool _isAdjustingProfileStatistics = false;
   bool _didHydrateInitialValues = false;
 
   @override
@@ -47,6 +51,102 @@ class _Account extends State<Account> {
     _firstNameController.text = (userData['first_name'] ?? '').toString();
     _lastNameController.text = (userData['last_name'] ?? '').toString();
     _didHydrateInitialValues = true;
+  }
+
+  // maybe im being silly for adding this lol - but it works!
+  String _daySuffix(int day) {
+    if (day >= 11 && day <= 13) return 'th';
+    switch (day % 10) {
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
+    }
+  }
+
+  String _formatProfileCreatedOn(Timestamp? createdAt) {
+    if (createdAt == null) return 'Unknown';
+    final value = createdAt.toDate().toLocal();
+    const months = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final month = months[value.month - 1];
+    final suffix = _daySuffix(value.day);
+    return '$month ${value.day}$suffix, ${value.year}';
+  }
+
+  Future<void> _adjustProfileStatisticForDebug(
+      Future<void> Function(CollectionReference users) action) async {
+    if (!kDebugMode ||
+        !kShowProfileStatsAdminControls ||
+        _isAdjustingProfileStatistics ||
+        widget.uid.trim().isEmpty) {
+      return;
+    }
+    setState(() {
+      _isAdjustingProfileStatistics = true;
+    });
+    try {
+      final users = FirebaseFirestore.instance.collection('users');
+      await action(users);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to adjust metric: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAdjustingProfileStatistics = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildProfileStatisticRow({
+    required String label,
+    required int value,
+    required VoidCallback? onIncrement,
+    required VoidCallback? onDecrement,
+  }) {
+    return Row(
+      children: [
+        Expanded(child: Text('$label: $value')),
+        if (kDebugMode && kShowProfileStatsAdminControls)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Decrease',
+                onPressed: _isAdjustingProfileStatistics ? null : onDecrement,
+                icon: const Icon(Icons.remove_circle_outline),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Increase',
+                onPressed: _isAdjustingProfileStatistics ? null : onIncrement,
+                icon: const Icon(Icons.add_circle_outline),
+              ),
+            ],
+          ),
+      ],
+    );
   }
 
   Future<void> _saveName() async {
@@ -184,6 +284,21 @@ class _Account extends State<Account> {
 
         final userData =
             snapshot.data!.docs.first.data() as Map<String, dynamic>;
+        final profileStatisticsRaw = userData['profile_statistics'];
+        final profileStatistics = profileStatisticsRaw is Map
+            ? Map<String, dynamic>.from(profileStatisticsRaw)
+            : <String, dynamic>{};
+        final longestStreak =
+            (profileStatistics['longest_app_usage_streak'] as num?)?.toInt() ??
+                0;
+        final sentMessageCount =
+            (profileStatistics['messages_sent_count'] as num?)?.toInt() ?? 0;
+        final receivedMessageCount =
+            (profileStatistics['messages_received_count'] as num?)?.toInt() ??
+                0;
+        final profileCreatedAt =
+            profileStatistics['profile_created_at'] as Timestamp?;
+        final profileCreatedOnText = _formatProfileCreatedOn(profileCreatedAt);
         _hydrateNameFields(userData);
 
         return ListView(
@@ -221,6 +336,52 @@ class _Account extends State<Account> {
                   : const Icon(Icons.save),
               label: const Text('Save name'),
             ),
+            const SizedBox(height: 20),
+            const Text(
+              'Profile Statistics',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            _buildProfileStatisticRow(
+              label: 'Longest Streak for using the Intrst App',
+              value: longestStreak,
+              onIncrement: () {
+                _adjustProfileStatisticForDebug((users) =>
+                    fu.incrementLongestStreakForDebug(users, widget.uid, 1));
+              },
+              onDecrement: () {
+                _adjustProfileStatisticForDebug((users) =>
+                    fu.decrementLongestStreakForDebug(users, widget.uid, 1));
+              },
+            ),
+            const SizedBox(height: 4),
+            _buildProfileStatisticRow(
+              label: 'Number of messages sent',
+              value: sentMessageCount,
+              onIncrement: () {
+                _adjustProfileStatisticForDebug((users) =>
+                    fu.incrementSentMessageCount(users, widget.uid, 1));
+              },
+              onDecrement: () {
+                _adjustProfileStatisticForDebug((users) =>
+                    fu.decrementSentMessageCount(users, widget.uid, 1));
+              },
+            ),
+            const SizedBox(height: 4),
+            _buildProfileStatisticRow(
+              label: 'Number of messages recieved',
+              value: receivedMessageCount,
+              onIncrement: () {
+                _adjustProfileStatisticForDebug((users) =>
+                    fu.incrementReceivedMessageCount(users, widget.uid, 1));
+              },
+              onDecrement: () {
+                _adjustProfileStatisticForDebug((users) =>
+                    fu.decrementReceivedMessageCount(users, widget.uid, 1));
+              },
+            ),
+            const SizedBox(height: 4),
+            Text('Profile created on $profileCreatedOnText'),
             const SizedBox(height: 20),
             TextButton(
               onPressed: () {
