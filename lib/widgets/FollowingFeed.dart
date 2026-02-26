@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intrst/utility/FirebaseUsersUtility.dart';
 
 class FollowingFeed extends StatefulWidget {
   const FollowingFeed({
@@ -31,14 +32,50 @@ class _FollowingFeedState extends State<FollowingFeed> {
   late final ScrollController _feedScrollController;
   bool _showScrollToTop = false;
 
-  bool _isSelfProfileStatisticEventType(String type) {
-    return type == 'longest_streak_milestone' ||
-        type == 'messages_sent_milestone' ||
+  bool _isMessageCountMilestoneType(String type) {
+    return type == 'messages_sent_milestone' ||
         type == 'messages_received_milestone';
   }
 
-  bool _isSelfVisibleEventType(String type) {
-    return _isSelfProfileStatisticEventType(type) || type == 'interest_posted';
+  bool _shouldIncludeFeedEvent({
+    required String actorUid,
+    required String type,
+    required Set<String> followingUids,
+    required bool showPosts,
+    required bool showMessages,
+    required bool showInterestUpdates,
+    required bool showStreaks,
+    required bool showMessageCounts,
+  }) {
+    final isOwnEvent = actorUid == widget.userUid;
+    if (isOwnEvent) {
+      if (type == 'interest_posted') {
+        // Always keep own posts visible, regardless of the toggle.
+        return true;
+      }
+      if (type == 'longest_streak_milestone') {
+        return showStreaks;
+      }
+      if (_isMessageCountMilestoneType(type)) {
+        return showMessageCounts;
+      }
+      return false;
+    }
+
+    if (!followingUids.contains(actorUid)) {
+      return false;
+    }
+
+    if (type == 'interest_posted') {
+      return showPosts;
+    }
+    if (type == 'message_sent') {
+      return showMessages;
+    }
+    if (type == 'interest_created' || type == 'interest_updated') {
+      return showInterestUpdates;
+    }
+    return true;
   }
 
   String _extractFirstName(String fullName) {
@@ -209,6 +246,31 @@ class _FollowingFeedState extends State<FollowingFeed> {
                 .where((uid) => uid.isNotEmpty)
                 .toSet() ??
             <String>{};
+        final feedSettingsRaw =
+            currentUserData[FirebaseUsersUtility.feedSettingsField];
+        final feedSettings = feedSettingsRaw is Map
+            ? Map<String, dynamic>.from(feedSettingsRaw)
+            : <String, dynamic>{};
+        final showPosts = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowPosts,
+        );
+        final showMessages = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowMessages,
+        );
+        final showInterestUpdates = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowInterestUpdates,
+        );
+        final showStreaks = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowStreaks,
+        );
+        final showMessageCounts = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowMessageCounts,
+        );
 
         return StreamBuilder<QuerySnapshot>(
           stream: _activityStream,
@@ -231,11 +293,16 @@ class _FollowingFeedState extends State<FollowingFeed> {
                 }).where((data) {
                   final actorUid = (data['actor_uid'] ?? '').toString();
                   final type = (data['type'] ?? '').toString();
-                  if (followingUids.contains(actorUid)) {
-                    return true;
-                  }
-                  return actorUid == widget.userUid &&
-                      _isSelfVisibleEventType(type);
+                  return _shouldIncludeFeedEvent(
+                    actorUid: actorUid,
+                    type: type,
+                    followingUids: followingUids,
+                    showPosts: showPosts,
+                    showMessages: showMessages,
+                    showInterestUpdates: showInterestUpdates,
+                    showStreaks: showStreaks,
+                    showMessageCounts: showMessageCounts,
+                  );
                 }).toList() ??
                 [];
 

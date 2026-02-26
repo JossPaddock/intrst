@@ -9,6 +9,21 @@ import 'package:http/http.dart' as http;
 import 'package:restart_app/restart_app.dart';
 
 class FirebaseUsersUtility {
+  static const String feedSettingsField = 'feed_settings';
+  static const String feedSettingShowPosts = 'show_posts';
+  static const String feedSettingShowMessages = 'show_messages';
+  static const String feedSettingShowInterestUpdates = 'show_interest_updates';
+  static const String feedSettingShowStreaks = 'show_streaks';
+  static const String feedSettingShowMessageCounts =
+      'show_message_count_milestones';
+  static const Set<String> _supportedFeedSettingKeys = {
+    feedSettingShowPosts,
+    feedSettingShowMessages,
+    feedSettingShowInterestUpdates,
+    feedSettingShowStreaks,
+    feedSettingShowMessageCounts,
+  };
+
   static const List<String> _longestStreakMilestoneTemplates = [
     "{X} days. That's not luck - that's your longest streak on intrst app.",
     "You didn't just show up. You built your longest streak on intrst app at {X} days.",
@@ -31,6 +46,22 @@ class FirebaseUsersUtility {
     'Momentum secured at {X} days - your longest streak on intrst app so far.',
     '{X} days and still pushing. Longest streak on intrst app officially reset higher.',
   ];
+
+  Map<String, bool> _defaultFeedSettings() {
+    return const <String, bool>{
+      feedSettingShowPosts: true,
+      feedSettingShowMessages: true,
+      feedSettingShowInterestUpdates: true,
+      feedSettingShowStreaks: true,
+      feedSettingShowMessageCounts: true,
+    };
+  }
+
+  static bool readFeedSettingValue(
+      Map<String, dynamic> feedSettings, String key) {
+    final value = feedSettings[key];
+    return value is bool ? value : true;
+  }
 
   Future<GeoPoint> retrieveUserLocation(
       CollectionReference users, String userUid) async {
@@ -236,6 +267,7 @@ class FirebaseUsersUtility {
       'following_uids': [],
       'unread_notifications': [],
       'unread_notifications_count': <String, int>{},
+      feedSettingsField: _defaultFeedSettings(),
       'profile_statistics': {
         'longest_app_usage_streak': 0,
         'messages_sent_count': 0,
@@ -390,6 +422,18 @@ class FirebaseUsersUtility {
     if (stats['profile_created_at'] is! Timestamp) {
       updates['profile_statistics.profile_created_at'] =
           FieldValue.serverTimestamp();
+    }
+
+    final feedSettingsRaw = data[feedSettingsField];
+    if (feedSettingsRaw is! Map) {
+      updates[feedSettingsField] = _defaultFeedSettings();
+    } else {
+      final feedSettings = Map<String, dynamic>.from(feedSettingsRaw);
+      for (final key in _supportedFeedSettingKeys) {
+        if (feedSettings[key] is! bool) {
+          updates['$feedSettingsField.$key'] = true;
+        }
+      }
     }
 
     if (updates.isNotEmpty) {
@@ -749,6 +793,26 @@ class FirebaseUsersUtility {
       }
     }
 
+    return true;
+  }
+
+  Future<bool> updateFeedVisibilitySetting(CollectionReference users,
+      String userUid, String settingKey, bool isEnabled) async {
+    final sanitizedUid = userUid.trim();
+    if (sanitizedUid.isEmpty ||
+        !_supportedFeedSettingKeys.contains(settingKey)) {
+      return false;
+    }
+
+    final querySnapshot =
+        await users.where('user_uid', isEqualTo: sanitizedUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return false;
+    }
+
+    await querySnapshot.docs.first.reference.update({
+      '$feedSettingsField.$settingKey': isEnabled,
+    });
     return true;
   }
 

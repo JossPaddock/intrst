@@ -28,6 +28,7 @@ class _Account extends State<Account> {
   bool _isSavingName = false;
   bool _isAdjustingProfileStatistics = false;
   bool _didHydrateInitialValues = false;
+  final Set<String> _updatingFeedSettingKeys = <String>{};
 
   @override
   void didUpdateWidget(covariant Account oldWidget) {
@@ -199,6 +200,62 @@ class _Account extends State<Account> {
     }
   }
 
+  Future<void> _updateFeedSetting(String settingKey, bool isEnabled) async {
+    if (widget.uid.trim().isEmpty ||
+        _updatingFeedSettingKeys.contains(settingKey)) {
+      return;
+    }
+
+    setState(() {
+      _updatingFeedSettingKeys.add(settingKey);
+    });
+
+    try {
+      final users = FirebaseFirestore.instance.collection('users');
+      final updated = await fu.updateFeedVisibilitySetting(
+        users,
+        widget.uid,
+        settingKey,
+        isEnabled,
+      );
+      if (!mounted) return;
+      if (!updated) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not update feed setting.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update feed setting: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _updatingFeedSettingKeys.remove(settingKey);
+        });
+      }
+    }
+  }
+
+  Widget _buildFeedSettingTile({
+    required String settingKey,
+    required String title,
+    required String subtitle,
+    required bool value,
+  }) {
+    return SwitchListTile.adaptive(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      title: Text(title),
+      subtitle: Text(subtitle),
+      value: value,
+      onChanged: _updatingFeedSettingKeys.contains(settingKey)
+          ? null
+          : (nextValue) => _updateFeedSetting(settingKey, nextValue),
+    );
+  }
+
   Future<void> _requestPushNotificationPermissions() async {
     await FirebaseMessaging.instance.requestPermission(provisional: true);
 
@@ -288,6 +345,31 @@ class _Account extends State<Account> {
         final profileStatistics = profileStatisticsRaw is Map
             ? Map<String, dynamic>.from(profileStatisticsRaw)
             : <String, dynamic>{};
+        final feedSettingsRaw =
+            userData[FirebaseUsersUtility.feedSettingsField];
+        final feedSettings = feedSettingsRaw is Map
+            ? Map<String, dynamic>.from(feedSettingsRaw)
+            : <String, dynamic>{};
+        final showPosts = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowPosts,
+        );
+        final showMessages = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowMessages,
+        );
+        final showInterestUpdates = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowInterestUpdates,
+        );
+        final showStreaks = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowStreaks,
+        );
+        final showMessageCounts = FirebaseUsersUtility.readFeedSettingValue(
+          feedSettings,
+          FirebaseUsersUtility.feedSettingShowMessageCounts,
+        );
         final longestStreak =
             (profileStatistics['longest_app_usage_streak'] as num?)?.toInt() ??
                 0;
@@ -382,6 +464,52 @@ class _Account extends State<Account> {
             ),
             const SizedBox(height: 4),
             Text('Profile created on $profileCreatedOnText'),
+            const SizedBox(height: 20),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text(
+                'Advanced Feed Settings',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              children: [
+                _buildFeedSettingTile(
+                  settingKey: FirebaseUsersUtility.feedSettingShowPosts,
+                  title: 'Posts',
+                  subtitle:
+                      'Whenever someone you follow posts an interest with a message. Your own posts always stay visible.',
+                  value: showPosts,
+                ),
+                _buildFeedSettingTile(
+                  settingKey: FirebaseUsersUtility.feedSettingShowMessages,
+                  title: 'Messages',
+                  subtitle:
+                      'Message reminders whenever someone sends you a new message.',
+                  value: showMessages,
+                ),
+                _buildFeedSettingTile(
+                  settingKey:
+                      FirebaseUsersUtility.feedSettingShowInterestUpdates,
+                  title: 'Interest Updates',
+                  subtitle:
+                      'Whenever someone creates or updates their interests.',
+                  value: showInterestUpdates,
+                ),
+                _buildFeedSettingTile(
+                  settingKey: FirebaseUsersUtility.feedSettingShowStreaks,
+                  title: 'Streaks',
+                  subtitle:
+                      'Whenever you earn a new Longest Streak for using the Intrst App.',
+                  value: showStreaks,
+                ),
+                _buildFeedSettingTile(
+                  settingKey: FirebaseUsersUtility.feedSettingShowMessageCounts,
+                  title: 'Messages Counts',
+                  subtitle:
+                      'Whenever you reach new milestones for large numbers of messages.',
+                  value: showMessageCounts,
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             TextButton(
               onPressed: () {
