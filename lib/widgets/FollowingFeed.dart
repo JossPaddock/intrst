@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class FollowingFeed extends StatelessWidget {
+class FollowingFeed extends StatefulWidget {
   const FollowingFeed({
     super.key,
     required this.userUid,
@@ -14,6 +14,37 @@ class FollowingFeed extends StatelessWidget {
   final Future<void> Function(String userUid, String userName) onOpenInterests;
   final void Function(String userUid, String userName) onOpenMessages;
   final Future<void> Function(String userUid, String userName) onOpenUserOnMap;
+
+  @override
+  State<FollowingFeed> createState() => _FollowingFeedState();
+}
+
+class _FollowingFeedState extends State<FollowingFeed> {
+  late Stream<QuerySnapshot> _currentUserStream;
+  late Stream<QuerySnapshot> _activityStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _buildStreams();
+  }
+
+  @override
+  void didUpdateWidget(covariant FollowingFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userUid != widget.userUid) {
+      _buildStreams();
+    }
+  }
+
+  void _buildStreams() {
+    final users = FirebaseFirestore.instance.collection('users');
+    final feed = FirebaseFirestore.instance.collection('activity_feed');
+    _currentUserStream =
+        users.where('user_uid', isEqualTo: widget.userUid).limit(1).snapshots();
+    _activityStream =
+        feed.where('target_uids', arrayContains: widget.userUid).snapshots();
+  }
 
   String _formatTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return '';
@@ -40,26 +71,25 @@ class FollowingFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (userUid.isEmpty) {
+    if (widget.userUid.isEmpty) {
       return const Center(
         child: Text('Sign in to see activity from people you follow.'),
       );
     }
 
-    final users = FirebaseFirestore.instance.collection('users');
-    final feed = FirebaseFirestore.instance.collection('activity_feed');
-
     return StreamBuilder<QuerySnapshot>(
-      stream: users.where('user_uid', isEqualTo: userUid).limit(1).snapshots(),
+      stream: _currentUserStream,
       builder: (context, currentUserSnapshot) {
-        if (currentUserSnapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+        if (currentUserSnapshot.hasError) {
+          return Center(
+            child: Text(
+                'Error loading feed settings: ${currentUserSnapshot.error}'),
+          );
         }
 
         if (!currentUserSnapshot.hasData ||
             currentUserSnapshot.data!.docs.isEmpty) {
-          return const Center(
-              child: Text('Could not load your feed settings.'));
+          return const Center(child: CircularProgressIndicator());
         }
 
         final currentUserData =
@@ -77,15 +107,15 @@ class FollowingFeed extends StatelessWidget {
         }
 
         return StreamBuilder<QuerySnapshot>(
-          stream: feed.where('target_uids', arrayContains: userUid).snapshots(),
+          stream: _activityStream,
           builder: (context, activitySnapshot) {
-            if (activitySnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
             if (activitySnapshot.hasError) {
               return Center(
                   child: Text('Error loading feed: ${activitySnapshot.error}'));
+            }
+
+            if (!activitySnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
             }
 
             final entries = activitySnapshot.data?.docs
@@ -126,28 +156,37 @@ class FollowingFeed extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         TextButton(
-                          onPressed: () => onOpenUserOnMap(actorUid, actorName),
+                          onPressed: () =>
+                              widget.onOpenUserOnMap(actorUid, actorName),
                           child: Text(actorName),
                         ),
                         const Text(' created a new interest, '),
                         TextButton(
-                          onPressed: () => onOpenInterests(actorUid, actorName),
+                          onPressed: () =>
+                              widget.onOpenInterests(actorUid, actorName),
                           child: const Text('check it out here'),
                         ),
                       ],
                     );
                     break;
                   case 'interest_updated':
+                    final interestName =
+                        (item['interest_name'] ?? '').toString().trim();
+                    final updateText = interestName.isEmpty
+                        ? ' has updated their interest, '
+                        : ' has updated their interest "$interestName", ';
                     action = Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         TextButton(
-                          onPressed: () => onOpenUserOnMap(actorUid, actorName),
+                          onPressed: () =>
+                              widget.onOpenUserOnMap(actorUid, actorName),
                           child: Text(actorName),
                         ),
-                        const Text(' has updated their interest, '),
+                        Text(updateText),
                         TextButton(
-                          onPressed: () => onOpenInterests(actorUid, actorName),
+                          onPressed: () =>
+                              widget.onOpenInterests(actorUid, actorName),
                           child: const Text('check it out here'),
                         ),
                       ],
@@ -161,12 +200,14 @@ class FollowingFeed extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         TextButton(
-                          onPressed: () => onOpenUserOnMap(actorUid, actorName),
+                          onPressed: () =>
+                              widget.onOpenUserOnMap(actorUid, actorName),
                           child: Text(actorName),
                         ),
                         Text(' sent you a message "$messageContent", '),
                         TextButton(
-                          onPressed: () => onOpenMessages(actorUid, actorName),
+                          onPressed: () =>
+                              widget.onOpenMessages(actorUid, actorName),
                           child: const Text('click here to chat'),
                         ),
                       ],

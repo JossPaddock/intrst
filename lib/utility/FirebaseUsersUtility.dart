@@ -133,10 +133,27 @@ class FirebaseUsersUtility {
         }
       }
 
-      await doc.reference.update({
-        'unread_notifications_count': counts,
-      });
+      final existingCounts =
+          ((data['unread_notifications_count'] as Map?) ?? {})
+              .map((key, value) => MapEntry(
+                    key.toString(),
+                    value is num ? value.toInt() : 0,
+                  ));
+
+      if (!_stringIntMapsEqual(existingCounts, counts)) {
+        await doc.reference.update({
+          'unread_notifications_count': counts,
+        });
+      }
     }
+  }
+
+  bool _stringIntMapsEqual(Map<String, int> left, Map<String, int> right) {
+    if (left.length != right.length) return false;
+    for (final entry in left.entries) {
+      if (right[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   Future<int> retrieveNotificationCount(
@@ -351,7 +368,21 @@ class FirebaseUsersUtility {
     required Interest oldInterest,
     required Interest newInterest,
     int minChangedCharacters = 10,
+    Duration suppressInitialUpdateWindow = const Duration(minutes: 5),
+    int initialUpdateTimestampToleranceSeconds = 3,
   }) async {
+    final createdAt = oldInterest.created_timestamp;
+    final lastUpdatedAt = oldInterest.updated_timestamp;
+    final bool wasNeverEditedBefore =
+        (lastUpdatedAt.difference(createdAt).inSeconds).abs() <=
+            initialUpdateTimestampToleranceSeconds;
+    final bool isWithinFreshCreateWindow =
+        DateTime.now().difference(createdAt) <= suppressInitialUpdateWindow;
+
+    if (wasNeverEditedBefore && isWithinFreshCreateWindow) {
+      return;
+    }
+
     final oldText = _flattenInterestForDiff(oldInterest);
     final newText = _flattenInterestForDiff(newInterest);
     final changedCharacterCount =
