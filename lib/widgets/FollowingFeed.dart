@@ -11,7 +11,8 @@ class FollowingFeed extends StatefulWidget {
   });
 
   final String userUid;
-  final Future<void> Function(String userUid, String userName) onOpenInterests;
+  final Future<void> Function(
+      String userUid, String userName, String interestId) onOpenInterests;
   final void Function(String userUid, String userName) onOpenMessages;
   final Future<void> Function(String userUid, String userName) onOpenUserOnMap;
 
@@ -150,6 +151,8 @@ class _FollowingFeedState extends State<FollowingFeed> {
                 final actorUid = (item['actor_uid'] ?? '').toString();
                 final actorName =
                     (item['actor_name'] ?? 'Unknown user').toString();
+                final interestId =
+                    (item['interest_id'] ?? '').toString().trim();
                 final createdAt = item['created_at'] as Timestamp?;
 
                 Widget action;
@@ -165,8 +168,8 @@ class _FollowingFeedState extends State<FollowingFeed> {
                         ),
                         const Text(' created a new interest, '),
                         TextButton(
-                          onPressed: () =>
-                              widget.onOpenInterests(actorUid, actorName),
+                          onPressed: () => widget.onOpenInterests(
+                              actorUid, actorName, interestId),
                           child: const Text('check it out here'),
                         ),
                       ],
@@ -188,8 +191,8 @@ class _FollowingFeedState extends State<FollowingFeed> {
                         ),
                         Text(updateText),
                         TextButton(
-                          onPressed: () =>
-                              widget.onOpenInterests(actorUid, actorName),
+                          onPressed: () => widget.onOpenInterests(
+                              actorUid, actorName, interestId),
                           child: const Text('check it out here'),
                         ),
                       ],

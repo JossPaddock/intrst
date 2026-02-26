@@ -30,7 +30,7 @@ class Preview extends StatefulWidget {
 }
 
 class _InterestAlertDialogState extends State<Preview> {
-  List<List<String>> _buttonLabels = [];
+  List<Interest> _previewInterests = [];
   String _name = '';
   FirebaseUsersUtility fuu = FirebaseUsersUtility();
   FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
@@ -87,11 +87,8 @@ class _InterestAlertDialogState extends State<Preview> {
     List<Interest> interests =
         await fuu.pullInterestsForUser(users, widget.alternateUid);
     String name = await fuu.lookUpNameByUserUid(users, widget.alternateUid);
-    List<List<String>> labels = interests
-        .map((interest) => [interest.name, interest.link ?? ""])
-        .toList();
     setState(() {
-      _buttonLabels = labels;
+      _previewInterests = interests;
       _name = name;
     });
   }
@@ -154,9 +151,20 @@ class _InterestAlertDialogState extends State<Preview> {
     });
   }
 
-  void _handlePreviewToInterestsWidgetFlow() {
+  void _handlePreviewToInterestsWidgetFlow(
+      {String highlightedInterestId = ''}) {
     if (widget.signedIn) {
       _handleAlternateUserModel(widget.alternateUid, _name);
+      final userModel = Provider.of<UserModel>(context, listen: false);
+      final sanitizedInterestId = highlightedInterestId.trim();
+      if (sanitizedInterestId.isNotEmpty) {
+        userModel.setFeedInterestHighlight(
+          ownerUid: widget.alternateUid,
+          interestId: sanitizedInterestId,
+        );
+      } else {
+        userModel.clearFeedInterestHighlight();
+      }
       widget.scaffoldKey.currentState?.openEndDrawer();
       widget.onDrawerOpened();
     } else {
@@ -221,26 +229,29 @@ class _InterestAlertDialogState extends State<Preview> {
               alignment: WrapAlignment.center,
               spacing: 16.0,
               runSpacing: 8.0,
-              children: _buttonLabels
-                  .map((label) {
+              children: _previewInterests
+                  .map((interest) {
+                    final interestLink = (interest.link ?? '').trim();
                     return ElevatedButton(
                       onPressed: () {
                         //_handlePreviewToInterestsWidgetFlow();
                       },
                       child: GestureDetector(
                         onTap: () {
-                          if (label.last == "") {
-                            _handlePreviewToInterestsWidgetFlow();
+                          if (interestLink.isEmpty) {
+                            _handlePreviewToInterestsWidgetFlow(
+                                highlightedInterestId: interest.id);
                           }
-                          _launchUrl(label.last);
+                          _launchUrl(interest.link);
                         },
                         child: Text(
-                          formatTextByWords(label.first, 3),
+                          formatTextByWords(interest.name, 3),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                              color:
-                                  label.last == "" ? Colors.black : Colors.blue,
-                              decoration: label.last == ""
+                              color: interestLink.isEmpty
+                                  ? Colors.black
+                                  : Colors.blue,
+                              decoration: interestLink.isEmpty
                                   ? TextDecoration.none
                                   : TextDecoration.underline),
                         ),

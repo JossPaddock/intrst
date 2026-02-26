@@ -142,8 +142,17 @@ extension _HomeUserLogic on _MyHomePageState {
   }
 
   Future<void> _openInterestsForUserFromFeed(
-      String targetUid, String targetName) async {
+      String targetUid, String targetName, String targetInterestId) async {
     _handleAlternateUserModel(targetUid, targetName);
+    final sanitizedInterestId = targetInterestId.trim();
+    if (sanitizedInterestId.isNotEmpty) {
+      UserModel().setFeedInterestHighlight(
+        ownerUid: targetUid,
+        interestId: sanitizedInterestId,
+      );
+    } else {
+      UserModel().clearFeedInterestHighlight();
+    }
     _onItemTapped(0);
     await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;

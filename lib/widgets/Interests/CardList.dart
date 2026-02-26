@@ -288,7 +288,7 @@ class CardListState extends State<CardList>
         title: const Text('Invalid link'),
         content: const Text(
           'The link you entered does not appear to be reachable. '
-              'Please try fix it before saving.',
+          'Please try fix it before saving.',
         ),
         actions: [
           TextButton(
@@ -336,8 +336,9 @@ class CardListState extends State<CardList>
         titleController: titleController,
         quillController: quillController,
       );
-      if(!kIsWeb) {
-        final isValid = await isUrlResolvable(normalizeUrl(linkController.text));
+      if (!kIsWeb) {
+        final isValid =
+            await isUrlResolvable(normalizeUrl(linkController.text));
         if (!isValid) {
           await _showInvalidLinkDialog();
           return;
@@ -435,6 +436,10 @@ class CardListState extends State<CardList>
                     final String id = interest.id;
                     final String toggleKey = id;
                     bool toggle = userModel.getToggle(toggleKey);
+                    final shouldHighlightFromFeed =
+                        userModel.feedHighlightedInterestOwnerUid ==
+                                userModel.alternateUid &&
+                            userModel.feedHighlightedInterestId == id;
 
                     final titleController =
                         _titleControllers[id] ?? TextEditingController();
@@ -448,6 +453,18 @@ class CardListState extends State<CardList>
                           vertical: 8.0, horizontal: 8.0),
                       child: Card(
                         key: ValueKey(id),
+                        color: shouldHighlightFromFeed
+                            ? const Color(0xFFFFF3CD)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: shouldHighlightFromFeed
+                                ? const Color(0xFFF0AD4E)
+                                : Colors.transparent,
+                            width: shouldHighlightFromFeed ? 2 : 0,
+                          ),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
