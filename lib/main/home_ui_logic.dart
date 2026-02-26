@@ -332,12 +332,31 @@ extension _HomeUiLogic on _MyHomePageState {
                                     },
                                   ),
                                   Positioned(
+                                    bottom: kIsWeb ? 185 : 125,
+                                    right: 10,
+                                    child: FloatingActionButton(
+                                      mini: true,
+                                      backgroundColor: Colors.white,
+                                      onPressed: () {
+                                        _showTemporaryBottomMessage(
+                                          "Taking you to your Marker's location",
+                                        );
+                                        moveCameraToUserLocation();
+                                      },
+                                      child:
+                                          Icon(Icons.place, color: Colors.blue),
+                                    ),
+                                  ),
+                                  Positioned(
                                     bottom: kIsWeb ? 130 : 70,
                                     right: 10,
                                     child: FloatingActionButton(
                                       mini: true,
                                       backgroundColor: Colors.white,
                                       onPressed: () {
+                                        _showTemporaryBottomMessage(
+                                          'Taking you to your current location',
+                                        );
                                         _gotoCurrentUserLocationFast(
                                             true, _signedIn);
                                       },
@@ -593,7 +612,7 @@ extension _HomeUiLogic on _MyHomePageState {
                     },
                   ),
                   ListTile(
-                    title: const Text('Following'),
+                    title: const Text('Feed'),
                     selected: _selectedIndex == 1,
                     onTap: () {
                       _onItemTapped(1);

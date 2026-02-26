@@ -178,4 +178,16 @@ extension _HomeUserLogic on _MyHomePageState {
       });
     });
   }
+
+  void _showTemporaryBottomMessage(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 }
