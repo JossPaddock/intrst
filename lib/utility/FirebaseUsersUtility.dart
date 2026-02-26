@@ -969,6 +969,38 @@ class FirebaseUsersUtility {
     );
   }
 
+  Future<void> createInterestPostedActivity({
+    required String actorUid,
+    required Interest interest,
+    required String message,
+  }) async {
+    final sanitizedActorUid = actorUid.trim();
+    final sanitizedMessage = message.trim();
+    if (sanitizedActorUid.isEmpty ||
+        sanitizedMessage.isEmpty ||
+        interest.id.trim().isEmpty) {
+      return;
+    }
+
+    final users = FirebaseFirestore.instance.collection('users');
+    final followers = await retrieveFollowerUids(sanitizedActorUid);
+    final targetUids = <String>{sanitizedActorUid, ...followers}
+        .where((uid) => uid.trim().isNotEmpty)
+        .toList();
+    if (targetUids.isEmpty) return;
+
+    final actorName = await lookUpNameByUserUid(users, sanitizedActorUid);
+    await _createActivityForUsers(
+      type: 'interest_posted',
+      actorUid: sanitizedActorUid,
+      actorName: actorName,
+      targetUids: targetUids,
+      interestId: interest.id,
+      interestName: interest.name,
+      messageContent: sanitizedMessage,
+    );
+  }
+
   Future<void> createMessageActivity({
     required String senderUid,
     required String recipientUid,

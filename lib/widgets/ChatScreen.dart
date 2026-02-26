@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:intrst/utility/DateTimeUtility.dart';
 import 'package:intrst/widgets/ChatBubble.dart';
 
@@ -24,7 +23,7 @@ class ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-   /* SchedulerBinding.instance.addPostFrameCallback((_) {
+    /* SchedulerBinding.instance.addPostFrameCallback((_) {
       scrollController.jumpTo(
         scrollController.position.maxScrollExtent,
       );
@@ -64,7 +63,7 @@ class ChatScreenState extends State<ChatScreen> {
 
     return SizedBox(
       height: 300,
-      width: 300,
+      width: double.infinity,
       child: ListView.builder(
         reverse: true, // This automatically handles sticking to the bottom
         controller: scrollController,

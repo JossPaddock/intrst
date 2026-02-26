@@ -1,12 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
-import 'package:intrst/widgets/CollapsibleChatScreen.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/Interest.dart';
 import '../models/UserModel.dart';
-import '../utility/FirebaseMessagesUtility.dart';
 
 class Preview extends StatefulWidget {
   const Preview({
@@ -17,6 +15,7 @@ class Preview extends StatefulWidget {
     required this.onItemTapped,
     required this.signedIn,
     required this.onDrawerOpened,
+    required this.onOpenMessages,
   });
   final String uid;
   final String alternateUid;
@@ -24,6 +23,7 @@ class Preview extends StatefulWidget {
   final void Function(int) onItemTapped;
   final bool signedIn;
   final VoidCallback onDrawerOpened;
+  final void Function(String userUid, String userName) onOpenMessages;
 
   @override
   _InterestAlertDialogState createState() => _InterestAlertDialogState();
@@ -33,14 +33,7 @@ class _InterestAlertDialogState extends State<Preview> {
   List<Interest> _previewInterests = [];
   String _name = '';
   FirebaseUsersUtility fuu = FirebaseUsersUtility();
-  FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
-  bool chatOpen = false;
-  CollectionReference messages =
-      FirebaseFirestore.instance.collection('messages');
   CollectionReference users = FirebaseFirestore.instance.collection('users');
-  Map<DocumentReference, Map<String, dynamic>>? initMessageData = null;
-  bool hasNotification = false;
-  int notificationCount = 0;
   bool _isFollowing = false;
   bool _followStateLoading = false;
   bool _followActionLoading = false;
@@ -49,38 +42,13 @@ class _InterestAlertDialogState extends State<Preview> {
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
-    _loadNotificationCount();
     _loadFollowState();
-  }
-
-  void _loadNotificationCount() async {
-    while (initMessageData == null) {
-      await Future.delayed(Duration(milliseconds: 500));
-    }
-    print('attempting to load notification count');
-    int count = await fuu.retrieveNotificationCount(
-        users, widget.uid, initMessageData!.entries.first.key.path);
-    print('the notification count was $count');
-    setState(() {
-      if (count > 0) {
-        hasNotification = true;
-        notificationCount = count;
-      } else {
-        hasNotification = false;
-        notificationCount = 0;
-      }
-    });
   }
 
   void _handleAlternateUserModel(String value, String name) {
     UserModel userModel = Provider.of<UserModel>(context, listen: false);
     userModel.changeAlternateUid(value);
     userModel.changeAlternateName(name);
-  }
-
-  String _handleLookUpViewerOfPreviewWidget() {
-    UserModel userModel = Provider.of<UserModel>(context, listen: false);
-    return userModel.currentUid;
   }
 
   Future<void> _fetchNameAndButtonLabels() async {
@@ -90,19 +58,6 @@ class _InterestAlertDialogState extends State<Preview> {
     setState(() {
       _previewInterests = interests;
       _name = name;
-    });
-  }
-
-  Future<void> _fetchInitialMessageData() async {
-    List<String> userUids = [widget.uid, widget.alternateUid];
-    Map<DocumentReference, Map<String, dynamic>>? data =
-        await fmu.getMessageDocumentsExclusivelyByUserUids(userUids);
-    if (data == null) {
-      await fmu.createMessageDocument([widget.uid, widget.alternateUid]);
-      data = await fmu.getMessageDocumentsExclusivelyByUserUids(userUids);
-    }
-    setState(() {
-      initMessageData = data;
     });
   }
 
@@ -173,6 +128,16 @@ class _InterestAlertDialogState extends State<Preview> {
     }
   }
 
+  void _openMessagesFromPreview() {
+    if (!widget.signedIn) {
+      Navigator.pop(context);
+      widget.onItemTapped(1);
+      return;
+    }
+    widget.onOpenMessages(widget.alternateUid, _name);
+    Navigator.pop(context);
+  }
+
   String formatTextByWords(String text, int wordsPerLine) {
     final words = text.split(' ');
     final buffer = StringBuffer();
@@ -224,71 +189,53 @@ class _InterestAlertDialogState extends State<Preview> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!chatOpen)
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 16.0,
-              runSpacing: 8.0,
-              children: _previewInterests
-                  .map((interest) {
-                    final interestLink = (interest.link ?? '').trim();
-                    return ElevatedButton(
-                      onPressed: () {
-                        //_handlePreviewToInterestsWidgetFlow();
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 16.0,
+            runSpacing: 8.0,
+            children: _previewInterests
+                .map((interest) {
+                  final interestLink = (interest.link ?? '').trim();
+                  return ElevatedButton(
+                    onPressed: () {
+                      //_handlePreviewToInterestsWidgetFlow();
+                    },
+                    child: GestureDetector(
+                      onTap: () {
+                        if (interestLink.isEmpty) {
+                          _handlePreviewToInterestsWidgetFlow(
+                              highlightedInterestId: interest.id);
+                        }
+                        _launchUrl(interest.link);
                       },
-                      child: GestureDetector(
-                        onTap: () {
-                          if (interestLink.isEmpty) {
-                            _handlePreviewToInterestsWidgetFlow(
-                                highlightedInterestId: interest.id);
-                          }
-                          _launchUrl(interest.link);
-                        },
-                        child: Text(
-                          formatTextByWords(interest.name, 3),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: interestLink.isEmpty
-                                  ? Colors.black
-                                  : Colors.blue,
-                              decoration: interestLink.isEmpty
-                                  ? TextDecoration.none
-                                  : TextDecoration.underline),
-                        ),
+                      child: Text(
+                        formatTextByWords(interest.name, 3),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: interestLink.isEmpty
+                                ? Colors.black
+                                : Colors.blue,
+                            decoration: interestLink.isEmpty
+                                ? TextDecoration.none
+                                : TextDecoration.underline),
                       ),
-                    );
-                  })
-                  .toList()
-                  .take(5)
-                  .toList(),
-            ),
-          if (!chatOpen) SizedBox(height: 16.0),
+                    ),
+                  );
+                })
+                .toList()
+                .take(5)
+                .toList(),
+          ),
+          SizedBox(height: 16.0),
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 8.0,
             runSpacing: 8.0,
             children: [
               ElevatedButton.icon(
-                onPressed: () async {
-                  if (widget.signedIn) {
-                  } else {
-                    Navigator.pop(context); // Close the dialog
-                    widget.onItemTapped(1);
-                  } //
-                  if (widget.uid.isNotEmpty && widget.alternateUid.isNotEmpty) {
-                    await _fetchInitialMessageData();
-                  }
-                  setState(() {
-                    chatOpen = !chatOpen;
-                  });
-                },
-                icon: Badge.count(
-                    offset: Offset(9.0, -7.0),
-                    isLabelVisible: hasNotification,
-                    count: notificationCount,
-                    child: const Icon(Icons.chat)),
-                label: Text(chatOpen ? 'Close' : 'Chat',
-                    style: TextStyle(fontSize: 12)),
+                onPressed: _openMessagesFromPreview,
+                icon: const Icon(Icons.chat),
+                label: const Text('Chat', style: TextStyle(fontSize: 12)),
               ),
               ElevatedButton.icon(
                 onPressed: () {
@@ -318,29 +265,6 @@ class _InterestAlertDialogState extends State<Preview> {
                 ),
             ],
           ),
-          if (!chatOpen)
-            ElevatedButton.icon(
-              onPressed: () {
-                widget.onItemTapped(3);
-                Navigator.pop(context);
-              },
-              icon: Icon(Icons.chat),
-              label: Text('Show all chats'),
-            ),
-          if (chatOpen && initMessageData != null)
-            Column(
-              children: [
-                CollapsibleChatScreen(
-                    autoOpen: true,
-                    showNameAtTop: false,
-                    uid: _handleLookUpViewerOfPreviewWidget(),
-                    documentData: initMessageData!.entries.first.value,
-                    documentReference: initMessageData!.entries.first.key),
-              ],
-            ),
-          if (chatOpen && initMessageData == null)
-            Text(
-                'You have never had a chat with this person, we are creating that chat now ')
         ],
       ),
     );

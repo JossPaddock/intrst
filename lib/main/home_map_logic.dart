@@ -346,6 +346,7 @@ extension _HomeMapLogic on _MyHomePageState {
                 onDrawerOpened: () {
                   Navigator.of(context).pop(true);
                 },
+                onOpenMessages: _openMessagesForUserFromFeed,
               );
             }).then((drawerOpened) {
           if (drawerOpened != true) {

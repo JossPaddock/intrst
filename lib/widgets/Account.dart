@@ -338,7 +338,7 @@ class _Account extends State<Account> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Profile Statistics',
+              'Statistics',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
