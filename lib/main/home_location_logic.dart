@@ -1,6 +1,11 @@
 part of 'package:intrst/main.dart';
 
 extension _HomeLocationLogic on _MyHomePageState {
+  bool _shouldSuppressAutoCenter(bool suppressWhenPendingFocus) {
+    return suppressWhenPendingFocus &&
+        (_pendingMapFocusUserUid?.isNotEmpty ?? false);
+  }
+
   Future<void> _showLocationDisclaimer(BuildContext context) async {
     await showDialog(
       context: context,
@@ -25,8 +30,14 @@ extension _HomeLocationLogic on _MyHomePageState {
   }
 
   Future<void> _getLocationServiceAndPermission(
-      Completer<GoogleMapController> controllerCompleter) async {
+    Completer<GoogleMapController> controllerCompleter, {
+    bool suppressWhenPendingFocus = false,
+  }) async {
     print('getLocationServiceAndPermission is running');
+
+    if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
+      return;
+    }
 
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     final GoogleMapController controller = await controllerCompleter.future;
@@ -90,8 +101,15 @@ extension _HomeLocationLogic on _MyHomePageState {
     if (userLocation == GeoPoint(0, 0)) {
       print('user location was 0,0');
       // Update user location in Firestore and move map camera
-      bool movedUser = await _gotoCurrentUserLocation(true, _signedIn);
+      bool movedUser = await _gotoCurrentUserLocation(
+        true,
+        _signedIn,
+        suppressWhenPendingFocus: suppressWhenPendingFocus,
+      );
       if (!movedUser) {
+        if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
+          return;
+        }
         // Move map camera to stored location with a small random offset
         Random random = Random();
         double lat = generateRandomNumber(-50, 50, random);
@@ -119,6 +137,9 @@ extension _HomeLocationLogic on _MyHomePageState {
         });
       }
     } else {
+      if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
+        return;
+      }
       // Move map camera to stored location with a small random offset
       Random random = Random();
       double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
@@ -176,7 +197,10 @@ extension _HomeLocationLogic on _MyHomePageState {
   }
 
   Future<bool> _gotoCurrentUserLocation(
-      bool updateUserLocation, bool loadUserMarker) async {
+    bool updateUserLocation,
+    bool loadUserMarker, {
+    bool suppressWhenPendingFocus = false,
+  }) async {
     print('running _gotoCurrentUserLocation method');
     Random random = Random();
     double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
@@ -209,6 +233,9 @@ extension _HomeLocationLogic on _MyHomePageState {
     print('locationData: ${locationData.latitude}');
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     String localUid = FirebaseAuth.instance.currentUser!.uid;
+    if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
+      return false;
+    }
     if (updateUserLocation) {
       print(
           'updating user with user_uid: $localUid location to lat: ${locationData.latitude}; long: ${locationData.longitude} in Firebase');
@@ -223,6 +250,9 @@ extension _HomeLocationLogic on _MyHomePageState {
             locationData.longitude! + randomNumber2),
         zoom: 12);
     await loadMarkers(loadUserMarker);
+    if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
+      return false;
+    }
     await controller
         .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
     setState(() {

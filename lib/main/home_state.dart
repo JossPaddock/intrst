@@ -33,6 +33,8 @@ class _MyHomePageState extends State<MyHomePage> {
   int notificationCount = 0;
   Timer? _notificationLoading;
   String? _openMessagesWithUserUid;
+  String? _pendingMapFocusUserUid;
+  bool _hasPerformedInitialSignedInMapSetup = false;
 
   final mapId = "bc8e2917cca03ad4";
 

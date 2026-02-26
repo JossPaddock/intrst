@@ -42,11 +42,14 @@ extension _HomeUserLogic on _MyHomePageState {
       if (user == null) {
         print('User is currently signed out!');
         _notificationLoading?.cancel();
+        _hasPerformedInitialSignedInMapSetup = false;
+        _pendingMapFocusUserUid = null;
       } else {
         CollectionReference users =
             FirebaseFirestore.instance.collection('users');
         print('User is signed in!');
         _signedIn = true;
+        _hasPerformedInitialSignedInMapSetup = false;
         _selectedIndex = 0;
         String localUid = FirebaseAuth.instance.currentUser!.uid;
         setState(() {});
@@ -84,8 +87,13 @@ extension _HomeUserLogic on _MyHomePageState {
   void _handleSignInChanged(bool newValue) {
     setState(() {
       _signedIn = newValue;
+      if (!newValue) {
+        _hasPerformedInitialSignedInMapSetup = false;
+        _pendingMapFocusUserUid = null;
+      }
     });
     if (newValue) {
+      _hasPerformedInitialSignedInMapSetup = false;
       loadUserContext();
     }
   }
@@ -142,10 +150,10 @@ extension _HomeUserLogic on _MyHomePageState {
   Future<void> _openUserOnMapFromFeed(
       String targetUid, String targetName) async {
     _handleAlternateUserModel(targetUid, targetName);
+    setState(() {
+      _pendingMapFocusUserUid = targetUid;
+    });
     _onItemTapped(0);
-    await Future.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
-    await moveCameraToSpecificUser(targetUid, zoom: 13.5);
   }
 
   void _onItemTapped(int index) {
@@ -153,6 +161,9 @@ extension _HomeUserLogic on _MyHomePageState {
       _selectedIndex = index;
       if (index != 3) {
         _openMessagesWithUserUid = null;
+      }
+      if (index != 0) {
+        _pendingMapFocusUserUid = null;
       }
     });
   }

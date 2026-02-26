@@ -276,6 +276,11 @@ extension _HomeUiLogic on _MyHomePageState {
                                     markers: markers,
                                     onMapCreated:
                                         (GoogleMapController controller) async {
+                                      final pendingFeedMapFocusUid =
+                                          _pendingMapFocusUserUid;
+                                      final hasPendingFeedMapFocus =
+                                          (pendingFeedMapFocusUid?.isNotEmpty ??
+                                              false);
                                       loadFCMToken();
                                       double zoom =
                                           await controller.getZoomLevel();
@@ -284,11 +289,22 @@ extension _HomeUiLogic on _MyHomePageState {
                                       if (_controller.isCompleted) {
                                         _controller = Completer();
                                       }
-                                      await _showLocationDisclaimer(context);
-                                      _getLocationServiceAndPermission(
-                                          _controller);
-                                      _gotoCurrentUserLocation(
-                                          false, _signedIn);
+                                      _controller.complete(controller);
+                                      if (!hasPendingFeedMapFocus &&
+                                          !_hasPerformedInitialSignedInMapSetup) {
+                                        _hasPerformedInitialSignedInMapSetup =
+                                            true;
+                                        await _showLocationDisclaimer(context);
+                                        _getLocationServiceAndPermission(
+                                          _controller,
+                                          suppressWhenPendingFocus: true,
+                                        );
+                                        _gotoCurrentUserLocation(
+                                          false,
+                                          _signedIn,
+                                          suppressWhenPendingFocus: true,
+                                        );
+                                      }
                                       print('callback is working');
                                       setState(() {});
                                       if (markers.isEmpty) {
@@ -297,7 +313,22 @@ extension _HomeUiLogic on _MyHomePageState {
                                         await loadMarkers(true);
                                       }
                                       _onCameraMove(_currentZoom);
-                                      _controller.complete(controller);
+                                      if (hasPendingFeedMapFocus &&
+                                          pendingFeedMapFocusUid != null &&
+                                          pendingFeedMapFocusUid.isNotEmpty) {
+                                        await moveCameraToSpecificUser(
+                                          pendingFeedMapFocusUid,
+                                          zoom: 13.5,
+                                        );
+                                        if (mounted) {
+                                          setState(() {
+                                            if (_pendingMapFocusUserUid ==
+                                                pendingFeedMapFocusUid) {
+                                              _pendingMapFocusUserUid = null;
+                                            }
+                                          });
+                                        }
+                                      }
                                     },
                                   ),
                                   Positioned(
