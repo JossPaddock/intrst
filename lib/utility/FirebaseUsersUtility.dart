@@ -220,6 +220,56 @@ class FirebaseUsersUtility {
         .catchError((error) => print("Failed to add user: $error"));
   }
 
+  Future<bool> updateUserName(CollectionReference users, String userUid,
+      String firstName, String lastName) async {
+    final sanitizedUid = userUid.trim();
+    final sanitizedFirstName = firstName.trim();
+    final sanitizedLastName = lastName.trim();
+    if (sanitizedUid.isEmpty ||
+        sanitizedFirstName.isEmpty ||
+        sanitizedLastName.isEmpty) {
+      return false;
+    }
+
+    final querySnapshot =
+        await users.where('user_uid', isEqualTo: sanitizedUid).get();
+    if (querySnapshot.docs.isEmpty) {
+      return false;
+    }
+
+    for (final doc in querySnapshot.docs) {
+      await doc.reference.update({
+        'first_name': sanitizedFirstName,
+        'last_name': sanitizedLastName,
+      });
+    }
+
+    final updatedFullName = '$sanitizedFirstName $sanitizedLastName';
+    final activityCollection =
+        FirebaseFirestore.instance.collection('activity_feed');
+    final activitySnapshot = await activityCollection
+        .where('actor_uid', isEqualTo: sanitizedUid)
+        .get();
+    if (activitySnapshot.docs.isNotEmpty) {
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      int operationsInBatch = 0;
+      for (final activityDoc in activitySnapshot.docs) {
+        batch.update(activityDoc.reference, {'actor_name': updatedFullName});
+        operationsInBatch += 1;
+        if (operationsInBatch >= 400) {
+          await batch.commit();
+          batch = FirebaseFirestore.instance.batch();
+          operationsInBatch = 0;
+        }
+      }
+      if (operationsInBatch > 0) {
+        await batch.commit();
+      }
+    }
+
+    return true;
+  }
+
   Future<List<String>> retrieveFollowingUids(
       CollectionReference users, String userUid) async {
     QuerySnapshot querySnapshot =

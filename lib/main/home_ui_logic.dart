@@ -519,7 +519,10 @@ extension _HomeUiLogic on _MyHomePageState {
                       onOpenMessages: _openMessagesForUserFromFeed,
                       onOpenUserOnMap: _openUserOnMapFromFeed,
                     ),
-                    Account(uid: _uid),
+                    Account(
+                      uid: _uid,
+                      onNameChanged: _handleNameChanged,
+                    ),
                     Messaging(
                       user_uid: _uid,
                       openWithUserUid: _openMessagesWithUserUid,
