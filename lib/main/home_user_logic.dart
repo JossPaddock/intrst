@@ -5,7 +5,7 @@ extension _HomeUserLogic on _MyHomePageState {
     // You may set the permission requests to "provisional" which allows the user to choose what type
     // of notifications they would like to receive once the user receives a notification.
     final notificationSettings =
-    await FirebaseMessaging.instance.requestPermission(provisional: true);
+        await FirebaseMessaging.instance.requestPermission(provisional: true);
 
     // For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
     final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
@@ -25,6 +25,14 @@ extension _HomeUserLogic on _MyHomePageState {
   }
 
   Future<void> loadUserContext() async {
+    if (_uid.trim().isNotEmpty) {
+      try {
+        await fu.ensureProfileStatisticsDefaults(
+            FirebaseFirestore.instance.collection('users'), _uid);
+      } catch (e) {
+        print('Failed to initialize profile statistics defaults: $e');
+      }
+    }
     _loadNotificationCount();
     _notificationLoading = Timer.periodic(Duration(seconds: 10), (timer) {
       print(
@@ -42,11 +50,16 @@ extension _HomeUserLogic on _MyHomePageState {
       if (user == null) {
         print('User is currently signed out!');
         _notificationLoading?.cancel();
+        _hasPerformedInitialSignedInMapSetup = false;
+        _pendingMapFocusUserUid = null;
+        _lastTrackedUsageDayKey = '';
       } else {
         CollectionReference users =
-        FirebaseFirestore.instance.collection('users');
+            FirebaseFirestore.instance.collection('users');
         print('User is signed in!');
         _signedIn = true;
+        _hasPerformedInitialSignedInMapSetup = false;
+        _lastTrackedUsageDayKey = '';
         _selectedIndex = 0;
         String localUid = FirebaseAuth.instance.currentUser!.uid;
         setState(() {});
@@ -84,8 +97,14 @@ extension _HomeUserLogic on _MyHomePageState {
   void _handleSignInChanged(bool newValue) {
     setState(() {
       _signedIn = newValue;
+      if (!newValue) {
+        _hasPerformedInitialSignedInMapSetup = false;
+        _pendingMapFocusUserUid = null;
+        _lastTrackedUsageDayKey = '';
+      }
     });
     if (newValue) {
+      _hasPerformedInitialSignedInMapSetup = false;
       loadUserContext();
     }
   }
@@ -122,10 +141,70 @@ extension _HomeUserLogic on _MyHomePageState {
     UserModel().changeAlternateName(name);
   }
 
+  Future<void> _openInterestsForUserFromFeed(
+      String targetUid, String targetName, String targetInterestId) async {
+    _handleAlternateUserModel(targetUid, targetName);
+    final sanitizedInterestId = targetInterestId.trim();
+    if (sanitizedInterestId.isNotEmpty) {
+      UserModel().setFeedInterestHighlight(
+        ownerUid: targetUid,
+        interestId: sanitizedInterestId,
+      );
+    } else {
+      UserModel().clearFeedInterestHighlight();
+    }
+    _onItemTapped(0);
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  void _openMessagesForUserFromFeed(String targetUid, String targetName) {
+    _handleAlternateUserModel(targetUid, targetName);
+    setState(() {
+      _openMessagesWithUserUid = targetUid;
+      _selectedIndex = 3;
+    });
+    _trackSignedInUsageAction();
+  }
+
+  Future<void> _openUserOnMapFromFeed(
+      String targetUid, String targetName) async {
+    _handleAlternateUserModel(targetUid, targetName);
+    setState(() {
+      _pendingMapFocusUserUid = targetUid;
+    });
+    _onItemTapped(0);
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      if (index != 3) {
+        _openMessagesWithUserUid = null;
+      }
+      if (index != 0) {
+        _pendingMapFocusUserUid = null;
+      }
     });
+    _trackSignedInUsageAction();
+  }
+
+  Future<void> _trackSignedInUsageAction() async {
+    if (!_signedIn || _uid.trim().isEmpty) return;
+    final now = DateTime.now().toLocal();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    final dayKey = '${now.year}-$month-$day';
+    if (_lastTrackedUsageDayKey == dayKey) return;
+
+    _lastTrackedUsageDayKey = dayKey;
+    try {
+      await fu.recordAppUsageAction(
+          FirebaseFirestore.instance.collection('users'), _uid);
+    } catch (_) {
+      _lastTrackedUsageDayKey = '';
+    }
   }
 
   void _showLoadingIndicator() {
@@ -137,5 +216,17 @@ extension _HomeUserLogic on _MyHomePageState {
         _isLoading = false;
       });
     });
+  }
+
+  void _showTemporaryBottomMessage(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 }

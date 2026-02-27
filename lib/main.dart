@@ -18,6 +18,7 @@ import 'package:intrst/widgets/Account.dart';
 import 'package:intrst/widgets/Interests/Interests.dart';
 //import 'package:intrst/widgets/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
+import 'package:intrst/widgets/FollowingFeed.dart';
 import 'package:intrst/widgets/Preview.dart' as custom_preview;
 import 'package:provider/provider.dart';
 import 'login/LoginScreen.dart';

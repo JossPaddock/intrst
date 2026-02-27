@@ -288,7 +288,7 @@ class CardListState extends State<CardList>
         title: const Text('Invalid link'),
         content: const Text(
           'The link you entered does not appear to be reachable. '
-              'Please try fix it before saving.',
+          'Please try fix it before saving.',
         ),
         actions: [
           TextButton(
@@ -298,6 +298,100 @@ class CardListState extends State<CardList>
         ],
       ),
     );
+  }
+
+  Future<void> _showPostInterestToFeedDialog(Interest interest) async {
+    if (widget.uid.trim().isEmpty) return;
+
+    final TextEditingController postMessageController = TextEditingController();
+    bool isPosting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Post "${interest.name}" to your feed'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: postMessageController,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'Say something about this interest...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isPosting
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isPosting
+                      ? null
+                      : () async {
+                          final message = postMessageController.text.trim();
+                          if (message.isEmpty) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Please add a message before posting.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() {
+                            isPosting = true;
+                          });
+
+                          try {
+                            await fu.createInterestPostedActivity(
+                              actorUid: widget.uid,
+                              interest: interest,
+                              message: message,
+                            );
+                            if (!mounted || !dialogContext.mounted) return;
+                            Navigator.of(dialogContext).pop();
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(content: Text('Posted to feed.')),
+                            );
+                          } catch (e) {
+                            setDialogState(() {
+                              isPosting = false;
+                            });
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(content: Text('Could not post: $e')),
+                            );
+                          }
+                        },
+                  child: isPosting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Post to my Feed'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    postMessageController.dispose();
   }
 
   String normalizeUrl(String input) {
@@ -336,8 +430,9 @@ class CardListState extends State<CardList>
         titleController: titleController,
         quillController: quillController,
       );
-      if(!kIsWeb) {
-        final isValid = await isUrlResolvable(normalizeUrl(linkController.text));
+      if (!kIsWeb) {
+        final isValid =
+            await isUrlResolvable(normalizeUrl(linkController.text));
         if (!isValid) {
           await _showInvalidLinkDialog();
           return;
@@ -435,6 +530,10 @@ class CardListState extends State<CardList>
                     final String id = interest.id;
                     final String toggleKey = id;
                     bool toggle = userModel.getToggle(toggleKey);
+                    final shouldHighlightFromFeed =
+                        userModel.feedHighlightedInterestOwnerUid ==
+                                userModel.alternateUid &&
+                            userModel.feedHighlightedInterestId == id;
 
                     final titleController =
                         _titleControllers[id] ?? TextEditingController();
@@ -448,6 +547,18 @@ class CardListState extends State<CardList>
                           vertical: 8.0, horizontal: 8.0),
                       child: Card(
                         key: ValueKey(id),
+                        color: shouldHighlightFromFeed
+                            ? const Color(0xFFFFF3CD)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: shouldHighlightFromFeed
+                                ? const Color(0xFFF0AD4E)
+                                : Colors.transparent,
+                            width: shouldHighlightFromFeed ? 2 : 0,
+                          ),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -607,6 +718,14 @@ class CardListState extends State<CardList>
                                             _syncControllersWithInterests();
                                           });
                                         }),
+                                  if (widget.showInputForm && !toggle)
+                                    IconButton(
+                                      tooltip: 'Post to my feed',
+                                      icon: const Icon(Icons.share),
+                                      onPressed: () {
+                                        _showPostInterestToFeedDialog(interest);
+                                      },
+                                    ),
                                   if (widget.showInputForm)
                                     IconButton(
                                       icon: Icon(
