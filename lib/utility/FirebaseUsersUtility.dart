@@ -265,6 +265,7 @@ class FirebaseUsersUtility {
       'interests': [],
       'location': geoPoint,
       'following_uids': [],
+      'friends_uids': [],
       'unread_notifications': [],
       'unread_notifications_count': <String, int>{},
       feedSettingsField: _defaultFeedSettings(),
@@ -281,6 +282,87 @@ class FirebaseUsersUtility {
         .add(userData)
         .then((value) => print("User added to Firestore"))
         .catchError((error) => print("Failed to add user: $error"));
+  }
+
+  Future<void> sendFriendRequest(CollectionReference users, String senderUid, String receiverUid) async {
+    // Find the actual document references based on the 'user_uid' field
+    QuerySnapshot senderSnap = await users.where('user_uid', isEqualTo: senderUid).limit(1).get();
+    QuerySnapshot receiverSnap = await users.where('user_uid', isEqualTo: receiverUid).limit(1).get();
+
+    if (senderSnap.docs.isEmpty || receiverSnap.docs.isEmpty) return;
+
+    DocumentReference senderDocRef = senderSnap.docs.first.reference;
+    DocumentReference receiverDocRef = receiverSnap.docs.first.reference;
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    batch.set(senderDocRef.collection('friendships').doc(receiverUid), {
+      'status': 'requested',
+      'type': 'outgoing',
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(receiverDocRef.collection('friendships').doc(senderUid), {
+      'status': 'requested',
+      'type': 'incoming',
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+  }
+
+  Future<void> resetFriendship(CollectionReference users, String userUid, String targetUid) async {
+    QuerySnapshot userSnap = await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    QuerySnapshot targetSnap = await users.where('user_uid', isEqualTo: targetUid).limit(1).get();
+
+    if (userSnap.docs.isEmpty || targetSnap.docs.isEmpty) return;
+
+    DocumentReference userDocRef = userSnap.docs.first.reference;
+    DocumentReference targetDocRef = targetSnap.docs.first.reference;
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    // Deleting the state sub-collection documents
+    batch.delete(userDocRef.collection('friendships').doc(targetUid));
+    batch.delete(targetDocRef.collection('friendships').doc(userUid));
+
+    // Removing from the main array
+    batch.update(userDocRef, {'friends_uids': FieldValue.arrayRemove([targetUid])});
+    batch.update(targetDocRef, {'friends_uids': FieldValue.arrayRemove([userUid])});
+
+    await batch.commit();
+  }
+
+  Future<List<String>> retrieveIncomingRequests(String userUid) async {
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userUid)
+        .collection('friendships')
+        .where('status', isEqualTo: 'requested')
+        .where('type', isEqualTo: 'incoming')
+        .get();
+
+    return snapshot.docs.map((doc) => doc.id).toList();
+  }
+
+  Future<void> approveFriendRequest(CollectionReference users, String approverUid, String requesterUid) async {
+    QuerySnapshot approverSnap = await users.where('user_uid', isEqualTo: approverUid).limit(1).get();
+    QuerySnapshot requesterSnap = await users.where('user_uid', isEqualTo: requesterUid).limit(1).get();
+
+    if (approverSnap.docs.isEmpty || requesterSnap.docs.isEmpty) return;
+
+    DocumentReference approverDocRef = approverSnap.docs.first.reference;
+    DocumentReference requesterDocRef = requesterSnap.docs.first.reference;
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    batch.update(approverDocRef.collection('friendships').doc(requesterUid), {'status': 'approved'});
+    batch.update(requesterDocRef.collection('friendships').doc(approverUid), {'status': 'approved'});
+
+    batch.update(approverDocRef, {'friends_uids': FieldValue.arrayUnion([requesterUid])});
+    batch.update(requesterDocRef, {'friends_uids': FieldValue.arrayUnion([approverUid])});
+
+    await batch.commit();
   }
 
   String _usageDayKeyFromDateTime(DateTime value) {
@@ -1456,30 +1538,36 @@ class FirebaseUsersUtility {
       await documentRef.update({'interests': interests});
     }
   }
-
   Future<List<Interest>> pullInterestsForUser(
       CollectionReference users, String uid) async {
     List<Interest> interests = [];
-    QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
 
-    List<Future<void>> futures = [];
+    // 1. Get the user document directly using the 'user_uid' query
+    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).limit(1).get();
 
-    for (QueryDocumentSnapshot doc in querySnapshot.docs) {
-      futures.add(FirebaseFirestore.instance
-          .collection('users')
-          .doc(doc.id)
-          .get()
-          .then((documentSnapshot) {
-        Map<String, dynamic>? data =
-            documentSnapshot.data() as Map<String, dynamic>?;
-        if (data != null) {
-          interests.addAll(fm.mapInterests(data['interests']));
+    if (querySnapshot.docs.isNotEmpty) {
+      var userDoc = querySnapshot.docs.first;
+      Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
+
+      if (data != null && data['interests'] != null) {
+        // 2. Handle the 'interests' field.
+        // This assumes 'interests' is stored as a List or Map in the User document.
+        var rawInterests = data['interests'];
+
+        if (rawInterests is List) {
+          // If it's a List of Maps
+          for (var item in rawInterests) {
+            interests.add(Interest.fromMap(item as Map<String, dynamic>));
+          }
+        } else if (rawInterests is Map) {
+          // If it's a Map of Maps (where keys are IDs)
+          rawInterests.forEach((key, value) {
+            interests.add(Interest.fromMap(value as Map<String, dynamic>));
+          });
         }
-      }));
+      }
     }
-    // FORCE waiting for the forEach completion
-    await Future.wait(futures);
+
     return interests;
   }
 

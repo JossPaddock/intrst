@@ -65,6 +65,9 @@ class CardListState extends State<CardList>
   final Map<String, TextEditingController> _titleControllers = {};
   final Map<String, TextEditingController> _linkControllers = {};
   final Map<String, QuillController> _quillControllers = {};
+  bool _isFriend = false;
+  bool _isFollowing = false;
+  bool _relationshipsLoaded = false;
 
   TextEditingController _mobileTitleController = TextEditingController();
   TextEditingController _mobileLinkController = TextEditingController();
@@ -146,11 +149,68 @@ class CardListState extends State<CardList>
     return fetchSortedInterestsForUser(user_uid);
   }
 
+  Future<void> _checkRelationships() async {
+    if (widget.showInputForm) {
+      if (mounted) setState(() => _relationshipsLoaded = true);
+      return;
+    }
+
+    try {
+      UserModel userModel = Provider.of<UserModel>(context, listen: false);
+      final String viewerUid = widget.uid;
+      final String ownerUid = userModel.alternateUid;
+
+      // Check friendship via subcollection
+      final ownerSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('user_uid', isEqualTo: ownerUid)
+          .limit(1)
+          .get();
+
+      bool isFriend = false;
+      if (ownerSnap.docs.isNotEmpty) {
+        final friendshipDoc = await ownerSnap.docs.first.reference
+            .collection('friendships')
+            .doc(viewerUid)
+            .get();
+
+        isFriend = friendshipDoc.exists &&
+            (friendshipDoc.data()?['status'] == 'approved');
+      }
+
+      // Check if viewer is following owner by reading the VIEWER's following_uids
+      final viewerSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('user_uid', isEqualTo: viewerUid)
+          .limit(1)
+          .get();
+
+      bool isFollowing = false;
+      if (viewerSnap.docs.isNotEmpty) {
+        final viewerData = viewerSnap.docs.first.data();
+        final List<dynamic> viewerFollowing = viewerData['following_uids'] ?? [];
+        isFollowing = viewerFollowing.contains(ownerUid);
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFriend = isFriend;
+          _isFollowing = isFollowing;
+          _relationshipsLoaded = true;
+        });
+      }
+    } catch (e) {
+      print("Error checking relationships: $e");
+      if (mounted) setState(() => _relationshipsLoaded = true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _mobileQuillController = QuillController.basic();
     _syncControllersWithInterests();
+    _checkRelationships();
   }
 
   @override
@@ -462,20 +522,40 @@ class CardListState extends State<CardList>
   Widget build(BuildContext context) {
     super.build(context);
     UserModel userModel = Provider.of<UserModel>(context);
+    // Wait for relationship check if we aren't the owner
+    if (!widget.showInputForm && !_relationshipsLoaded) {
+      return const Center(child: CircularProgressIndicator());
+    }
     double deviceScreenHeight = MediaQuery.of(context).size.height;
     double maxHeight = deviceScreenHeight * 0.88;
+
+// --- PRIVACY FILTERING LOGIC ---
+    List<Interest> filteredInterests = localInterests;
+
+    // If NOT the owner, filter the list
+    if (!widget.showInputForm) {
+      // Relationships (Assume these lists are in your userModel/currentUser state)
+      // widget.uid is the PROFILE OWNER, widget.alternateUid is the VIEWER (signed-in user)
+
+      filteredInterests = localInterests.where((interest) {
+        if (interest.privacy == 4) return true; // Public
+        if (interest.privacy == 3 && _isFriend) return true; // Friends Only
+        if (interest.privacy == 2 && (_isFriend || _isFollowing))
+          return true; // Friends & Followers
+        return false; // Private (0) or mismatch
+      }).toList();
+    }
+
+    // Use filteredInterests for the rest of the logic
     final editingEntry = userModel.editToggles.entries.firstWhere(
       (e) => e.value == true,
       orElse: () => MapEntry('', false),
     );
-
     final editingId = editingEntry.key;
 
-// show only the card being edited, or full list if none are being edited
     final visibleInterests = editingId.isEmpty
-        ? localInterests
-        : localInterests.where((i) => (i.id) == editingId).toList();
-    //_syncControllersWithInterests();
+        ? filteredInterests
+        : filteredInterests.where((i) => (i.id) == editingId).toList();
 
     return Container(
       alignment: Alignment.topCenter,
@@ -677,6 +757,44 @@ class CardListState extends State<CardList>
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   if (widget.showInputForm)
+                                    DropdownButton<int>(
+                                      value: [0, 2, 3, 4]
+                                              .contains(interest.privacy)
+                                          ? interest.privacy
+                                          : 4,
+                                      items: const [
+                                        DropdownMenuItem(
+                                            value: 0, child: Text("Private")),
+                                        DropdownMenuItem(
+                                            value: 2,
+                                            child:
+                                                Text("Friends and followers")),
+                                        DropdownMenuItem(
+                                            value: 3,
+                                            child: Text("Friends only")),
+                                        DropdownMenuItem(
+                                            value: 4, child: Text("Public")),
+                                      ],
+                                      onChanged: (int? newValue) async {
+                                        if (newValue == null) return;
+
+                                        Interest newInterest = interest
+                                            .copyWith(privacy: newValue);
+
+                                        setState(() {
+                                          localInterests[index] = newInterest;
+                                        });
+
+                                        await fu.updateEditedInterest(
+                                          FirebaseFirestore.instance
+                                              .collection('users'),
+                                          interest,
+                                          newInterest,
+                                          widget.uid,
+                                        );
+                                      },
+                                    ),
+                                  if (widget.showInputForm)
                                     IconButton(
                                         icon: Icon(Icons.star,
                                             color: interest.favorite
@@ -782,6 +900,7 @@ class CardListState extends State<CardList>
                                                           .created_timestamp,
                                                       updated_timestamp: interest
                                                           .updated_timestamp,
+                                                      privacy: interest.privacy,
                                                     );
 
                                                     fu.removeInterest(

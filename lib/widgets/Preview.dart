@@ -34,27 +34,28 @@ class _InterestAlertDialogState extends State<Preview> {
   String _name = '';
   FirebaseUsersUtility fuu = FirebaseUsersUtility();
   CollectionReference users = FirebaseFirestore.instance.collection('users');
+
   bool _isFollowing = false;
   bool _followStateLoading = false;
   bool _followActionLoading = false;
+
+  String _friendshipStatus = '';
+  String _friendshipType = '';
+  bool _friendStateLoading = false;
+  bool _friendActionLoading = false;
 
   @override
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
     _loadFollowState();
-  }
-
-  void _handleAlternateUserModel(String value, String name) {
-    UserModel userModel = Provider.of<UserModel>(context, listen: false);
-    userModel.changeAlternateUid(value);
-    userModel.changeAlternateName(name);
+    _loadFriendshipState();
   }
 
   Future<void> _fetchNameAndButtonLabels() async {
-    List<Interest> interests =
-        await fuu.pullInterestsForUser(users, widget.alternateUid);
+    List<Interest> interests = await fuu.pullInterestsForUser(users, widget.alternateUid);
     String name = await fuu.lookUpNameByUserUid(users, widget.alternateUid);
+    if (!mounted) return;
     setState(() {
       _previewInterests = interests;
       _name = name;
@@ -62,24 +63,44 @@ class _InterestAlertDialogState extends State<Preview> {
   }
 
   Future<void> _loadFollowState() async {
-    if (!widget.signedIn ||
-        widget.uid.isEmpty ||
-        widget.alternateUid.isEmpty ||
-        widget.uid == widget.alternateUid) {
-      return;
-    }
-
-    setState(() {
-      _followStateLoading = true;
-    });
-
-    final isFollowing =
-        await fuu.isFollowingUser(users, widget.uid, widget.alternateUid);
+    if (!widget.signedIn || widget.uid.isEmpty || widget.alternateUid.isEmpty || widget.uid == widget.alternateUid) return;
+    setState(() => _followStateLoading = true);
+    final isFollowing = await fuu.isFollowingUser(users, widget.uid, widget.alternateUid);
     if (!mounted) return;
-
     setState(() {
       _isFollowing = isFollowing;
       _followStateLoading = false;
+    });
+  }
+
+  Future<void> _loadFriendshipState() async {
+    if (!widget.signedIn || widget.uid.isEmpty || widget.alternateUid.isEmpty || widget.uid == widget.alternateUid) return;
+    setState(() => _friendStateLoading = true);
+
+    final query = await users.where('user_uid', isEqualTo: widget.uid).limit(1).get();
+
+    if (query.docs.isNotEmpty) {
+      final doc = await query.docs.first.reference
+          .collection('friendships')
+          .doc(widget.alternateUid)
+          .get();
+
+      if (!mounted) return;
+      if (doc.exists) {
+        setState(() {
+          _friendshipStatus = doc.data()?['status'] ?? '';
+          _friendshipType = doc.data()?['type'] ?? '';
+          _friendStateLoading = false;
+        });
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _friendshipStatus = '';
+      _friendshipType = '';
+      _friendStateLoading = false;
     });
   }
 
@@ -89,34 +110,52 @@ class _InterestAlertDialogState extends State<Preview> {
       widget.onItemTapped(1);
       return;
     }
-
-    if (widget.uid == widget.alternateUid) return;
-
-    setState(() {
-      _followActionLoading = true;
-    });
-
-    final nowFollowing =
-        await fuu.toggleFollowUser(users, widget.uid, widget.alternateUid);
+    setState(() => _followActionLoading = true);
+    final nowFollowing = await fuu.toggleFollowUser(users, widget.uid, widget.alternateUid);
     if (!mounted) return;
-
     setState(() {
       _isFollowing = nowFollowing;
       _followActionLoading = false;
     });
   }
 
-  void _handlePreviewToInterestsWidgetFlow(
-      {String highlightedInterestId = ''}) {
+  Future<void> _handleFriendAction() async {
+    if (!widget.signedIn) {
+      Navigator.pop(context);
+      widget.onItemTapped(1);
+      return;
+    }
+
+    setState(() => _friendActionLoading = true);
+
+    try {
+      if (_friendshipStatus == '') {
+        await fuu.sendFriendRequest(users, widget.uid, widget.alternateUid);
+      } else if (_friendshipStatus == 'requested' && _friendshipType == 'outgoing') {
+        await fuu.resetFriendship(users, widget.uid, widget.alternateUid);
+      } else if (_friendshipStatus == 'requested' && _friendshipType == 'incoming') {
+        await fuu.approveFriendRequest(users, widget.uid, widget.alternateUid);
+      } else if (_friendshipStatus == 'approved') {
+        await fuu.resetFriendship(users, widget.uid, widget.alternateUid);
+      }
+
+      await _loadFriendshipState();
+    } catch (e) {
+      print("Friend action failed: $e");
+    } finally {
+      if (mounted) setState(() => _friendActionLoading = false);
+    }
+  }
+
+  void _handlePreviewToInterestsWidgetFlow({String highlightedInterestId = ''}) {
     if (widget.signedIn) {
-      _handleAlternateUserModel(widget.alternateUid, _name);
-      final userModel = Provider.of<UserModel>(context, listen: false);
+      UserModel userModel = Provider.of<UserModel>(context, listen: false);
+      userModel.changeAlternateUid(widget.alternateUid);
+      userModel.changeAlternateName(_name);
+
       final sanitizedInterestId = highlightedInterestId.trim();
       if (sanitizedInterestId.isNotEmpty) {
-        userModel.setFeedInterestHighlight(
-          ownerUid: widget.alternateUid,
-          interestId: sanitizedInterestId,
-        );
+        userModel.setFeedInterestHighlight(ownerUid: widget.alternateUid, interestId: sanitizedInterestId);
       } else {
         userModel.clearFeedInterestHighlight();
       }
@@ -138,54 +177,61 @@ class _InterestAlertDialogState extends State<Preview> {
     Navigator.pop(context);
   }
 
+  Future<void> _launchUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    String finalUrl = url.startsWith('http') ? url : 'http://$url';
+    if (await canLaunch(finalUrl)) await launch(finalUrl);
+  }
+
   String formatTextByWords(String text, int wordsPerLine) {
     final words = text.split(' ');
     final buffer = StringBuffer();
-
     for (int i = 0; i < words.length; i++) {
       buffer.write(words[i]);
       if (i < words.length - 1) {
-        if ((i + 1) % wordsPerLine == 0) {
-          buffer.write('\n'); // Newline after every N words
-        } else {
-          buffer.write(' ');
-        }
+        if ((i + 1) % wordsPerLine == 0) buffer.write('\n');
+        else buffer.write(' ');
       }
     }
-
     return buffer.toString();
   }
 
-  Future<void> _launchUrl(String? url) async {
-    if (url == null || url.isEmpty) return;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'http://' + url;
-    }
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
-    }
+  List<Interest> get _filteredInterests {
+    // If viewing own profile, show everything
+    if (widget.uid == widget.alternateUid) return _previewInterests;
+
+    return _previewInterests.where((interest) {
+      if (interest.privacy == 4) return true; // Public
+      if (interest.privacy == 3 && _friendshipStatus == 'approved') return true; // Friends only
+      if (interest.privacy == 2 && (_friendshipStatus == 'approved' || _isFollowing)) return true; // Friends & followers
+      return false; // Private or unmatched
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    String friendLabel = "Add friend";
+    IconData friendIcon = Icons.person_add;
+
+    if (_friendshipStatus == 'requested') {
+      if (_friendshipType == 'outgoing') {
+        friendLabel = "Cancel request";
+        friendIcon = Icons.hourglass_empty;
+      } else {
+        friendLabel = "Accept friend";
+        friendIcon = Icons.check_circle_outline;
+      }
+    } else if (_friendshipStatus == 'approved') {
+      friendLabel = "Unfriend";
+      friendIcon = Icons.person_remove;
+    }
+
     return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10.0),
-        side: BorderSide(
-          color: Colors.grey, // Border color
-          width: 1.0, // Border width
-        ),
+        side: const BorderSide(color: Colors.grey, width: 1.0),
       ),
-      title: Text(
-        _name,
-        textAlign: TextAlign.center, // Center the title text
-        style: TextStyle(
-          fontSize: 20, // Adjust font size as needed
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      title: Text(_name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -193,40 +239,24 @@ class _InterestAlertDialogState extends State<Preview> {
             alignment: WrapAlignment.center,
             spacing: 16.0,
             runSpacing: 8.0,
-            children: _previewInterests
-                .map((interest) {
-                  final interestLink = (interest.link ?? '').trim();
-                  return ElevatedButton(
-                    onPressed: () {
-                      //_handlePreviewToInterestsWidgetFlow();
-                    },
-                    child: GestureDetector(
-                      onTap: () {
-                        if (interestLink.isEmpty) {
-                          _handlePreviewToInterestsWidgetFlow(
-                              highlightedInterestId: interest.id);
-                        }
-                        _launchUrl(interest.link);
-                      },
-                      child: Text(
-                        formatTextByWords(interest.name, 3),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: interestLink.isEmpty
-                                ? Colors.black
-                                : Colors.blue,
-                            decoration: interestLink.isEmpty
-                                ? TextDecoration.none
-                                : TextDecoration.underline),
-                      ),
-                    ),
-                  );
-                })
-                .toList()
-                .take(5)
-                .toList(),
+            children: _filteredInterests.take(5).map((interest) {
+              final interestLink = (interest.link ?? '').trim();
+              return ElevatedButton(
+                onPressed: () => interestLink.isEmpty
+                    ? _handlePreviewToInterestsWidgetFlow(highlightedInterestId: interest.id)
+                    : _launchUrl(interest.link),
+                child: Text(
+                  formatTextByWords(interest.name, 3),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: interestLink.isEmpty ? Colors.black : Colors.blue,
+                    decoration: interestLink.isEmpty ? TextDecoration.none : TextDecoration.underline,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-          SizedBox(height: 16.0),
+          const SizedBox(height: 16.0),
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 8.0,
@@ -238,30 +268,25 @@ class _InterestAlertDialogState extends State<Preview> {
                 label: const Text('Chat', style: TextStyle(fontSize: 12)),
               ),
               ElevatedButton.icon(
-                onPressed: () {
-                  _handlePreviewToInterestsWidgetFlow();
-                },
-                icon: Icon(Icons.add),
-                label: Text('All interests', style: TextStyle(fontSize: 12)),
+                onPressed: _handlePreviewToInterestsWidgetFlow,
+                icon: const Icon(Icons.add),
+                label: const Text('All interests', style: TextStyle(fontSize: 12)),
               ),
               if (widget.signedIn && widget.uid != widget.alternateUid)
                 ElevatedButton.icon(
-                  onPressed: (_followStateLoading || _followActionLoading)
-                      ? null
-                      : _toggleFollowState,
+                  onPressed: (_followStateLoading || _followActionLoading) ? null : _toggleFollowState,
                   icon: _followActionLoading
-                      ? SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(_isFollowing
-                          ? Icons.person_remove
-                          : Icons.person_add),
-                  label: Text(
-                    _isFollowing ? 'Unfollow' : 'Follow',
-                    style: TextStyle(fontSize: 12),
-                  ),
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(_isFollowing ? Icons.person_remove : Icons.person_add),
+                  label: Text(_isFollowing ? 'Unfollow' : 'Follow', style: const TextStyle(fontSize: 12)),
+                ),
+              if (widget.signedIn && widget.uid != widget.alternateUid)
+                ElevatedButton.icon(
+                  onPressed: (_friendActionLoading || _friendStateLoading) ? null : _handleFriendAction,
+                  icon: (_friendActionLoading || _friendStateLoading)
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(friendIcon),
+                  label: Text(friendLabel, style: const TextStyle(fontSize: 12)),
                 ),
             ],
           ),

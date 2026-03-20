@@ -15,6 +15,7 @@ import 'package:intrst/models/UserModel.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:intrst/utility/BackendIntegration.dart';
 import 'package:intrst/widgets/Account.dart';
+import 'package:intrst/widgets/IncomingFriendRequests.dart';
 import 'package:intrst/widgets/Interests/Interests.dart';
 //import 'package:intrst/widgets/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
