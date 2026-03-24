@@ -66,7 +66,7 @@ class FirebaseUsersUtility {
   Future<GeoPoint> retrieveUserLocation(
       CollectionReference users, String userUid) async {
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).get();
+    await users.where('user_uid', isEqualTo: userUid).get();
     return querySnapshot.docs.first['location'];
   }
 
@@ -92,8 +92,8 @@ class FirebaseUsersUtility {
     final List<dynamic> originalArray = data[arrayField];
     final List<String> updatedArray = originalArray
         .where((item) =>
-            item is String &&
-            !item.toLowerCase().contains(substring.toLowerCase()))
+    item is String &&
+        !item.toLowerCase().contains(substring.toLowerCase()))
         .cast<String>()
         .toList();
 
@@ -105,20 +105,17 @@ class FirebaseUsersUtility {
     final usersCollection = FirebaseFirestore.instance.collection('users');
     print('attempting to add FCM token for user: $userUid');
     try {
-      // Find the user document by user_uid
       final querySnapshot =
-          await usersCollection.where('user_uid', isEqualTo: userUid).get();
+      await usersCollection.where('user_uid', isEqualTo: userUid).get();
 
       if (querySnapshot.docs.isEmpty) {
         print('No user found with uid: $userUid');
         return;
       }
 
-      // For each matching user (probably only one with that user uid)
       for (final doc in querySnapshot.docs) {
         final docRef = usersCollection.doc(doc.id);
 
-        // Use arrayUnion to add the token (avoids duplicates automatically)
         await docRef.update({
           'fcm_tokens': FieldValue.arrayUnion([fcmToken])
         });
@@ -133,7 +130,7 @@ class FirebaseUsersUtility {
   Future<void> removeUnreadNotifications(String docRef, String uid) async {
     final usersCollection = FirebaseFirestore.instance.collection('users');
     final querySnapshot =
-        await usersCollection.where('user_uid', isEqualTo: uid).get();
+    await usersCollection.where('user_uid', isEqualTo: uid).get();
     for (final doc in querySnapshot.docs) {
       final docPath = doc.reference.path;
       await removeItemsContainingSubstring(
@@ -149,19 +146,14 @@ class FirebaseUsersUtility {
       String docRefPath, String messageUuid) async {
     final collection = FirebaseFirestore.instance.collection(collectionPath);
     QuerySnapshot querySnapshot =
-        await collection.where('user_uid', isEqualTo: userUid).get();
+    await collection.where('user_uid', isEqualTo: userUid).get();
     querySnapshot.docs.first.reference.update({
       'unread_notifications':
-          FieldValue.arrayUnion(['$docRefPath:$messageUuid'])
+      FieldValue.arrayUnion(['$docRefPath:$messageUuid'])
     });
     print('added to unread_notifications: $docRefPath:$messageUuid');
   }
 
-//Warning this method updates notification counts for everyone and shouldn't be called too often
-//right now it is called when anyone hits the send button ensuring it works when it needs to.
-// But it is probably working more than it should.
-  //Ideally it only runs when updateNotifications is read!
-  //the method should be made more granular so it only updates notifications for one user.
   Future<void> updateUnreadNotificationCounts(String collectionPath) async {
     final collection = FirebaseFirestore.instance.collection(collectionPath);
 
@@ -188,11 +180,11 @@ class FirebaseUsersUtility {
       }
 
       final existingCounts =
-          ((data['unread_notifications_count'] as Map?) ?? {})
-              .map((key, value) => MapEntry(
-                    key.toString(),
-                    value is num ? value.toInt() : 0,
-                  ));
+      ((data['unread_notifications_count'] as Map?) ?? {})
+          .map((key, value) => MapEntry(
+        key.toString(),
+        value is num ? value.toInt() : 0,
+      ));
 
       if (!_stringIntMapsEqual(existingCounts, counts)) {
         await doc.reference.update({
@@ -214,10 +206,10 @@ class FirebaseUsersUtility {
       CollectionReference users, String userUid,
       [String? docRef]) async {
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).get();
+    await users.where('user_uid', isEqualTo: userUid).get();
     QueryDocumentSnapshot userQDS = querySnapshot.docs.first;
     final Map<String, dynamic>? notifications =
-        userQDS.get('unread_notifications_count')?.cast<String, dynamic>();
+    userQDS.get('unread_notifications_count')?.cast<String, dynamic>();
     if (notifications == null) return 0;
     if (docRef != null) {
       final value = notifications[docRef];
@@ -265,6 +257,7 @@ class FirebaseUsersUtility {
       'interests': [],
       'location': geoPoint,
       'following_uids': [],
+      'friends_uids': [],
       'unread_notifications': [],
       'unread_notifications_count': <String, int>{},
       feedSettingsField: _defaultFeedSettings(),
@@ -281,6 +274,84 @@ class FirebaseUsersUtility {
         .add(userData)
         .then((value) => print("User added to Firestore"))
         .catchError((error) => print("Failed to add user: $error"));
+  }
+
+  Future<void> sendFriendRequest(CollectionReference users, String senderUid, String receiverUid) async {
+    QuerySnapshot senderSnap = await users.where('user_uid', isEqualTo: senderUid).limit(1).get();
+    QuerySnapshot receiverSnap = await users.where('user_uid', isEqualTo: receiverUid).limit(1).get();
+
+    if (senderSnap.docs.isEmpty || receiverSnap.docs.isEmpty) return;
+
+    DocumentReference senderDocRef = senderSnap.docs.first.reference;
+    DocumentReference receiverDocRef = receiverSnap.docs.first.reference;
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    batch.set(senderDocRef.collection('friendships').doc(receiverUid), {
+      'status': 'requested',
+      'type': 'outgoing',
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(receiverDocRef.collection('friendships').doc(senderUid), {
+      'status': 'requested',
+      'type': 'incoming',
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+  }
+
+  Future<void> resetFriendship(CollectionReference users, String userUid, String targetUid) async {
+    QuerySnapshot userSnap = await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    QuerySnapshot targetSnap = await users.where('user_uid', isEqualTo: targetUid).limit(1).get();
+
+    if (userSnap.docs.isEmpty || targetSnap.docs.isEmpty) return;
+
+    DocumentReference userDocRef = userSnap.docs.first.reference;
+    DocumentReference targetDocRef = targetSnap.docs.first.reference;
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    batch.delete(userDocRef.collection('friendships').doc(targetUid));
+    batch.delete(targetDocRef.collection('friendships').doc(userUid));
+
+    batch.update(userDocRef, {'friends_uids': FieldValue.arrayRemove([targetUid])});
+    batch.update(targetDocRef, {'friends_uids': FieldValue.arrayRemove([userUid])});
+
+    await batch.commit();
+  }
+
+  Future<List<String>> retrieveIncomingRequests(String userUid) async {
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userUid)
+        .collection('friendships')
+        .where('status', isEqualTo: 'requested')
+        .where('type', isEqualTo: 'incoming')
+        .get();
+
+    return snapshot.docs.map((doc) => doc.id).toList();
+  }
+
+  Future<void> approveFriendRequest(CollectionReference users, String approverUid, String requesterUid) async {
+    QuerySnapshot approverSnap = await users.where('user_uid', isEqualTo: approverUid).limit(1).get();
+    QuerySnapshot requesterSnap = await users.where('user_uid', isEqualTo: requesterUid).limit(1).get();
+
+    if (approverSnap.docs.isEmpty || requesterSnap.docs.isEmpty) return;
+
+    DocumentReference approverDocRef = approverSnap.docs.first.reference;
+    DocumentReference requesterDocRef = requesterSnap.docs.first.reference;
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+
+    batch.update(approverDocRef.collection('friendships').doc(requesterUid), {'status': 'approved'});
+    batch.update(requesterDocRef.collection('friendships').doc(approverUid), {'status': 'approved'});
+
+    batch.update(approverDocRef, {'friends_uids': FieldValue.arrayUnion([requesterUid])});
+    batch.update(requesterDocRef, {'friends_uids': FieldValue.arrayUnion([approverUid])});
+
+    await batch.commit();
   }
 
   String _usageDayKeyFromDateTime(DateTime value) {
@@ -348,7 +419,7 @@ class FirebaseUsersUtility {
         .whereType<Map>()
         .map((entry) => Map<String, dynamic>.from(entry))
         .where((entry) =>
-            entry['day_key'] != null && entry['template_index'] is num)
+    entry['day_key'] != null && entry['template_index'] is num)
         .toList();
   }
 
@@ -382,7 +453,7 @@ class FirebaseUsersUtility {
   String _buildLongestStreakMilestoneMessage(
       int streakDays, int templateIndex) {
     final safeIndex = templateIndex >= 0 &&
-            templateIndex < _longestStreakMilestoneTemplates.length
+        templateIndex < _longestStreakMilestoneTemplates.length
         ? templateIndex
         : 0;
     return _longestStreakMilestoneTemplates[safeIndex]
@@ -393,7 +464,7 @@ class FirebaseUsersUtility {
       CollectionReference users, String userUid) async {
     if (userUid.trim().isEmpty) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     final data = querySnapshot.docs.first.data() as Map<String, dynamic>;
@@ -417,7 +488,7 @@ class FirebaseUsersUtility {
     }
     if (stats['streak_message_history'] is! List) {
       updates['profile_statistics.streak_message_history'] =
-          <Map<String, dynamic>>[];
+      <Map<String, dynamic>>[];
     }
     if (stats['profile_created_at'] is! Timestamp) {
       updates['profile_statistics.profile_created_at'] =
@@ -446,7 +517,7 @@ class FirebaseUsersUtility {
     if (userUid.trim().isEmpty) return;
     final dayKey = _usageDayKeyFromDateTime(DateTime.now());
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     String? streakMilestoneMessage;
@@ -461,10 +532,10 @@ class FirebaseUsersUtility {
           ? Map<String, dynamic>.from(statsRaw)
           : <String, dynamic>{};
       final usageDays = (stats['usage_days'] as List?)
-              ?.map((value) => value.toString())
-              .where((value) => value.isNotEmpty)
-              .toSet()
-              .toList() ??
+          ?.map((value) => value.toString())
+          .where((value) => value.isNotEmpty)
+          .toSet()
+          .toList() ??
           <String>[];
 
       if (usageDays.contains(dayKey)) {
@@ -488,7 +559,7 @@ class FirebaseUsersUtility {
 
       if (shouldCreateMilestoneFeedEvent) {
         final history =
-            _parseStreakMessageHistory(stats['streak_message_history']);
+        _parseStreakMessageHistory(stats['streak_message_history']);
         final templateIndex = _pickLongestStreakTemplateIndex(history, dayKey);
         history.add({
           'day_key': dayKey,
@@ -524,7 +595,7 @@ class FirebaseUsersUtility {
       [int incrementBy = 1]) async {
     if (userUid.trim().isEmpty || incrementBy <= 0) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
 
@@ -545,7 +616,7 @@ class FirebaseUsersUtility {
         final nextLongest = currentLongest + 1;
         final dayKey = _usageDayKeyFromDateTime(DateTime.now());
         final history =
-            _parseStreakMessageHistory(stats['streak_message_history']);
+        _parseStreakMessageHistory(stats['streak_message_history']);
         final templateIndex = _pickLongestStreakTemplateIndex(history, dayKey);
         history.add({
           'day_key': dayKey,
@@ -583,7 +654,7 @@ class FirebaseUsersUtility {
       [int decrementBy = 1]) async {
     if (userUid.trim().isEmpty || decrementBy <= 0) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     await FirebaseFirestore.instance.runTransaction<void>((transaction) async {
@@ -608,12 +679,12 @@ class FirebaseUsersUtility {
       [int incrementBy = 1]) async {
     if (userUid.trim().isEmpty || incrementBy <= 0) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     final crossedMilestones =
-        await FirebaseFirestore.instance.runTransaction<List<int>>(
-      (transaction) async {
+    await FirebaseFirestore.instance.runTransaction<List<int>>(
+          (transaction) async {
         final docSnapshot = await transaction.get(docRef);
         if (!docSnapshot.exists) return <int>[];
         final data = docSnapshot.data() as Map<String, dynamic>? ?? {};
@@ -655,7 +726,7 @@ class FirebaseUsersUtility {
       [int decrementBy = 1]) async {
     if (userUid.trim().isEmpty || decrementBy <= 0) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     await FirebaseFirestore.instance.runTransaction<void>((transaction) async {
@@ -679,12 +750,12 @@ class FirebaseUsersUtility {
       [int incrementBy = 1]) async {
     if (userUid.trim().isEmpty || incrementBy <= 0) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     final crossedMilestones =
-        await FirebaseFirestore.instance.runTransaction<List<int>>(
-      (transaction) async {
+    await FirebaseFirestore.instance.runTransaction<List<int>>(
+          (transaction) async {
         final docSnapshot = await transaction.get(docRef);
         if (!docSnapshot.exists) return <int>[];
         final data = docSnapshot.data() as Map<String, dynamic>? ?? {};
@@ -726,7 +797,7 @@ class FirebaseUsersUtility {
       [int decrementBy = 1]) async {
     if (userUid.trim().isEmpty || decrementBy <= 0) return;
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) return;
     final docRef = querySnapshot.docs.first.reference;
     await FirebaseFirestore.instance.runTransaction<void>((transaction) async {
@@ -758,7 +829,7 @@ class FirebaseUsersUtility {
     }
 
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: sanitizedUid).get();
+    await users.where('user_uid', isEqualTo: sanitizedUid).get();
     if (querySnapshot.docs.isEmpty) {
       return false;
     }
@@ -772,7 +843,7 @@ class FirebaseUsersUtility {
 
     final updatedFullName = '$sanitizedFirstName $sanitizedLastName';
     final activityCollection =
-        FirebaseFirestore.instance.collection('activity_feed');
+    FirebaseFirestore.instance.collection('activity_feed');
     final activitySnapshot = await activityCollection
         .where('actor_uid', isEqualTo: sanitizedUid)
         .get();
@@ -805,7 +876,7 @@ class FirebaseUsersUtility {
     }
 
     final querySnapshot =
-        await users.where('user_uid', isEqualTo: sanitizedUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: sanitizedUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) {
       return false;
     }
@@ -819,17 +890,17 @@ class FirebaseUsersUtility {
   Future<List<String>> retrieveFollowingUids(
       CollectionReference users, String userUid) async {
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) {
       return [];
     }
 
     final Map<String, dynamic> data =
-        querySnapshot.docs.first.data() as Map<String, dynamic>;
+    querySnapshot.docs.first.data() as Map<String, dynamic>;
     return (data['following_uids'] as List?)
-            ?.map((value) => value.toString())
-            .where((value) => value.isNotEmpty)
-            .toList() ??
+        ?.map((value) => value.toString())
+        .where((value) => value.isNotEmpty)
+        .toList() ??
         [];
   }
 
@@ -849,7 +920,7 @@ class FirebaseUsersUtility {
     }
 
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) {
       return;
     }
@@ -866,7 +937,7 @@ class FirebaseUsersUtility {
     }
 
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
     if (querySnapshot.docs.isEmpty) {
       return;
     }
@@ -1012,7 +1083,7 @@ class FirebaseUsersUtility {
     final oldText = _flattenInterestForDiff(oldInterest);
     final newText = _flattenInterestForDiff(newInterest);
     final changedCharacterCount =
-        _calculateChangedCharacterCount(oldText, newText);
+    _calculateChangedCharacterCount(oldText, newText);
 
     if (changedCharacterCount <= minChangedCharacters) {
       return;
@@ -1096,7 +1167,7 @@ class FirebaseUsersUtility {
 
   String _flattenInterestForDiff(Interest interest) {
     final plainDescription =
-        _extractPlainTextFromQuillJson(interest.description);
+    _extractPlainTextFromQuillJson(interest.description);
     return '${interest.name.trim()}\n$plainDescription\n${interest.link?.trim() ?? ''}';
   }
 
@@ -1128,14 +1199,14 @@ class FirebaseUsersUtility {
     if (target.isEmpty) return source.length;
 
     List<int> previous =
-        List<int>.generate(target.length + 1, (index) => index);
+    List<int>.generate(target.length + 1, (index) => index);
     List<int> current = List<int>.filled(target.length + 1, 0);
 
     for (int i = 1; i <= source.length; i++) {
       current[0] = i;
       for (int j = 1; j <= target.length; j++) {
         final substitutionCost =
-            source.codeUnitAt(i - 1) == target.codeUnitAt(j - 1) ? 0 : 1;
+        source.codeUnitAt(i - 1) == target.codeUnitAt(j - 1) ? 0 : 1;
         current[j] = math.min(
           math.min(
             current[j - 1] + 1,
@@ -1156,7 +1227,7 @@ class FirebaseUsersUtility {
   Future<String> lookUpNameByUserUid(
       CollectionReference users, String uid) async {
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).get();
     String firstname = '';
     String lastname = '';
     querySnapshot.docs.forEach((doc) {
@@ -1170,7 +1241,7 @@ class FirebaseUsersUtility {
   Future<List> lookUpNameAndLocationByUserUid(
       CollectionReference users, String uid) async {
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).get();
     String firstname = '';
     String lastname = '';
     GeoPoint latlng = GeoPoint(0, 0);
@@ -1191,13 +1262,13 @@ class FirebaseUsersUtility {
       print(isValidWebsite(interest.link!!));
     }
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).get();
     for (final doc in querySnapshot.docs) {
       DocumentReference documentRef =
-          FirebaseFirestore.instance.collection('users').doc(doc.id);
+      FirebaseFirestore.instance.collection('users').doc(doc.id);
       DocumentSnapshot documentSnapshot = await documentRef.get();
       Map<String, dynamic>? data =
-          documentSnapshot.data() as Map<String, dynamic>?;
+      documentSnapshot.data() as Map<String, dynamic>?;
       if (data != null) {
         List<dynamic> array = data['interests'] ?? [];
         Map<String, dynamic> interest_map = interest.mapper();
@@ -1212,23 +1283,22 @@ class FirebaseUsersUtility {
   }
 
   Future<void> updateEditedInterest(
-    CollectionReference users,
-    Interest oldInterest,
-    Interest newInterest,
-    String uid,
-  ) async {
+      CollectionReference users,
+      Interest oldInterest,
+      Interest newInterest,
+      String uid,
+      ) async {
     print('attempting to update interest: $newInterest');
 
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).get();
 
     for (var doc in querySnapshot.docs) {
       DocumentReference documentRef =
-          FirebaseFirestore.instance.collection('users').doc(doc.id);
+      FirebaseFirestore.instance.collection('users').doc(doc.id);
 
       List<dynamic> interests = (doc['interests'] ?? []) as List<dynamic>;
 
-      // Replace the matching interest by ID
       for (int i = 0; i < interests.length; i++) {
         if (interests[i]['id'] == oldInterest.id) {
           interests[i] = newInterest.mapper();
@@ -1238,7 +1308,6 @@ class FirebaseUsersUtility {
 
       await documentRef.update({'interests': interests});
 
-      // Enforce max 5 favorites
       if (!oldInterest.favorite && newInterest.favorite) {
         int favoriteCount =
             interests.where((interest) => interest['favorite'] == true).length;
@@ -1263,11 +1332,11 @@ class FirebaseUsersUtility {
       CollectionReference users, String uid, int maxFavorites) async {
     print('Checking favorite interests for user with UID: $uid');
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).get();
 
     for (var doc in querySnapshot.docs) {
       DocumentReference documentRef =
-          FirebaseFirestore.instance.collection('users').doc(doc.id);
+      FirebaseFirestore.instance.collection('users').doc(doc.id);
       DocumentSnapshot updatedDoc = await documentRef.get();
 
       List<dynamic> interests = updatedDoc['interests'];
@@ -1277,24 +1346,21 @@ class FirebaseUsersUtility {
           .cast<Map<String, dynamic>>()
           .toList();
 
-      // maxFavorites is the limit passed into this method
       if (favoriteInterests.length > maxFavorites) {
         print(
             'Too many favorites: ${favoriteInterests.length} (The max defined is: $maxFavorites)');
 
-        // Sort by `favorited_timestamp` in ASCENDING order
         favoriteInterests.sort((a, b) {
           DateTime aTimestamp =
-              (a['favorited_timestamp'] as Timestamp).toDate();
+          (a['favorited_timestamp'] as Timestamp).toDate();
           DateTime bTimestamp =
-              (b['favorited_timestamp'] as Timestamp).toDate();
+          (b['favorited_timestamp'] as Timestamp).toDate();
           return aTimestamp.compareTo(bTimestamp);
         });
 
-        // these are the favorites we need to now unfavorite
         int extraCount = favoriteInterests.length - maxFavorites;
         List<Map<String, dynamic>> interestsToUnfavorite =
-            favoriteInterests.take(extraCount).toList();
+        favoriteInterests.take(extraCount).toList();
         for (var interest in interestsToUnfavorite) {
           await documentRef.update({
             'interests': FieldValue.arrayRemove([interest]),
@@ -1330,21 +1396,64 @@ class FirebaseUsersUtility {
     return false;
   }
 
-  /*Future<void> removeInterest(CollectionReference users, Interest interest, String uid) async {
-    //fire base arrayRemove and arrayUnion method calls may be more performant!!!
-    //fire base object must match directly if doing a plain array remove, but not so much with built-ins
-    QuerySnapshot querySnapshot = await users.where('user_uid', isEqualTo: uid).get();
+  /// Merges [targetUids] into the `shared_with_uids` list of a specific
+  /// interest owned by [ownerUid]. Users in that list can always view the
+  /// interest regardless of its privacy setting. Sharing is additive — calling
+  /// this again with different people adds to the list without removing
+  /// existing shares.
+  Future<bool> shareInterestWithUsers({
+    required CollectionReference users,
+    required String ownerUid,
+    required String interestId,
+    required List<String> targetUids,
+  }) async {
+    final sanitizedOwner = ownerUid.trim();
+    final sanitizedTargets = targetUids
+        .map((u) => u.trim())
+        .where((u) => u.isNotEmpty && u != sanitizedOwner)
+        .toSet()
+        .toList();
 
-    for (var doc in querySnapshot.docs) {
-      DocumentReference documentRef = FirebaseFirestore.instance.collection('users').doc(doc.id);
-
-      Map<String, dynamic> interestMap = interest.mapper();
-
-      await documentRef.update({
-        'interests': FieldValue.arrayRemove([interestMap])
-      });
+    if (sanitizedOwner.isEmpty ||
+        sanitizedTargets.isEmpty ||
+        interestId.trim().isEmpty) {
+      return false;
     }
-  }*/
+
+    final querySnapshot = await users
+        .where('user_uid', isEqualTo: sanitizedOwner)
+        .limit(1)
+        .get();
+    if (querySnapshot.docs.isEmpty) return false;
+
+    final docRef = querySnapshot.docs.first.reference;
+    final docSnapshot = await docRef.get();
+    final data = docSnapshot.data() as Map<String, dynamic>?;
+    if (data == null) return false;
+
+    final List<dynamic> interests =
+    List<dynamic>.from(data['interests'] ?? []);
+    bool updated = false;
+
+    for (int i = 0; i < interests.length; i++) {
+      if (interests[i]['id'] == interestId) {
+        final existing = List<String>.from(
+          (interests[i]['shared_with_uids'] as List<dynamic>? ?? [])
+              .map((e) => e.toString()),
+        );
+        final merged = {...existing, ...sanitizedTargets}.toList();
+        interests[i] = Map<String, dynamic>.from(interests[i] as Map)
+          ..['shared_with_uids'] = merged;
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) return false;
+
+    await docRef.update({'interests': interests});
+    return true;
+  }
 
   Future<void> showReauthAndDeleteDialog(
       BuildContext context, String user_uid) async {
@@ -1405,7 +1514,7 @@ class FirebaseUsersUtility {
                   await user.delete();
 
                   final usersRef =
-                      FirebaseFirestore.instance.collection('users');
+                  FirebaseFirestore.instance.collection('users');
 
                   final querySnapshot = await usersRef
                       .where('user_uid', isEqualTo: user_uid)
@@ -1443,11 +1552,11 @@ class FirebaseUsersUtility {
   Future<void> removeInterest(
       CollectionReference users, Interest interest, String uid) async {
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).get();
 
     for (var doc in querySnapshot.docs) {
       DocumentReference documentRef =
-          FirebaseFirestore.instance.collection('users').doc(doc.id);
+      FirebaseFirestore.instance.collection('users').doc(doc.id);
 
       List<dynamic> interests = (doc['interests'] ?? []) as List<dynamic>;
 
@@ -1460,26 +1569,29 @@ class FirebaseUsersUtility {
   Future<List<Interest>> pullInterestsForUser(
       CollectionReference users, String uid) async {
     List<Interest> interests = [];
+
     QuerySnapshot querySnapshot =
-        await users.where('user_uid', isEqualTo: uid).get();
+    await users.where('user_uid', isEqualTo: uid).limit(1).get();
 
-    List<Future<void>> futures = [];
+    if (querySnapshot.docs.isNotEmpty) {
+      var userDoc = querySnapshot.docs.first;
+      Map<String, dynamic>? data = userDoc.data() as Map<String, dynamic>?;
 
-    for (QueryDocumentSnapshot doc in querySnapshot.docs) {
-      futures.add(FirebaseFirestore.instance
-          .collection('users')
-          .doc(doc.id)
-          .get()
-          .then((documentSnapshot) {
-        Map<String, dynamic>? data =
-            documentSnapshot.data() as Map<String, dynamic>?;
-        if (data != null) {
-          interests.addAll(fm.mapInterests(data['interests']));
+      if (data != null && data['interests'] != null) {
+        var rawInterests = data['interests'];
+
+        if (rawInterests is List) {
+          for (var item in rawInterests) {
+            interests.add(Interest.fromMap(item as Map<String, dynamic>));
+          }
+        } else if (rawInterests is Map) {
+          rawInterests.forEach((key, value) {
+            interests.add(Interest.fromMap(value as Map<String, dynamic>));
+          });
         }
-      }));
+      }
     }
-    // FORCE waiting for the forEach completion
-    await Future.wait(futures);
+
     return interests;
   }
 
@@ -1497,23 +1609,21 @@ class FirebaseUsersUtility {
 
   String getMatchedInterest(String data, String searchTerm,
       {bool includeDescription = false}) {
-    // 1. Create a pattern that handles both names and the nested "insert" fields in descriptions
     String fieldPattern = includeDescription ? 'name|insert' : 'name';
 
     RegExp regex = RegExp(
       r'(' + fieldPattern + r'):\s*("?)(.*?)\2(?=[,}\]])',
       caseSensitive: false,
-      dotAll: true, // Allows matching across newlines if description has them
+      dotAll: true,
     );
 
-    // 2. Use allMatches to check EVERY instance in the data
     final matches = regex.allMatches(data);
 
     for (final match in matches) {
       if (match.groupCount >= 3) {
         String value = match.group(3)!.trim();
         if (value.toLowerCase().contains(searchTerm.toLowerCase())) {
-          return value; // Return the first one that actually matches your search
+          return value;
         }
       }
     }
@@ -1548,7 +1658,7 @@ class FirebaseUsersUtility {
 
   Future<List<String>> listInterests() async {
     final querySnapshot =
-        await FirebaseFirestore.instance.collection('users').get();
+    await FirebaseFirestore.instance.collection('users').get();
 
     final List<String> interestNames = [];
 
@@ -1569,6 +1679,58 @@ class FirebaseUsersUtility {
     }
 
     return interestNames;
+  }
+
+  /// Removes a single [targetUid] from the `shared_with_uids` list of a
+  /// specific interest owned by [ownerUid].
+  Future<bool> unshareInterestWithUser({
+    required CollectionReference users,
+    required String ownerUid,
+    required String interestId,
+    required String targetUid,
+  }) async {
+    final sanitizedOwner = ownerUid.trim();
+    final sanitizedTarget = targetUid.trim();
+
+    if (sanitizedOwner.isEmpty ||
+        sanitizedTarget.isEmpty ||
+        interestId.trim().isEmpty) {
+      return false;
+    }
+
+    final querySnapshot = await users
+        .where('user_uid', isEqualTo: sanitizedOwner)
+        .limit(1)
+        .get();
+    if (querySnapshot.docs.isEmpty) return false;
+
+    final docRef = querySnapshot.docs.first.reference;
+    final docSnapshot = await docRef.get();
+    final data = docSnapshot.data() as Map<String, dynamic>?;
+    if (data == null) return false;
+
+    final List<dynamic> interests =
+    List<dynamic>.from(data['interests'] ?? []);
+    bool updated = false;
+
+    for (int i = 0; i < interests.length; i++) {
+      if (interests[i]['id'] == interestId) {
+        final existing = List<String>.from(
+          (interests[i]['shared_with_uids'] as List<dynamic>? ?? [])
+              .map((e) => e.toString()),
+        );
+        existing.remove(sanitizedTarget);
+        interests[i] = Map<String, dynamic>.from(interests[i] as Map)
+          ..['shared_with_uids'] = existing;
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) return false;
+
+    await docRef.update({'interests': interests});
+    return true;
   }
 
   Future<List<String>> searchForPeopleAndInterests(
@@ -1625,7 +1787,7 @@ class FirebaseUsersUtility {
     });
     return list.where((current) {
       final pattern =
-          RegExp(r'\b' + RegExp.escape(current) + r'\b', caseSensitive: false);
+      RegExp(r'\b' + RegExp.escape(current) + r'\b', caseSensitive: false);
 
       return !list.any((other) => other != current && pattern.hasMatch(other));
     }).toList();
@@ -1638,7 +1800,7 @@ class FirebaseUsersUtility {
     for (final item in input) {
       final key = item.toLowerCase();
       if (seen.add(key)) {
-        result.add(item); // keep first occurrence
+        result.add(item);
       }
     }
 

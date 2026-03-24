@@ -528,10 +528,7 @@ extension _HomeUiLogic on _MyHomePageState {
                       user_uid: _uid,
                       openWithUserUid: _openMessagesWithUserUid,
                     ),
-                    Text(
-                      'Index 4: Replace this text widget with the Sign Out widget',
-                      style: _MyHomePageState.optionStyle,
-                    ),
+          FriendsManagerWidget(currentUserUid: _uid)
                   ][_selectedIndex]
                 : <Widget>[
                     Stack(children: [
@@ -616,6 +613,26 @@ extension _HomeUiLogic on _MyHomePageState {
                     },
                   ),
                   ListTile(
+                    title: const Text('Messages'),
+                    trailing: Badge.count(
+                      isLabelVisible: hasNotification,
+                      count: notificationCount,
+                    ),
+                    selected: _selectedIndex == 3,
+                    onTap: () {
+                      _onItemTapped(3);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    title: const Text('Friends'),
+                    selected: _selectedIndex == 4,
+                    onTap: () {
+                      _onItemTapped(4);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
                     title: const Text('Feed'),
                     selected: _selectedIndex == 1,
                     onTap: () {
@@ -631,18 +648,7 @@ extension _HomeUiLogic on _MyHomePageState {
                       Navigator.pop(context);
                     },
                   ),
-                  ListTile(
-                    title: const Text('Messages'),
-                    trailing: Badge.count(
-                      isLabelVisible: hasNotification,
-                      count: notificationCount,
-                    ),
-                    selected: _selectedIndex == 3,
-                    onTap: () {
-                      _onItemTapped(3);
-                      Navigator.pop(context);
-                    },
-                  ),
+
                   ListTile(
                     title: const Text('Sign Out'),
                     selected: _selectedIndex == 0,
