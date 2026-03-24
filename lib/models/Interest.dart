@@ -13,6 +13,7 @@ class Interest {
   final DateTime created_timestamp;
   DateTime updated_timestamp;
   final int privacy;
+  final List<String> sharedWithUids;
 
   Interest({
     String? id,
@@ -26,9 +27,10 @@ class Interest {
     required this.created_timestamp,
     required this.updated_timestamp,
     this.privacy = 4,
-  }) : id = id ?? UuidV4().generate();
+    List<String>? sharedWithUids,
+  }) : id = id ?? UuidV4().generate(),
+        sharedWithUids = sharedWithUids ?? [];
 
-  // ADD THIS FACTORY METHOD
   factory Interest.fromMap(Map<String, dynamic> map) {
     return Interest(
       id: map['id'],
@@ -43,8 +45,12 @@ class Interest {
           : null,
       created_timestamp: (map['created_timestamp'] as Timestamp).toDate(),
       updated_timestamp: (map['updated_timestamp'] as Timestamp).toDate(),
-      // This line ensures the privacy level is recovered from the DB
       privacy: map['privacy'] ?? 4,
+      sharedWithUids: (map['shared_with_uids'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList() ??
+          [],
     );
   }
 
@@ -61,6 +67,7 @@ class Interest {
       'created_timestamp': created_timestamp,
       'updated_timestamp': updated_timestamp,
       'privacy': privacy,
+      'shared_with_uids': sharedWithUids,
     };
   }
 
@@ -76,6 +83,7 @@ class Interest {
     DateTime? created_timestamp,
     DateTime? updated_timestamp,
     int? privacy,
+    List<String>? sharedWithUids,
   }) {
     return Interest(
       id: id ?? this.id,
@@ -89,6 +97,7 @@ class Interest {
       created_timestamp: created_timestamp ?? this.created_timestamp,
       updated_timestamp: updated_timestamp ?? this.updated_timestamp,
       privacy: privacy ?? this.privacy,
+      sharedWithUids: sharedWithUids ?? this.sharedWithUids,
     );
   }
 }
