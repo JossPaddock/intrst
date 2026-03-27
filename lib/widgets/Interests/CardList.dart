@@ -54,7 +54,7 @@ class CardListState extends State<CardList>
   bool get isEditingAny {
     final userModel = Provider.of<UserModel>(context, listen: false);
     return localInterests.any(
-          (i) => userModel.getToggle(i.id) == true,
+      (i) => userModel.getToggle(i.id) == true,
     );
   }
 
@@ -73,7 +73,7 @@ class CardListState extends State<CardList>
   List<String> searchResults = <String>[];
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
   final CollectionReference users =
-  FirebaseFirestore.instance.collection('users');
+      FirebaseFirestore.instance.collection('users');
   final Set<String> selectedItems = <String>{};
   final Map<String, String> _userNameCache = <String, String>{};
 
@@ -107,9 +107,9 @@ class CardListState extends State<CardList>
     final filtered = results
         .map((value) => value.trim())
         .where((value) =>
-    value.isNotEmpty &&
-        value != widget.uid &&
-        !selectedItems.contains(value))
+            value.isNotEmpty &&
+            value != widget.uid &&
+            !selectedItems.contains(value))
         .toSet()
         .toList();
 
@@ -340,8 +340,7 @@ class CardListState extends State<CardList>
                           final idx = localInterests
                               .indexWhere((i) => i.id == interest.id);
                           if (idx != -1) {
-                            final updated =
-                            List<String>.from(
+                            final updated = List<String>.from(
                                 localInterests[idx].sharedWithUids)
                               ..remove(uid);
                             localInterests[idx] = localInterests[idx]
@@ -352,7 +351,8 @@ class CardListState extends State<CardList>
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Could not remove access, please try again.'),
+                            content: Text(
+                                'Could not remove access, please try again.'),
                           ),
                         );
                       }
@@ -427,7 +427,7 @@ class CardListState extends State<CardList>
         // Merge new targets into the local interest immediately so the
         // "already shared with" row updates without needing a full refresh
         final updatedSharedWith =
-        {...interest.sharedWithUids, ...targets}.toList();
+            {...interest.sharedWithUids, ...targets}.toList();
 
         setState(() {
           final idx = localInterests.indexWhere((i) => i.id == interest.id);
@@ -646,7 +646,7 @@ class CardListState extends State<CardList>
         title: const Text('Invalid link'),
         content: const Text(
           'The link you entered does not appear to be reachable. '
-              'Please try fix it before saving.',
+          'Please try fix it before saving.',
         ),
         actions: [
           TextButton(
@@ -689,57 +689,57 @@ class CardListState extends State<CardList>
                   onPressed: isPosting
                       ? null
                       : () {
-                    Navigator.of(dialogContext).pop();
-                  },
+                          Navigator.of(dialogContext).pop();
+                        },
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: isPosting
                       ? null
                       : () async {
-                    final message = postMessageController.text.trim();
-                    if (message.isEmpty) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Please add a message before posting.'),
-                        ),
-                      );
-                      return;
-                    }
+                          final message = postMessageController.text.trim();
+                          if (message.isEmpty) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Please add a message before posting.'),
+                              ),
+                            );
+                            return;
+                          }
 
-                    setDialogState(() {
-                      isPosting = true;
-                    });
+                          setDialogState(() {
+                            isPosting = true;
+                          });
 
-                    try {
-                      await fu.createInterestPostedActivity(
-                        actorUid: widget.uid,
-                        interest: interest,
-                        message: message,
-                      );
-                      if (!mounted || !dialogContext.mounted) return;
-                      Navigator.of(dialogContext).pop();
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        const SnackBar(content: Text('Posted to feed.')),
-                      );
-                    } catch (e) {
-                      setDialogState(() {
-                        isPosting = false;
-                      });
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        SnackBar(content: Text('Could not post: $e')),
-                      );
-                    }
-                  },
+                          try {
+                            await fu.createInterestPostedActivity(
+                              actorUid: widget.uid,
+                              interest: interest,
+                              message: message,
+                            );
+                            if (!mounted || !dialogContext.mounted) return;
+                            Navigator.of(dialogContext).pop();
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(content: Text('Posted to feed.')),
+                            );
+                          } catch (e) {
+                            setDialogState(() {
+                              isPosting = false;
+                            });
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(content: Text('Could not post: $e')),
+                            );
+                          }
+                        },
                   child: isPosting
                       ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text('Post to my Feed'),
                 ),
               ],
@@ -775,7 +775,7 @@ class CardListState extends State<CardList>
       String toggleKey) async {
     if (toggle) {
       CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
+          FirebaseFirestore.instance.collection('users');
       Interest newInterest = interest.copyWith(
         name: titleController.text,
         description: _getQuillJson(quillController),
@@ -787,9 +787,9 @@ class CardListState extends State<CardList>
         titleController: titleController,
         quillController: quillController,
       );
-      if (!kIsWeb) {
+      if (!kIsWeb && linkController.text != '') {
         final isValid =
-        await isUrlResolvable(normalizeUrl(linkController.text));
+            await isUrlResolvable(normalizeUrl(linkController.text));
         if (!isValid) {
           await _showInvalidLinkDialog();
           return;
@@ -814,6 +814,21 @@ class CardListState extends State<CardList>
     updateToggles(toggleKey, !toggle);
   }
 
+  String getStatusText(int statusId) {
+    switch (statusId) {
+      case 0:
+        return 'shared privately';
+      case 2:
+        return 'shared with friends and followers';
+      case 3:
+        return 'shared with friends';
+      case 4:
+        return 'shared publicly';
+      default:
+        return 'Unknown Status';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -835,15 +850,16 @@ class CardListState extends State<CardList>
         // Explicit per-user share always wins, regardless of privacy level
         if (interest.sharedWithUids.contains(viewerUid)) return true;
 
-        if (interest.privacy == 4) return true;                                 // Public
-        if (interest.privacy == 3 && _isFriend) return true;                   // Friends only
-        if (interest.privacy == 2 && (_isFriend || _isFollowing)) return true; // Friends & followers
-        return false;                                                            // Private or unmatched
+        if (interest.privacy == 4) return true; // Public
+        if (interest.privacy == 3 && _isFriend) return true; // Friends only
+        if (interest.privacy == 2 && (_isFriend || _isFollowing))
+          return true; // Friends & followers
+        return false; // Private or unmatched
       }).toList();
     }
 
     final editingEntry = userModel.editToggles.entries.firstWhere(
-          (e) => e.value == true,
+      (e) => e.value == true,
       orElse: () => MapEntry('', false),
     );
     final editingId = editingEntry.key;
@@ -906,7 +922,7 @@ class CardListState extends State<CardList>
                     bool toggle = userModel.getToggle(toggleKey);
                     final shouldHighlightFromFeed =
                         userModel.feedHighlightedInterestOwnerUid ==
-                            userModel.alternateUid &&
+                                userModel.alternateUid &&
                             userModel.feedHighlightedInterestId == id;
 
                     final titleController =
@@ -942,149 +958,155 @@ class CardListState extends State<CardList>
                                 onTap: () => _launchUrl(interest.link),
                                 child: toggle
                                     ? TextField(
-                                  controller: titleController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Edit title here',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                )
+                                        controller: titleController,
+                                        decoration: InputDecoration(
+                                          labelText: 'Edit title here',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                      )
                                     : Text(
-                                  interest.name,
-                                  style: TextStyle(
-                                      color: interest.link == ""
-                                          ? Colors.black
-                                          : Colors.blue,
-                                      decoration: interest.link == ""
-                                          ? TextDecoration.none
-                                          : TextDecoration.underline),
-                                ),
+                                        interest.name,
+                                        style: TextStyle(
+                                            color: interest.link == ""
+                                                ? Colors.black
+                                                : Colors.blue,
+                                            decoration: interest.link == ""
+                                                ? TextDecoration.none
+                                                : TextDecoration.underline),
+                                      ),
                               ),
                               SizedBox(height: 4),
                               toggle
                                   ? Column(
-                                children: [
-                                  TextField(
-                                    controller: linkController,
-                                    decoration: InputDecoration(
-                                      labelText: 'Edit link here',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      border:
-                                      Border.all(color: Colors.grey),
-                                      borderRadius:
-                                      BorderRadius.circular(4),
-                                    ),
-                                    child: Column(
                                       children: [
-                                        QuillSimpleToolbar(
-                                          controller: quillController,
-                                          config:
-                                          const QuillSimpleToolbarConfig(
-                                            showFontFamily: false,
-                                            showFontSize: false,
-                                            showBoldButton: true,
-                                            showItalicButton: true,
-                                            showUnderLineButton: true,
-                                            showListBullets: true,
-                                            showListNumbers: true,
-                                            showStrikeThrough: false,
-                                            showAlignmentButtons: false,
-                                            showBackgroundColorButton:
-                                            false,
-                                            showCenterAlignment: false,
-                                            showClearFormat: false,
-                                            showClipboardCopy: false,
-                                            showClipboardCut: false,
-                                            showClipboardPaste: false,
-                                            showCodeBlock: false,
-                                            showColorButton: false,
-                                            showDirection: false,
-                                            showDividers: false,
-                                            showHeaderStyle: false,
-                                            showIndent: false,
-                                            showInlineCode: false,
-                                            showJustifyAlignment: false,
-                                            showLeftAlignment: false,
-                                            showLineHeightButton: false,
-                                            showLink: true,
-                                            showListCheck: false,
-                                            showQuote: false,
-                                            showRedo: false,
-                                            showRightAlignment: false,
-                                            showSearchButton: false,
-                                            showSmallButton: false,
-                                            showSubscript: false,
-                                            showSuperscript: false,
-                                            showUndo: false,
+                                        TextField(
+                                          controller: linkController,
+                                          decoration: InputDecoration(
+                                            labelText: 'Edit link here',
+                                            border: OutlineInputBorder(),
                                           ),
                                         ),
+                                        SizedBox(height: 8),
                                         Container(
-                                          height: 150,
-                                          padding: EdgeInsets.all(8),
-                                          child: QuillEditor.basic(
-                                            controller: quillController,
+                                          decoration: BoxDecoration(
+                                            border:
+                                                Border.all(color: Colors.grey),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              QuillSimpleToolbar(
+                                                controller: quillController,
+                                                config:
+                                                    const QuillSimpleToolbarConfig(
+                                                  showFontFamily: false,
+                                                  showFontSize: false,
+                                                  showBoldButton: true,
+                                                  showItalicButton: true,
+                                                  showUnderLineButton: true,
+                                                  showListBullets: true,
+                                                  showListNumbers: true,
+                                                  showStrikeThrough: false,
+                                                  showAlignmentButtons: false,
+                                                  showBackgroundColorButton:
+                                                      false,
+                                                  showCenterAlignment: false,
+                                                  showClearFormat: false,
+                                                  showClipboardCopy: false,
+                                                  showClipboardCut: false,
+                                                  showClipboardPaste: false,
+                                                  showCodeBlock: false,
+                                                  showColorButton: false,
+                                                  showDirection: false,
+                                                  showDividers: false,
+                                                  showHeaderStyle: false,
+                                                  showIndent: false,
+                                                  showInlineCode: false,
+                                                  showJustifyAlignment: false,
+                                                  showLeftAlignment: false,
+                                                  showLineHeightButton: false,
+                                                  showLink: true,
+                                                  showListCheck: false,
+                                                  showQuote: false,
+                                                  showRedo: false,
+                                                  showRightAlignment: false,
+                                                  showSearchButton: false,
+                                                  showSmallButton: false,
+                                                  showSubscript: false,
+                                                  showSuperscript: false,
+                                                  showUndo: false,
+                                                ),
+                                              ),
+                                              Container(
+                                                height: 150,
+                                                padding: EdgeInsets.all(8),
+                                                child: QuillEditor.basic(
+                                                  controller: quillController,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                ],
-                              )
+                                    )
                                   : Container(
-                                padding: EdgeInsets.all(8),
-                                child: QuillEditor.basic(
-                                  focusNode:
-                                  FocusNode(canRequestFocus: false),
-                                  controller: quillController,
-                                  config: QuillEditorConfig(
-                                      showCursor: false),
-                                ),
-                              ),
+                                      padding: EdgeInsets.all(8),
+                                      child: QuillEditor.basic(
+                                        focusNode:
+                                            FocusNode(canRequestFocus: false),
+                                        controller: quillController,
+                                        config: QuillEditorConfig(
+                                            showCursor: false),
+                                      ),
+                                    ),
+                              Container(alignment: Alignment.bottomRight, child: Text(getStatusText(interest.privacy), style: TextStyle(fontSize: 8,), ),),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  if (widget.showInputForm)
-                                    DropdownButton<int>(
-                                      value: [0, 2, 3, 4]
-                                          .contains(interest.privacy)
-                                          ? interest.privacy
-                                          : 4,
-                                      items: const [
-                                        DropdownMenuItem(
-                                            value: 0, child: Text("Private")),
-                                        DropdownMenuItem(
-                                            value: 2,
-                                            child:
-                                            Text("Friends and followers")),
-                                        DropdownMenuItem(
-                                            value: 3,
-                                            child: Text("Friends only")),
-                                        DropdownMenuItem(
-                                            value: 4, child: Text("Public")),
-                                      ],
-                                      onChanged: (int? newValue) async {
-                                        if (newValue == null) return;
+                                  if (widget.showInputForm && isEditingAny)
+                                    ConstrainedBox(
+                                      constraints:
+                                          const BoxConstraints(maxWidth: 175),
+                                      child: DropdownButton<int>(
+                                        value: [0, 2, 3, 4]
+                                                .contains(interest.privacy)
+                                            ? interest.privacy
+                                            : 4,
+                                        items: const [
+                                          DropdownMenuItem(
+                                              value: 0, child: Text("Private")),
+                                          DropdownMenuItem(
+                                              value: 2,
+                                              child: Text(
+                                                  "Friends & followers")),
+                                          DropdownMenuItem(
+                                              value: 3,
+                                              child: Text("Friends only")),
+                                          DropdownMenuItem(
+                                              value: 4, child: Text("Public")),
+                                        ],
+                                        onChanged: (int? newValue) async {
+                                          if (newValue == null) return;
 
-                                        Interest newInterest = interest
-                                            .copyWith(privacy: newValue);
+                                          Interest newInterest = interest
+                                              .copyWith(privacy: newValue);
 
-                                        setState(() {
-                                          localInterests[index] = newInterest;
-                                        });
+                                          setState(() {
+                                            localInterests[index] = newInterest;
+                                          });
 
-                                        await fu.updateEditedInterest(
-                                          FirebaseFirestore.instance
-                                              .collection('users'),
-                                          interest,
-                                          newInterest,
-                                          widget.uid,
-                                        );
-                                      },
+                                          await fu.updateEditedInterest(
+                                            FirebaseFirestore.instance
+                                                .collection('users'),
+                                            interest,
+                                            newInterest,
+                                            widget.uid,
+                                          );
+                                        },
+                                      ),
                                     ),
+                                  SizedBox(width: 20,),
                                   if (widget.showInputForm)
                                     IconButton(
                                         icon: Icon(Icons.star,
@@ -1093,16 +1115,16 @@ class CardListState extends State<CardList>
                                                 : Colors.blueGrey),
                                         onPressed: () async {
                                           CollectionReference users =
-                                          FirebaseFirestore.instance
-                                              .collection('users');
+                                              FirebaseFirestore.instance
+                                                  .collection('users');
                                           bool favorited = !interest.favorite;
                                           Interest newInterest =
-                                          interest.copyWith(
-                                              favorite: !interest.favorite,
-                                              favorited_timestamp: favorited
-                                                  ? DateTime.now()
-                                                  : interest
-                                                  .favorited_timestamp);
+                                              interest.copyWith(
+                                                  favorite: !interest.favorite,
+                                                  favorited_timestamp: favorited
+                                                      ? DateTime.now()
+                                                      : interest
+                                                          .favorited_timestamp);
 
                                           setState(() {
                                             localInterests[index] = newInterest;
@@ -1119,8 +1141,8 @@ class CardListState extends State<CardList>
                                               newInterest,
                                               widget.uid);
                                           List<Interest> updatedInterests =
-                                          await refreshInterestsForUser(
-                                              widget.uid);
+                                              await refreshInterestsForUser(
+                                                  widget.uid);
 
                                           setState(() {
                                             localInterests = updatedInterests;
@@ -1158,69 +1180,69 @@ class CardListState extends State<CardList>
                                         context: context,
                                         builder: (BuildContext context) =>
                                             AlertDialog(
-                                              title: const Text(
-                                                  'Are you sure you want\nto delete this interest?'),
-                                              content: Text(
-                                                  'This will permanently delete\nthe interest \"${interest.name}\"',
-                                                  textAlign: TextAlign.center),
-                                              actions: <Widget>[
-                                                Center(
-                                                  child: Column(children: <Widget>[
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        CollectionReference users =
+                                          title: const Text(
+                                              'Are you sure you want\nto delete this interest?'),
+                                          content: Text(
+                                              'This will permanently delete\nthe interest \"${interest.name}\"',
+                                              textAlign: TextAlign.center),
+                                          actions: <Widget>[
+                                            Center(
+                                              child: Column(children: <Widget>[
+                                                TextButton(
+                                                  onPressed: () {
+                                                    CollectionReference users =
                                                         FirebaseFirestore
                                                             .instance
                                                             .collection(
-                                                            'users');
-                                                        Interest oldInterest =
+                                                                'users');
+                                                    Interest oldInterest =
                                                         Interest(
-                                                          id: interest.id,
-                                                          nextInterestId: interest
-                                                              .nextInterestId,
-                                                          active: interest.active,
-                                                          name: interest.name,
-                                                          description:
+                                                      id: interest.id,
+                                                      nextInterestId: interest
+                                                          .nextInterestId,
+                                                      active: interest.active,
+                                                      name: interest.name,
+                                                      description:
                                                           interest.description,
-                                                          link: interest.link,
-                                                          favorite:
+                                                      link: interest.link,
+                                                      favorite:
                                                           interest.favorite,
-                                                          favorited_timestamp: interest
-                                                              .favorited_timestamp,
-                                                          created_timestamp: interest
-                                                              .created_timestamp,
-                                                          updated_timestamp: interest
-                                                              .updated_timestamp,
-                                                          privacy: interest.privacy,
-                                                        );
+                                                      favorited_timestamp: interest
+                                                          .favorited_timestamp,
+                                                      created_timestamp: interest
+                                                          .created_timestamp,
+                                                      updated_timestamp: interest
+                                                          .updated_timestamp,
+                                                      privacy: interest.privacy,
+                                                    );
 
-                                                        fu.removeInterest(
-                                                            users,
-                                                            oldInterest,
-                                                            widget.uid);
+                                                    fu.removeInterest(
+                                                        users,
+                                                        oldInterest,
+                                                        widget.uid);
 
-                                                        setState(() {
-                                                          _disposeControllersForId(
-                                                              id);
-                                                          localInterests
-                                                              .removeAt(index);
-                                                        });
+                                                    setState(() {
+                                                      _disposeControllersForId(
+                                                          id);
+                                                      localInterests
+                                                          .removeAt(index);
+                                                    });
 
-                                                        Navigator.pop(
-                                                            context, 'Delete');
-                                                      },
-                                                      child: const Text('Yes'),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(context,
-                                                              'Never mind'),
-                                                      child: const Text('No'),
-                                                    ),
-                                                  ]),
+                                                    Navigator.pop(
+                                                        context, 'Delete');
+                                                  },
+                                                  child: const Text('Yes'),
                                                 ),
-                                              ],
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(context,
+                                                          'Never mind'),
+                                                  child: const Text('No'),
+                                                ),
+                                              ]),
                                             ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                 ],
@@ -1282,7 +1304,7 @@ class CardListState extends State<CardList>
                 child: TextButton(
                     onPressed: () async {
                       CollectionReference users =
-                      FirebaseFirestore.instance.collection('users');
+                          FirebaseFirestore.instance.collection('users');
                       Interest interest = Interest(
                           name: '',
                           description: '',
