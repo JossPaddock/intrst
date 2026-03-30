@@ -32,7 +32,7 @@ dependencies:
   flutter_quill: ^11.5.0
 
 dependency_overrides:
-  font_awesome_flutter: ^10.8.0  # or whatever latest compatible version is
+  font_awesome_flutter: 10.7.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
