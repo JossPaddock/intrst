@@ -5,6 +5,94 @@ from firebase_functions import firestore_fn
 # Initialize the Firebase Admin SDK.
 firebase_admin.initialize_app()
 
+@firestore_fn.on_document_created(document="activities/{activityId}")
+def on_activity_created(
+    event: firestore_fn.Event[firestore_fn.DocumentSnapshot]
+):
+    """
+    Triggers when a new feed activity document is created.
+    Sends a notification to all target_uids.
+    """
+    data = event.data.to_dict()
+    if not data:
+        print("Empty activity document, ignoring.")
+        return
+
+    activity_type = data.get("type", "")
+    actor_name = data.get("actor_name", "Someone")
+    actor_uid = data.get("actor_uid")
+    target_uids = data.get("target_uids", [])
+    interest_id = data.get("interest_id")
+
+    if not target_uids:
+        print(f"Activity {event.params['activityId']} has no target_uids, skipping.")
+        return
+
+    # Build notification body based on activity type
+    notification_body_map = {
+        "interest_created": f"{actor_name} created a new interest.",
+        "interest_posted": f"{actor_name} posted an interest to their feed.",
+        # Add more activity types here as needed
+    }
+    body = notification_body_map.get(activity_type, f"{actor_name} has new activity.")
+
+    db = firestore.client()
+    users_ref = db.collection("users")
+
+    for target_uid in target_uids:
+        if target_uid == actor_uid:
+            continue  # Don't notify the actor themselves
+
+        try:
+            user_docs = list(
+                users_ref.where(
+                    filter=firestore.FieldFilter("user_uid", "==", target_uid)
+                ).stream()
+            )
+
+            if not user_docs:
+                print(f"No user found for target {target_uid}")
+                continue
+
+            user_doc = user_docs[0].to_dict()
+
+            # Badge count
+            notifications = user_doc.get("unread_notifications_count", {})
+            if not isinstance(notifications, dict):
+                notifications = {}
+            badge_count = sum(
+                int(v) for v in notifications.values() if isinstance(v, (int, float))
+            )
+
+            fcm_tokens = user_doc.get("fcm_tokens", [])
+            if not fcm_tokens:
+                print(f"No FCM tokens for target {target_uid}")
+                continue
+
+            multicast_message = messaging.MulticastMessage(
+                notification=messaging.Notification(
+                    title=actor_name,
+                    body=body,
+                ),
+                tokens=fcm_tokens,
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(badge=badge_count)
+                    )
+                ),
+                data={
+                    "activity_type": activity_type,
+                    "actor_uid": actor_uid or "",
+                    "interest_id": interest_id or "",
+                }
+            )
+
+            response = messaging.send_each_for_multicast(multicast_message)
+            print(f"Sent to {target_uid}: {response.success_count}/{len(fcm_tokens)} success.")
+
+        except Exception as e:
+            print(f"Error processing target {target_uid}: {e}")
+
 @firestore_fn.on_document_updated(document="messages/{messageId}")
 def on_message_updated(
     event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]
