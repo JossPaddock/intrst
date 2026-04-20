@@ -40,6 +40,7 @@ part 'main/home_user_logic.dart';
 part 'main/home_map_logic.dart';
 part 'main/home_location_logic.dart';
 part 'main/home_ui_logic.dart';
+part 'main/home_notification_logic.dart';
 
 Future<void> main() async {
   //debugPaintSizeEnabled = false;

@@ -246,7 +246,11 @@ def on_message_updated(
                 actor_uid=sender_uid,
                 title=f"{first_name} {last_name}",
                 body=message_content,
-                data_payload={},
+                data_payload={
+                    # ↓ CHANGED: sender_uid now included so the Flutter app
+                    #   can deep-link directly to this conversation on tap.
+                    "sender_uid": sender_uid or "",
+                },
             )
         except Exception as e:
             print(f"Error processing receiver {receiver_uid}: {e}")

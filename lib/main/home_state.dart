@@ -68,6 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
       markers = poiMarkers;
     });
     loadFCMToken();
+    _initNotifications();
     super.initState();
     _searchController = TextEditingController();
     _searchFocusNode = FocusNode();

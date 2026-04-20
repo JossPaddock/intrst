@@ -1335,7 +1335,7 @@ class CardListState extends State<CardList>
                                         _showPostInterestToFeedDialog(interest);
                                       },
                                     ),
-                                  if (widget.showInputForm)
+                                  if (widget.showInputForm && !_searchKeyboardActive)
                                     IconButton(
                                       icon: Icon(
                                           toggle ? Icons.save : Icons.edit),
