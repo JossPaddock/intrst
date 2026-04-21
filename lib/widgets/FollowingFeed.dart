@@ -62,7 +62,10 @@ class _FollowingFeedState extends State<FollowingFeed> {
       return false;
     }
 
-    if (!followingUids.contains(actorUid)) {
+    final isTargetedEvent = type == 'interest_shared' || type == 'message_sent';
+    //new case to allow for targeted interest_shared events to show up in feed even if not following the actor
+    if(!isTargetedEvent && !followingUids.contains(actorUid)) {
+      // For non-targeted events, only show if from someone you follow.
       return false;
     }
 
@@ -72,7 +75,7 @@ class _FollowingFeedState extends State<FollowingFeed> {
     if (type == 'message_sent') {
       return showMessages;
     }
-    if (type == 'interest_created' || type == 'interest_updated') {
+    if (type == 'interest_created' || type == 'interest_updated' || type == 'interest_shared') {
       return showInterestUpdates;
     }
     return true;
@@ -369,6 +372,29 @@ class _FollowingFeedState extends State<FollowingFeed> {
                               child: Text(actorName),
                             ),
                             Text(updateText),
+                            TextButton(
+                              onPressed: () => widget.onOpenInterests(
+                                  actorUid, actorName, interestId),
+                              child: const Text('check it out here'),
+                            ),
+                          ],
+                        );
+                        break;
+                      case 'interest_shared':
+                        final interestName =
+                            (item['interest_name'] ?? '').toString().trim();
+                        final shareText = interestName.isEmpty
+                            ? ' has shared an interest with you, '
+                            : ' has shared an interest "$interestName" with you, ';
+                        action = Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            TextButton(
+                              onPressed: () =>
+                                  widget.onOpenUserOnMap(actorUid, actorName),
+                              child: Text(actorName),
+                            ),
+                            Text(shareText),
                             TextButton(
                               onPressed: () => widget.onOpenInterests(
                                   actorUid, actorName, interestId),

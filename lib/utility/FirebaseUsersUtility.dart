@@ -1136,6 +1136,27 @@ class FirebaseUsersUtility {
     );
   }
 
+  Future<void> createInterestSharedActivity({
+    required String actorUid,
+    required String interestId,
+    required String interestName,
+    required List<String> targetUids,
+  }) async {
+    if(actorUid.isEmpty || interestId.isEmpty || interestName.trim().isEmpty || targetUids.isEmpty) {
+      return;
+    }
+    final users = FirebaseFirestore.instance.collection('users');
+    final actorName = await lookUpNameByUserUid(users, actorUid);
+    await _createActivityForUsers(
+      type: 'interest_shared',
+      actorUid: actorUid,
+      actorName: actorName,
+      targetUids: targetUids,
+      interestId: interestId,
+      interestName: interestName,
+    );
+  }
+
   Future<void> createMessageActivity({
     required String senderUid,
     required String recipientUid,
@@ -1405,6 +1426,7 @@ class FirebaseUsersUtility {
     required CollectionReference users,
     required String ownerUid,
     required String interestId,
+    required String interestName,
     required List<String> targetUids,
   }) async {
     final sanitizedOwner = ownerUid.trim();
@@ -1452,6 +1474,15 @@ class FirebaseUsersUtility {
     if (!updated) return false;
 
     await docRef.update({'interests': interests});
+
+    //after we share the interest with the target users, we want to create an activity for those users so it sync downstream in eventing
+    await createInterestSharedActivity(
+      actorUid: sanitizedOwner,
+      interestId: interestId,
+      interestName: interestName,
+      targetUids: sanitizedTargets,
+    );
+
     return true;
   }
 

@@ -67,9 +67,10 @@ extension _HomeNotificationLogic on _MyHomePageState {
       return;
     }
 
-    // ── Activity notification (interest_created / interest_updated) ────────
+    // ── Activity notification (interest_created / interest_updated / interest_shared) ────────
     if ((activityType == 'interest_created' ||
-        activityType == 'interest_updated') &&
+        activityType == 'interest_updated' ||
+        activityType == 'interest_shared') &&
         actorUid.isNotEmpty) {
       String actorName = '';
       try {

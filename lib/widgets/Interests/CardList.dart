@@ -474,6 +474,7 @@ class CardListState extends State<CardList>
         users: FirebaseFirestore.instance.collection('users'),
         ownerUid: widget.uid,
         interestId: interest.id,
+        interestName: interest.name,
         targetUids: targets,
       );
 
