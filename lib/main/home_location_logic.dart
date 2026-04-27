@@ -7,26 +7,35 @@ extension _HomeLocationLogic on _MyHomePageState {
   }
 
   Future<void> _showLocationDisclaimer(BuildContext context) async {
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Location Disclaimer"),
-          content: const Text(
-            "We respect your privacy. Your location data is used one time only "
-            "to place your marker on the map. We do not store, share, or track "
-            "your location, and we do not use your precise location — only an "
-            "approximate position is used to improve your experience.",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("OK"),
+    CollectionReference users =
+    FirebaseFirestore.instance.collection('users');
+    bool trigger = await fu.getFirstRunExperience( users, FirebaseAuth.instance.currentUser!.uid);
+    if(!trigger) {
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Location Disclaimer"),
+            content: const Text(
+              "Please use marker settings in bottom right to move your marker wherever "
+                  "you want it. We initially place it in a random spot in your general vicinity.",
             ),
-          ],
-        );
-      },
-    );
+            actions: [
+              TextButton(
+                onPressed: () {
+                  CollectionReference users =
+                  FirebaseFirestore.instance.collection('users');
+                  fu.setFirstRunExperienceComplete(
+                      users, FirebaseAuth.instance.currentUser!.uid);
+                  Navigator.of(context).pop();
+                },
+                child: const Text("OK"),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   Future<void> _getLocationServiceAndPermission(

@@ -260,6 +260,7 @@ class FirebaseUsersUtility {
       'friends_uids': [],
       'unread_notifications': [],
       'unread_notifications_count': <String, int>{},
+      'first_run_experience': false,
       feedSettingsField: _defaultFeedSettings(),
       'profile_statistics': {
         'longest_app_usage_streak': 0,
@@ -274,6 +275,44 @@ class FirebaseUsersUtility {
         .add(userData)
         .then((value) => print("User added to Firestore"))
         .catchError((error) => print("Failed to add user: $error"));
+  }
+
+  Future<void> setFirstRunExperienceComplete(
+      CollectionReference users, String userUid) async {
+    try {
+      final query = await users
+          .where('user_uid', isEqualTo: userUid)
+          .limit(1)
+          .get();
+      if (query.docs.isEmpty) {
+        print('setFirstRunExperienceComplete: no user found for $userUid');
+        return;
+      }
+      await query.docs.first.reference
+          .update({'first_run_experience': true});
+      print('first_run_experience set to false for $userUid');
+    } catch (e) {
+      print('Failed to set first_run_experience for $userUid: $e');
+    }
+  }
+
+  Future<bool> getFirstRunExperience(
+      CollectionReference users, String userUid) async {
+    try {
+      final query = await users
+          .where('user_uid', isEqualTo: userUid)
+          .limit(1)
+          .get();
+      if (query.docs.isEmpty) {
+        print('getFirstRunExperience: no user found for $userUid');
+        return false;
+      }
+      final data = query.docs.first.data() as Map<String, dynamic>;
+      return data['first_run_experience'] as bool? ?? false;
+    } catch (e) {
+      print('Failed to retrieve first_run_experience for $userUid: $e');
+      return false;
+    }
   }
 
   Future<void> sendFriendRequest(CollectionReference users, String senderUid, String receiverUid) async {

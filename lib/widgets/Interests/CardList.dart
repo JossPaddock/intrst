@@ -1507,7 +1507,7 @@ class CardListState extends State<CardList>
                       });
                       widget.cardListKey.currentState?.editTopMostInterest();
                     },
-                    child: Text("Add Interest")),
+                    child: Text("Add Interest",  style: TextStyle(color: Colors.white),)),
               ),
               SizedBox(height: 20)
             ],

@@ -148,7 +148,6 @@ class InterestInputFormState extends State<InterestInputForm> {
                                                 ),
                                                 QuillSimpleToolbar(
                                                   controller: _quillController,
-                                                  
                                                 ),
                                                 Expanded(
                                                   child: Container(
@@ -156,7 +155,6 @@ class InterestInputFormState extends State<InterestInputForm> {
                                                     child: QuillEditor.basic(
                                                       controller:
                                                           _quillController,
-                                                      
                                                     ),
                                                   ),
                                                 ),
@@ -178,18 +176,18 @@ class InterestInputFormState extends State<InterestInputForm> {
                                         Expanded(
                                           child: Text(
                                             _quillController.document
-                                                        .toPlainText()
-                                                        .trim()
-                                                        .isEmpty
+                                                    .toPlainText()
+                                                    .trim()
+                                                    .isEmpty
                                                 ? 'Enter a description of the interest.'
                                                 : _quillController.document
                                                     .toPlainText()
                                                     .trim(),
                                             style: TextStyle(
                                               color: _quillController.document
-                                                          .toPlainText()
-                                                          .trim()
-                                                          .isEmpty
+                                                      .toPlainText()
+                                                      .trim()
+                                                      .isEmpty
                                                   ? Colors.grey[600]
                                                   : Colors.black,
                                             ),
@@ -234,16 +232,16 @@ class InterestInputFormState extends State<InterestInputForm> {
                                           if (_formKey.currentState!
                                               .validate()) {
                                             // Save the description from quill
-                                            interest.description = _getQuillJson(
-                                                _quillController);
+                                            interest.description =
+                                                _getQuillJson(_quillController);
 
                                             // If the form is valid, display a snackbar for confirmation
                                             // Also make call to add interest for the given user uid (logged in user)
                                             CollectionReference users =
                                                 FirebaseFirestore.instance
                                                     .collection('users');
-                                            fu.addInterestForUser(
-                                                users, interest, user.currentUid);
+                                            fu.addInterestForUser(users,
+                                                interest, user.currentUid);
 
                                             ScaffoldMessenger.of(context)
                                                 .showSnackBar(

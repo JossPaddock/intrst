@@ -36,6 +36,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _pendingMapFocusUserUid;
   bool _hasPerformedInitialSignedInMapSetup = false;
   String _lastTrackedUsageDayKey = '';
+  RemoteMessage? _pendingInitialMessage;
 
   final mapId = "bc8e2917cca03ad4";
 
