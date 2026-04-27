@@ -36,6 +36,40 @@ extension _HomeNotificationLogic on _MyHomePageState {
     });
   }
 
+  // ── Cold-start Phase 1 ──────────────────────────────────────────────────
+  // Call this IMMEDIATELY after Firebase.initializeApp() resolves.
+  // getInitialMessage() must be called early — any delay risks the OS
+  // discarding the launch message before we read it.
+  Future<void> captureInitialMessage() async {
+    try {
+      _pendingInitialMessage =
+      await FirebaseMessaging.instance.getInitialMessage();
+      if (_pendingInitialMessage != null) {
+        print('notification: captured cold-start message, waiting for auth.');
+      }
+    } catch (e) {
+      print('notification: getInitialMessage failed: $e');
+    }
+  }
+
+  // ── Cold-start Phase 2 ──────────────────────────────────────────────────
+  // Call this from inside the authStateChanges listener, after _uid and
+  // _signedIn have been set and the UI is ready.
+  Future<void> flushInitialMessage() async {
+    final message = _pendingInitialMessage;
+    if (message == null) return;
+    _pendingInitialMessage = null; // consume so it never fires twice
+    if (!mounted || !_signedIn || _uid.isEmpty) return;
+
+    // Small delay so the home page finishes its own build/init before we
+    // try to open the drawer or switch tabs.
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+
+    print('notification: flushing cold-start deep-link.');
+    await _handleNotificationDeepLink(message);
+  }
+
   // ── Deep-link router ────────────────────────────────────────────────────
 
   Future<void> _handleNotificationDeepLink(RemoteMessage message) async {
@@ -67,9 +101,10 @@ extension _HomeNotificationLogic on _MyHomePageState {
       return;
     }
 
-    // ── Activity notification (interest_created / interest_updated) ────────
+    // ── Activity notification (interest_created / interest_updated / interest_shared) ────────
     if ((activityType == 'interest_created' ||
-        activityType == 'interest_updated') &&
+        activityType == 'interest_updated' ||
+        activityType == 'interest_shared') &&
         actorUid.isNotEmpty) {
       String actorName = '';
       try {

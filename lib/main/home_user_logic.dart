@@ -46,6 +46,7 @@ extension _HomeUserLogic on _MyHomePageState {
       name: 'intrst',
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await captureInitialMessage();
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
       if (user == null) {
         print('User is currently signed out!');
@@ -69,6 +70,7 @@ extension _HomeUserLogic on _MyHomePageState {
         _handleUserModel(localUid);
         setState(() {});
         loadUserContext();
+        await flushInitialMessage();
       }
     });
   }

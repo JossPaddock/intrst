@@ -104,7 +104,7 @@ def on_activity_created(
     interest_name = data.get("interest_name")
 
     # Only notify for these two activity types
-    NOTIFIABLE_TYPES = {"interest_created", "interest_updated"}
+    NOTIFIABLE_TYPES = {"interest_created", "interest_updated", "interest_shared"}
     if activity_type not in NOTIFIABLE_TYPES:
         print(f"Activity type '{activity_type}' is not notifiable, skipping.")
         return
@@ -116,6 +116,7 @@ def on_activity_created(
     body_map = {
         "interest_created": f"{actor_name} created{interest_label}.",
         "interest_updated": f"{actor_name} updated{interest_label}.",
+        "interest_shared": f"{actor_name} just shared an interest with you called{interest_label}.",
     }
     body = body_map.get(activity_type, f"{actor_name} has new activity.")
 
