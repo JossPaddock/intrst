@@ -52,7 +52,10 @@ extension _HomeUiLogic on _MyHomePageState {
           },
         ),
         title: StatefulBuilder(
-          builder: (context, setState) => SizedBox(
+          builder: (context, setState) => Row(
+            children: [
+              Expanded(
+                child:SizedBox(
             height: 48.0,
             width: screenWidth * 0.4 >= 225 ? screenWidth * 0.4 : 225,
             child: RawAutocomplete<String>(
@@ -182,6 +185,41 @@ extension _HomeUiLogic on _MyHomePageState {
                 print('Selected: $selection');
               },
             ),
+          ),
+        ),
+          const SizedBox(width: 0),
+          if (_searchController.text.isNotEmpty)
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF082D38),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(0),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  minimumSize: const Size(32, 48),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+        onPressed: () {
+          final searchText = _searchController.text;
+          _handleAlternateUserModel(_uid, _name);
+          setState(() {
+            _shouldCreateInterest = true;
+            _initialInterestName = searchText;
+          });
+          _scaffoldKey.currentState?.openEndDrawer();
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add),
+          ],
+        ),
+      ),
+    ),
+    ],
           ),
         ),
         backgroundColor: Color(0xFF082D38),
@@ -716,6 +754,8 @@ extension _HomeUiLogic on _MyHomePageState {
             scaffoldKey: _scaffoldKey,
             signedIn: _signedIn,
             onItemTapped: _onItemTapped,
+            shouldCreateInterest: _shouldCreateInterest,
+            initialInterestName: _initialInterestName,
           ),
         ),
       ),
@@ -731,6 +771,8 @@ extension _HomeUiLogic on _MyHomePageState {
             lastKnownDraggabilityState = _retrieveDraggabilityUserModel();
           }
           _onCameraMove(_currentZoom);
+          _shouldCreateInterest = false;
+          _initialInterestName = '';
         }
         setState(() {
           _zoomEnabled = !state;

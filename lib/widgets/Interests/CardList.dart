@@ -18,6 +18,18 @@ class CardList extends StatefulWidget {
   static GlobalKey<CardListState> createGlobalKey() =>
       GlobalKey<CardListState>();
 
+  final GlobalKey<CardListState> cardListKey;
+  final String name;
+  final GlobalKey<ScaffoldState> scaffoldKey;
+  final String uid;
+  final bool signedIn;
+  final List<Interest> interests;
+  final void Function(int) onItemTapped;
+  final bool showInputForm;
+  final List<bool> editToggles;
+  final bool shouldCreateInterest;
+  final String initialInterestName;
+
   const CardList({
     super.key,
     required this.cardListKey,
@@ -29,17 +41,9 @@ class CardList extends StatefulWidget {
     required this.onItemTapped,
     required this.showInputForm,
     required this.editToggles,
+    this.shouldCreateInterest = false,
+    this.initialInterestName = '',
   });
-
-  final GlobalKey<CardListState> cardListKey;
-  final String name;
-  final GlobalKey<ScaffoldState> scaffoldKey;
-  final String uid;
-  final bool signedIn;
-  final List<Interest> interests;
-  final void Function(int) onItemTapped;
-  final bool showInputForm;
-  final List<bool> editToggles;
 
   @override
   CardListState createState() => CardListState();
@@ -98,6 +102,30 @@ class CardListState extends State<CardList>
   // Loads interests for the current user with retry hardening.
   // If the result is empty and we have retries remaining, schedules another
   // attempt after [_interestRetryDelay].
+
+  Future<void> createNewInterest({String? initialName}) async {
+    final String? interestName =
+    await _showCreateInterestDialog(initialName: initialName);
+    if (interestName == null || !mounted) return;
+
+    CollectionReference users = FirebaseFirestore.instance.collection('users');
+    Interest interest = Interest(
+        name: interestName,
+        description: '',
+        link: '',
+        created_timestamp: DateTime.now(),
+        updated_timestamp: DateTime.now());
+
+    await fu.addInterestForUser(users, interest, widget.uid);
+    await refreshInterestsForUser(widget.uid).then((updatedInterests) {
+      setState(() {
+        localInterests = updatedInterests;
+        _syncControllersWithInterests();
+      });
+    });
+    editTopMostInterest();
+  }
+
   Future<void> _loadInterestsWithRetry() async {
     if (!mounted) return;
 
@@ -590,11 +618,21 @@ class CardListState extends State<CardList>
     if (localInterests.isEmpty && widget.showInputForm) {
       _loadInterestsWithRetry();
     }
+    if (widget.shouldCreateInterest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        createNewInterest(initialName: widget.initialInterestName);
+      });
+    }
   }
 
   @override
   void didUpdateWidget(covariant CardList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.shouldCreateInterest && !oldWidget.shouldCreateInterest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        createNewInterest(initialName: widget.initialInterestName);
+      });
+    }
     if (widget.interests != oldWidget.interests) {
       setState(() {
         localInterests = widget.interests;
@@ -843,8 +881,8 @@ class CardListState extends State<CardList>
 
   // Shows a modal prompting the user to enter a name before the interest is
   // created. Returns the trimmed name string, or null if the user cancelled.
-  Future<String?> _showCreateInterestDialog() async {
-    final TextEditingController nameController = TextEditingController();
+  Future<String?> _showCreateInterestDialog({String? initialName}) async {
+    final TextEditingController nameController = TextEditingController(text:initialName);
     String? result;
 
     await showDialog<void>(
