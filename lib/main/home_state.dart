@@ -28,7 +28,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoading = false;
   int toggleIndex = 0;
   bool mapOptionsVisibility = false;
-  String _markerDraggabilityText = 'not movable';
+  String _markerDraggabilityText = 'not moveable';
   bool hasNotification = false;
   int notificationCount = 0;
   Timer? _notificationLoading;
@@ -37,6 +37,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _hasPerformedInitialSignedInMapSetup = false;
   String _lastTrackedUsageDayKey = '';
   RemoteMessage? _pendingInitialMessage;
+  bool _shouldCreateInterest = false;
+  String _initialInterestName = '';
 
   final mapId = "bc8e2917cca03ad4";
 
