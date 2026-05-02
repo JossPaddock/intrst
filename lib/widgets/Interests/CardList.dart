@@ -105,7 +105,7 @@ class CardListState extends State<CardList>
 
   Future<void> createNewInterest({String? initialName}) async {
     final String? interestName =
-    await _showCreateInterestDialog(initialName: initialName);
+        await _showCreateInterestDialog(initialName: initialName);
     if (interestName == null || !mounted) return;
 
     CollectionReference users = FirebaseFirestore.instance.collection('users');
@@ -714,6 +714,66 @@ class CardListState extends State<CardList>
     return jsonEncode(controller.document.toDelta().toJson());
   }
 
+  Future<void> _openFullscreenQuillEditor(QuillController quillController) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        // 1. Using a Scaffold inside the Dialog ensures a clean Overlay
+        // and correct AppBar/Keyboard behavior.
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            title: const Text('Enter/edit description'),
+            automaticallyImplyLeading: false,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.check),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ],
+          ),
+          body: Column(
+            children: [
+              QuillSimpleToolbar(
+                controller: quillController,
+                config: const QuillSimpleToolbarConfig(
+                  // ... keep your existing config here
+                  showFontFamily: false,
+                  showFontSize: false,
+                  showBoldButton: true,
+                  showItalicButton: true,
+                  showUnderLineButton: true,
+                  showListBullets: true,
+                  showListNumbers: true,
+                  showLink: true,
+                  showUndo: false,
+                  showRedo: false,
+                  showSearchButton: false,
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  child: QuillEditor.basic(
+                    controller: quillController,
+                    config: const QuillEditorConfig(
+                      // 2. CRITICAL: This ensures the long-press works
+                      // anywhere in the white space, not just on the text.
+                      expands: true,
+                      scrollable: true,
+                      autoFocus: true,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _disposeControllersForId(String id) {
     _titleControllers[id]?.dispose();
     _titleControllers.remove(id);
@@ -882,7 +942,8 @@ class CardListState extends State<CardList>
   // Shows a modal prompting the user to enter a name before the interest is
   // created. Returns the trimmed name string, or null if the user cancelled.
   Future<String?> _showCreateInterestDialog({String? initialName}) async {
-    final TextEditingController nameController = TextEditingController(text:initialName);
+    final TextEditingController nameController =
+        TextEditingController(text: initialName);
     String? result;
 
     await showDialog<void>(
@@ -1197,65 +1258,47 @@ class CardListState extends State<CardList>
                                             ),
                                           ),
                                           SizedBox(height: 8),
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              border: Border.all(
-                                                  color: Colors.grey),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Column(
-                                              children: [
-                                                QuillSimpleToolbar(
-                                                  controller: quillController,
-                                                  config:
-                                                      const QuillSimpleToolbarConfig(
-                                                    showFontFamily: false,
-                                                    showFontSize: false,
-                                                    showBoldButton: true,
-                                                    showItalicButton: true,
-                                                    showUnderLineButton: true,
-                                                    showListBullets: true,
-                                                    showListNumbers: true,
-                                                    showStrikeThrough: false,
-                                                    showAlignmentButtons: false,
-                                                    showBackgroundColorButton:
-                                                        false,
-                                                    showCenterAlignment: false,
-                                                    showClearFormat: false,
-                                                    showClipboardCopy: false,
-                                                    showClipboardCut: false,
-                                                    showClipboardPaste: false,
-                                                    showCodeBlock: false,
-                                                    showColorButton: false,
-                                                    showDirection: false,
-                                                    showDividers: false,
-                                                    showHeaderStyle: false,
-                                                    showIndent: false,
-                                                    showInlineCode: false,
-                                                    showJustifyAlignment: false,
-                                                    showLeftAlignment: false,
-                                                    showLineHeightButton: false,
-                                                    showLink: true,
-                                                    showListCheck: false,
-                                                    showQuote: false,
-                                                    showRedo: false,
-                                                    showRightAlignment: false,
-                                                    showSearchButton: false,
-                                                    showSmallButton: false,
-                                                    showSubscript: false,
-                                                    showSuperscript: false,
-                                                    showUndo: false,
+                                          GestureDetector(
+                                            onTap: () async {
+                                              await _openFullscreenQuillEditor(
+                                                  quillController);
+                                              if (mounted) setState(() {});
+                                            },
+                                            child: Container(
+                                              padding: EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                    color: Colors.grey),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      maxLines: 8,
+                                                      _getQuillPlainText(
+                                                                  quillController)
+                                                              .trim()
+                                                              .isEmpty
+                                                          ? 'Enter a description of the interest.'
+                                                          : _getQuillPlainText(
+                                                                  quillController)
+                                                              .trim(),
+                                                      style: TextStyle(
+                                                        color: _getQuillPlainText(
+                                                                    quillController)
+                                                                .trim()
+                                                                .isEmpty
+                                                            ? Colors.grey[600]
+                                                            : Colors.black,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                                Container(
-                                                  height: 150,
-                                                  padding: EdgeInsets.all(8),
-                                                  child: QuillEditor.basic(
-                                                    controller: quillController,
-                                                  ),
-                                                ),
-                                              ],
+                                                  Icon(Icons.edit,
+                                                      color: Colors.grey[600]),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1374,7 +1417,8 @@ class CardListState extends State<CardList>
                                         _showPostInterestToFeedDialog(interest);
                                       },
                                     ),
-                                  if (widget.showInputForm && !_searchKeyboardActive)
+                                  if (widget.showInputForm &&
+                                      !_searchKeyboardActive)
                                     IconButton(
                                       icon: Icon(
                                           toggle ? Icons.save : Icons.edit),
@@ -1545,7 +1589,10 @@ class CardListState extends State<CardList>
                       });
                       widget.cardListKey.currentState?.editTopMostInterest();
                     },
-                    child: Text("Add Interest",  style: TextStyle(color: Colors.white),)),
+                    child: Text(
+                      "Add Interest",
+                      style: TextStyle(color: Colors.white),
+                    )),
               ),
               SizedBox(height: 20)
             ],
