@@ -30,6 +30,7 @@ dependencies:
   google_maps_flutter_web: ^0.5.10+1
   firebase_messaging: ^15.2.10
   flutter_quill: ^11.5.0
+  shared_preferences: ^2.5.3
 
 dependency_overrides:
   font_awesome_flutter: 10.7.0
