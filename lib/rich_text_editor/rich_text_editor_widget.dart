@@ -212,34 +212,111 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
   // ── Edit mode ──────────────────────────────────────────────────────────────
 
   Widget _buildEditMode() {
-    return GestureDetector(
-      // behavior: translucent so touches also reach the TextField underneath.
-      behavior: HitTestBehavior.translucent,
-      onTapUp: _onEditTapUp,
-      child: TextField(
-        key: _fieldKey,
-        controller: _controller,
-        focusNode: _focusNode,
-        decoration: widget.decoration,
-        style: widget.style,
-        maxLines: widget.maxLines,
-        minLines: widget.minLines,
-        keyboardType: widget.keyboardType,
-        textInputAction: widget.textInputAction,
-        textCapitalization: widget.textCapitalization,
-        enabled: widget.enabled,
-        autofocus: widget.autofocus,
-        scrollPhysics: widget.scrollPhysics,
-        scrollController: widget.scrollController,
-        onChanged: (text) {
-          _controller.reconcile(text);
-          widget.onChanged?.call(_controller.document);
-        },
-        onEditingComplete: widget.onEditingComplete,
-        onSubmitted: widget.onSubmitted,
-        onTap: widget.onTap,
-      ),
+    return TextField(
+      key: _fieldKey,
+      controller: _controller,
+      focusNode: _focusNode,
+      decoration: widget.decoration,
+      style: widget.style,
+      maxLines: widget.maxLines,
+      minLines: widget.minLines,
+      keyboardType: widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      textCapitalization: widget.textCapitalization,
+      enabled: widget.enabled,
+      autofocus: widget.autofocus,
+      scrollPhysics: widget.scrollPhysics,
+      scrollController: widget.scrollController,
+      onChanged: (text) {
+        _controller.reconcile(text);
+        widget.onChanged?.call(_controller.document);
+      },
+      onEditingComplete: widget.onEditingComplete,
+      onSubmitted: widget.onSubmitted,
+      onTap: () {
+        widget.onTap?.call();
+        // The TextField updates _controller.selection before onTap returns,
+        // but the selection value isn't flushed to the controller until the
+        // next frame, so we defer the link check by one frame.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final sel = _controller.selection;
+          if (!sel.isValid || !sel.isCollapsed) {
+            _hidePopover();
+            return;
+          }
+          final link = _controller.getLinkAtOffset(sel.baseOffset);
+          if (link != null) {
+            _showPopoverAtLinkRange(link);
+          } else {
+            _hidePopover();
+          }
+        });
+      },
     );
+  }
+
+  void _showPopoverAtLinkRange(({String url, int start, int end}) link) {
+    _hidePopover();
+
+    final renderBox =
+    _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final globalFieldOrigin = renderBox.localToGlobal(Offset.zero);
+    final padding = _resolvedContentPadding();
+    final painter =
+    _buildPainter(renderBox.size.width - padding.horizontal);
+
+    final boxes = painter.getBoxesForSelection(
+      TextSelection(baseOffset: link.start, extentOffset: link.end),
+    );
+    painter.dispose();
+
+    final Offset popoverGlobal;
+    if (boxes.isNotEmpty) {
+      final box = boxes.first;
+      popoverGlobal = Offset(
+        globalFieldOrigin.dx + padding.left + box.left,
+        globalFieldOrigin.dy + padding.top + box.bottom + 4,
+      );
+    } else {
+      popoverGlobal = Offset(
+        globalFieldOrigin.dx + padding.left,
+        globalFieldOrigin.dy + renderBox.size.height + 4,
+      );
+    }
+
+    _activeLink = link;
+    _popoverEntry = OverlayEntry(builder: (ctx) {
+      return _PopoverPositioner(
+        position: popoverGlobal,
+        onDismiss: _hidePopover,
+        child: LinkPopover(
+          url: link.url,
+          mode: LinkPopoverMode.edit,
+          onOpen: () {
+            _hidePopover();
+            _openLink(link.url);
+          },
+          onEdit: () {
+            _hidePopover();
+            _showLinkEditDialog(
+              initialText:
+              _controller.text.substring(link.start, link.end),
+              initialUrl: link.url,
+              offset: link.start,
+            );
+          },
+          onRemove: () {
+            _hidePopover();
+            _controller.removeLink(link.start);
+          },
+        ),
+      );
+    });
+
+    Overlay.of(context).insert(_popoverEntry!);
   }
 
   // ── View mode ──────────────────────────────────────────────────────────────
@@ -446,19 +523,25 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
       ),
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      textCtrl.dispose();
+      urlCtrl.dispose();
+      return;
+    }
+
+// ✅ Capture values BEFORE disposing
+    final newText = textCtrl.text.trim();
+    final rawUrl = urlCtrl.text.trim();
+
     textCtrl.dispose();
     urlCtrl.dispose();
 
     if (saved != true) return;
 
-    final newText = textCtrl.text.trim();
-    final newUrl = UrlDetector.normalise(urlCtrl.text.trim());
-
     _controller.updateLink(
       offset: offset,
       newText: newText.isEmpty ? null : newText,
-      newUrl: newUrl.isEmpty ? null : newUrl,
+      newUrl: rawUrl.isEmpty ? null : UrlDetector.normalise(rawUrl),
     );
   }
 

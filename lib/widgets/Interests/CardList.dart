@@ -12,6 +12,9 @@ import '../../login/LoginScreen.dart';
 import '../../models/Interest.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
+import '../../rich_text_editor/rich_text_document.dart';
+import '../../rich_text_editor/rich_text_editor_controller.dart';
+import '../../rich_text_editor/rich_text_editor_widget.dart';
 import '../../utility/url_validator/url_validator.dart';
 
 class CardList extends StatefulWidget {
@@ -65,7 +68,7 @@ class CardListState extends State<CardList>
   final TextEditingController _searchController = TextEditingController();
   // FocusNode with skipTraversal: true prevents the OS/Flutter focus system
   // from auto-jumping to this field when the emoji keyboard triggers a focus
-  // transition while the user is typing in the Quill description editor.
+  // transition while the user is typing in the RichText description editor.
   final FocusNode _searchFocusNode = FocusNode(skipTraversal: true);
   // True while the search field has focus (keyboard is up). Used to hide the
   // title, link, and description fields so the search results have full room.
@@ -73,7 +76,7 @@ class CardListState extends State<CardList>
 
   final Map<String, TextEditingController> _titleControllers = {};
   final Map<String, TextEditingController> _linkControllers = {};
-  final Map<String, QuillController> _quillControllers = {};
+  final Map<String, RichTextEditorController> _richTextControllers = {};
   bool _isFriend = false;
   bool _isFollowing = false;
   bool _relationshipsLoaded = false;
@@ -86,7 +89,7 @@ class CardListState extends State<CardList>
 
   TextEditingController _mobileTitleController = TextEditingController();
   TextEditingController _mobileLinkController = TextEditingController();
-  late QuillController _mobileQuillController;
+  late RichTextEditorController _mobileRichTextController;
   bool _isSearchingUsers = false;
   List<String> searchResults = <String>[];
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
@@ -238,10 +241,10 @@ class CardListState extends State<CardList>
 
   bool _isInterestBlank({
     required TextEditingController titleController,
-    required QuillController quillController,
+    required RichTextEditorController richTextController,
   }) {
     final title = titleController.text.trim();
-    final description = _getQuillPlainText(quillController);
+    final description = _getRichTextPlainText(richTextController);
 
     return title.isEmpty && description.isEmpty;
   }
@@ -603,7 +606,7 @@ class CardListState extends State<CardList>
   @override
   void initState() {
     super.initState();
-    _mobileQuillController = QuillController.basic();
+    _mobileRichTextController = RichTextEditorController();
     _syncControllersWithInterests();
     _checkRelationships();
     // Hide title/link/description while the search keyboard is up so the
@@ -658,18 +661,14 @@ class CardListState extends State<CardList>
       }
     }
 
+    // Interests that are gone — safe to dispose synchronously because no
+    // widget can be showing them (they've been removed from localInterests).
     for (final id in keysToRemove) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _titleControllers[id]?.dispose();
-      });
+      _titleControllers[id]?.dispose();
       _titleControllers.remove(id);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _quillControllers[id]?.dispose();
-      });
-      _quillControllers.remove(id);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _linkControllers[id]?.dispose();
-      });
+      _richTextControllers[id]?.dispose();
+      _richTextControllers.remove(id);
+      _linkControllers[id]?.dispose();
       _linkControllers.remove(id);
     }
 
@@ -680,47 +679,49 @@ class CardListState extends State<CardList>
         _titleControllers[id] = TextEditingController(text: interest.name);
       }
 
-      if (!_quillControllers.containsKey(id)) {
-        _quillControllers[id] = _createQuillController(interest.description);
+      final existingRtc = _richTextControllers[id];
+      if (existingRtc == null) {
+        // First time seeing this interest — create fresh.
+        _richTextControllers[id] =
+            _createRichTextController(interest.description);
+      } else {
+        // Already have a controller — update its document in-place rather than
+        // disposing and recreating. Disposing while animated widgets inside
+        // TextField still hold a reference causes use-after-dispose crashes.
+        final incoming =
+        RichTextDocument.fromJsonString(interest.description);
+        if (incoming != existingRtc.document) {
+          existingRtc.loadDocument(incoming);
+        }
       }
 
       if (!_linkControllers.containsKey(id)) {
-        _linkControllers[id] = TextEditingController(text: interest.link ?? '');
+        _linkControllers[id] =
+            TextEditingController(text: interest.link ?? '');
       }
     }
   }
 
-  QuillController _createQuillController(String text) {
-    try {
-      final doc = Document.fromJson(jsonDecode(text));
-      return QuillController(
-        document: doc,
-        selection: TextSelection.collapsed(offset: 0),
-      );
-    } catch (e) {
-      final doc = Document()..insert(0, text);
-      return QuillController(
-        document: doc,
-        selection: TextSelection.collapsed(offset: 0),
-      );
-    }
+  RichTextEditorController _createRichTextController(String text) {
+    return RichTextEditorController(
+      initialDocument: RichTextDocument.fromJsonString(text),
+    );
   }
 
-  String _getQuillPlainText(QuillController controller) {
-    return controller.document.toPlainText().trim();
+  String _getRichTextPlainText(RichTextEditorController controller) {
+    return controller.document.plainText.trim();
   }
 
-  String _getQuillJson(QuillController controller) {
-    return jsonEncode(controller.document.toDelta().toJson());
+  String _getRichTextJson(RichTextEditorController controller) {
+    return controller.document.toJsonString();
   }
 
-  Future<void> _openFullscreenQuillEditor(QuillController quillController) async {
+  Future<void> _openFullscreenRichTextEditor(
+      RichTextEditorController richTextController) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (BuildContext dialogContext) {
-        // 1. Using a Scaffold inside the Dialog ensures a clean Overlay
-        // and correct AppBar/Keyboard behavior.
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
@@ -733,42 +734,16 @@ class CardListState extends State<CardList>
               ),
             ],
           ),
-          body: Column(
-            children: [
-              QuillSimpleToolbar(
-                controller: quillController,
-                config: const QuillSimpleToolbarConfig(
-                  // ... keep your existing config here
-                  showFontFamily: false,
-                  showFontSize: false,
-                  showBoldButton: true,
-                  showItalicButton: true,
-                  showUnderLineButton: true,
-                  showListBullets: true,
-                  showListNumbers: true,
-                  showLink: true,
-                  showUndo: false,
-                  showRedo: false,
-                  showSearchButton: false,
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  child: QuillEditor.basic(
-                    controller: quillController,
-                    config: const QuillEditorConfig(
-                      // 2. CRITICAL: This ensures the long-press works
-                      // anywhere in the white space, not just on the text.
-                      expands: true,
-                      scrollable: true,
-                      autoFocus: true,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          body: Container(
+              padding: const EdgeInsets.all(20),
+              child: RichTextEditorWidget(
+                mode: RichTextEditorMode.edit,
+                controller: richTextController,
+                autofocus: true,
+                maxLines: null,
+                decoration:
+                    const InputDecoration(hintText: 'enter your interest here'),
+              )),
         );
       },
     );
@@ -777,8 +752,8 @@ class CardListState extends State<CardList>
   void _disposeControllersForId(String id) {
     _titleControllers[id]?.dispose();
     _titleControllers.remove(id);
-    _quillControllers[id]?.dispose();
-    _quillControllers.remove(id);
+    _richTextControllers[id]?.dispose();
+    _richTextControllers.remove(id);
     _linkControllers[id]?.dispose();
     _linkControllers.remove(id);
   }
@@ -791,12 +766,12 @@ class CardListState extends State<CardList>
     for (var controller in _linkControllers.values) {
       controller.dispose();
     }
-    for (var controller in _quillControllers.values) {
+    for (var controller in _richTextControllers.values) {
       controller.dispose();
     }
     _mobileTitleController.dispose();
     _mobileLinkController.dispose();
-    _mobileQuillController.dispose();
+    _mobileRichTextController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
   }
@@ -1016,7 +991,7 @@ class CardListState extends State<CardList>
       Interest interest,
       bool toggle,
       TextEditingController titleController,
-      QuillController quillController,
+      RichTextEditorController richTextController,
       TextEditingController linkController,
       int index,
       String id,
@@ -1026,14 +1001,14 @@ class CardListState extends State<CardList>
           FirebaseFirestore.instance.collection('users');
       Interest newInterest = interest.copyWith(
         name: titleController.text,
-        description: _getQuillJson(quillController),
+        description: _getRichTextJson(richTextController),
         link: linkController.text,
         created_timestamp: interest.created_timestamp,
         updated_timestamp: DateTime.now(),
       );
       final isBlank = _isInterestBlank(
         titleController: titleController,
-        quillController: quillController,
+        richTextController: richTextController,
       );
       if (!kIsWeb && linkController.text != '') {
         final isValid =
@@ -1043,7 +1018,7 @@ class CardListState extends State<CardList>
           return;
         }
       }
-      fu.updateEditedInterest(users, interest, newInterest, widget.uid);
+      await fu.updateEditedInterest(users, interest, newInterest, widget.uid);
 
       if (isBlank) {
         await _showBlankInterestDialog();
@@ -1193,8 +1168,8 @@ class CardListState extends State<CardList>
 
                     final titleController =
                         _titleControllers[id] ?? TextEditingController();
-                    final quillController = _quillControllers[id] ??
-                        _createQuillController(interest.description);
+                    final richTextController = _richTextControllers[id] ??
+                        _createRichTextController(interest.description);
                     final linkController =
                         _linkControllers[id] ?? TextEditingController();
 
@@ -1260,43 +1235,30 @@ class CardListState extends State<CardList>
                                           SizedBox(height: 8),
                                           GestureDetector(
                                             onTap: () async {
-                                              await _openFullscreenQuillEditor(
-                                                  quillController);
+                                              await _openFullscreenRichTextEditor(richTextController);
                                               if (mounted) setState(() {});
                                             },
                                             child: Container(
                                               padding: EdgeInsets.all(12),
                                               decoration: BoxDecoration(
-                                                border: Border.all(
-                                                    color: Colors.grey),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
+                                                border: Border.all(color: Colors.grey),
+                                                borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Row(
                                                 children: [
                                                   Expanded(
-                                                    child: Text(
+                                                    child: _getRichTextPlainText(richTextController).trim().isEmpty
+                                                        ? Text(
+                                                      'Enter a description of the interest.',
+                                                      style: TextStyle(color: Colors.grey[600]),
+                                                    )
+                                                        : RichTextEditorWidget(
+                                                      mode: RichTextEditorMode.view,
+                                                      controller: richTextController,
                                                       maxLines: 8,
-                                                      _getQuillPlainText(
-                                                                  quillController)
-                                                              .trim()
-                                                              .isEmpty
-                                                          ? 'Enter a description of the interest.'
-                                                          : _getQuillPlainText(
-                                                                  quillController)
-                                                              .trim(),
-                                                      style: TextStyle(
-                                                        color: _getQuillPlainText(
-                                                                    quillController)
-                                                                .trim()
-                                                                .isEmpty
-                                                            ? Colors.grey[600]
-                                                            : Colors.black,
-                                                      ),
                                                     ),
                                                   ),
-                                                  Icon(Icons.edit,
-                                                      color: Colors.grey[600]),
+                                                  Icon(Icons.edit, color: Colors.grey[600]),
                                                 ],
                                               ),
                                             ),
@@ -1305,12 +1267,10 @@ class CardListState extends State<CardList>
                                       )
                                     : Container(
                                         padding: EdgeInsets.all(8),
-                                        child: QuillEditor.basic(
-                                          focusNode:
-                                              FocusNode(canRequestFocus: false),
-                                          controller: quillController,
-                                          config: QuillEditorConfig(
-                                              showCursor: false),
+                                        child: RichTextEditorWidget(
+                                          mode: RichTextEditorMode.view,
+                                          controller: richTextController,
+                                          maxLines: null,
                                         ),
                                       ),
                                 Container(
@@ -1427,7 +1387,7 @@ class CardListState extends State<CardList>
                                             interest,
                                             toggle,
                                             titleController,
-                                            quillController,
+                                            richTextController,
                                             linkController,
                                             index,
                                             id,
