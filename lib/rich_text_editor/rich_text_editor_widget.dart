@@ -348,13 +348,12 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
       }
     }
 
-    // SelectableText.rich gives us free iOS magnifier + text selection.
-    return SelectableText.rich(
-      TextSpan(children: spans),
+    return RichText(
+      text: TextSpan(children: spans),
       maxLines: widget.maxLines,
-      minLines: widget.minLines,
-      focusNode: _focusNode,
-      onTap: widget.onTap,
+      overflow: widget.maxLines != null
+          ? TextOverflow.ellipsis
+          : TextOverflow.clip,
     );
   }
 
@@ -477,71 +476,22 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
     required String initialUrl,
     required int offset,
   }) async {
-    final textCtrl = TextEditingController(text: initialText);
-    final urlCtrl = TextEditingController(text: initialUrl);
-
-    final saved = await showDialog<bool>(
+    // We pass the data in and get the result back.
+    // No local controller management here!
+    final result = await showDialog<({String text, String url})>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit link'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: textCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Display text',
-                hintText: 'Link text shown to users',
-              ),
-              autofocus: true,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlCtrl,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://example.com',
-                prefixIcon: Icon(Icons.link_rounded),
-              ),
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => Navigator.pop(ctx, true),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (ctx) => _LinkEditDialog(
+        initialText: initialText,
+        initialUrl: initialUrl,
       ),
     );
 
-    if (!mounted) {
-      textCtrl.dispose();
-      urlCtrl.dispose();
-      return;
-    }
-
-// ✅ Capture values BEFORE disposing
-    final newText = textCtrl.text.trim();
-    final rawUrl = urlCtrl.text.trim();
-
-    textCtrl.dispose();
-    urlCtrl.dispose();
-
-    if (saved != true) return;
+    if (result == null || !mounted) return;
 
     _controller.updateLink(
       offset: offset,
-      newText: newText.isEmpty ? null : newText,
-      newUrl: rawUrl.isEmpty ? null : UrlDetector.normalise(rawUrl),
+      newText: result.text.isEmpty ? null : result.text,
+      newUrl: result.url.isEmpty ? null : UrlDetector.normalise(result.url),
     );
   }
 
@@ -617,6 +567,84 @@ class _PopoverPositioner extends StatelessWidget {
           left: position.dx,
           top: position.dy,
           child: child,
+        ),
+      ],
+    );
+  }
+}
+class _LinkEditDialog extends StatefulWidget {
+  final String initialText;
+  final String initialUrl;
+
+  const _LinkEditDialog({required this.initialText, required this.initialUrl});
+
+  @override
+  State<_LinkEditDialog> createState() => _LinkEditDialogState();
+}
+
+class _LinkEditDialogState extends State<_LinkEditDialog> {
+  late final TextEditingController _textCtrl;
+  late final TextEditingController _urlCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _textCtrl = TextEditingController(text: widget.initialText);
+    _urlCtrl = TextEditingController(text: widget.initialUrl);
+  }
+
+  @override
+  void dispose() {
+    // These now dispose only when the Dialog is actually destroyed
+    _textCtrl.dispose();
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    // 1. Unfocus first to stop the keyboard/caret logic
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    // 2. Return data
+    Navigator.of(context).pop((text: _textCtrl.text.trim(), url: _urlCtrl.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit link'),
+      content: SingleChildScrollView( // Prevents the RenderFlex overflow
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _textCtrl,
+              decoration: const InputDecoration(labelText: 'Display text'),
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _urlCtrl,
+              decoration: const InputDecoration(
+                labelText: 'URL',
+                prefixIcon: Icon(Icons.link_rounded),
+              ),
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _handleSave(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _handleSave,
+          child: const Text('Save'),
         ),
       ],
     );

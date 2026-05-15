@@ -688,16 +688,14 @@ class CardListState extends State<CardList>
         // Already have a controller — update its document in-place rather than
         // disposing and recreating. Disposing while animated widgets inside
         // TextField still hold a reference causes use-after-dispose crashes.
-        final incoming =
-        RichTextDocument.fromJsonString(interest.description);
+        final incoming = RichTextDocument.fromJsonString(interest.description);
         if (incoming != existingRtc.document) {
           existingRtc.loadDocument(incoming);
         }
       }
 
       if (!_linkControllers.containsKey(id)) {
-        _linkControllers[id] =
-            TextEditingController(text: interest.link ?? '');
+        _linkControllers[id] = TextEditingController(text: interest.link ?? '');
       }
     }
   }
@@ -735,7 +733,7 @@ class CardListState extends State<CardList>
             ],
           ),
           body: Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 64, 20, 20),
               child: RichTextEditorWidget(
                 mode: RichTextEditorMode.edit,
                 controller: richTextController,
@@ -1052,6 +1050,33 @@ class CardListState extends State<CardList>
     }
   }
 
+  Future<bool?> _showSaveDialog(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // user must choose
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("You may have unsaved changes"),
+          content: const Text("Do you want to save your work?"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false); // discard
+              },
+              child: const Text("Discard"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(true); // save
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1120,7 +1145,39 @@ class CardListState extends State<CardList>
               IconButton(
                 iconSize: 20,
                 icon: Icon(Icons.close, color: Colors.white),
-                onPressed: () {
+                onPressed: () async {
+                  // Only prompt when something is actively being edited.
+                  if (isEditingAny) {
+                    final bool? save = await _showSaveDialog(context);
+                    if (save == null) return; // user dismissed the dialog — do nothing
+
+                    if (save) {
+                      // Look up the editing interest and its controllers by ID.
+                      final idx = localInterests.indexWhere((i) => i.id == editingId);
+                      if (idx != -1) {
+                        final interest = localInterests[idx];
+                        final titleController =
+                            _titleControllers[editingId] ?? TextEditingController();
+                        final richTextController = _richTextControllers[editingId] ??
+                            _createRichTextController(interest.description);
+                        final linkController =
+                            _linkControllers[editingId] ?? TextEditingController();
+
+                        await editing(
+                          interest,
+                          true, // currently in edit mode
+                          titleController,
+                          richTextController,
+                          linkController,
+                          idx,
+                          editingId,
+                          editingId,
+                        );
+                      }
+                    }
+                    // If save == false (Discard), fall through and just close.
+                  }
+
                   widget.scaffoldKey.currentState?.closeEndDrawer();
                 },
                 tooltip: 'Close',
@@ -1235,30 +1292,45 @@ class CardListState extends State<CardList>
                                           SizedBox(height: 8),
                                           GestureDetector(
                                             onTap: () async {
-                                              await _openFullscreenRichTextEditor(richTextController);
+                                              await _openFullscreenRichTextEditor(
+                                                  richTextController);
                                               if (mounted) setState(() {});
                                             },
                                             child: Container(
                                               padding: EdgeInsets.all(12),
                                               decoration: BoxDecoration(
-                                                border: Border.all(color: Colors.grey),
-                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                    color: Colors.grey),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: Row(
                                                 children: [
                                                   Expanded(
-                                                    child: _getRichTextPlainText(richTextController).trim().isEmpty
+                                                    child: _getRichTextPlainText(
+                                                                richTextController)
+                                                            .trim()
+                                                            .isEmpty
                                                         ? Text(
-                                                      'Enter a description of the interest.',
-                                                      style: TextStyle(color: Colors.grey[600]),
-                                                    )
-                                                        : RichTextEditorWidget(
-                                                      mode: RichTextEditorMode.view,
-                                                      controller: richTextController,
-                                                      maxLines: 8,
-                                                    ),
+                                                            'Enter a description of the interest.',
+                                                            style: TextStyle(
+                                                                color: Colors
+                                                                    .grey[600]),
+                                                          )
+                                                        : SingleChildScrollView(
+                                                            child:
+                                                                RichTextEditorWidget(
+                                                              mode:
+                                                                  RichTextEditorMode
+                                                                      .view,
+                                                              controller:
+                                                                  richTextController,
+                                                              maxLines: null,
+                                                            ),
+                                                          ),
                                                   ),
-                                                  Icon(Icons.edit, color: Colors.grey[600]),
+                                                  Icon(Icons.edit,
+                                                      color: Colors.grey[600]),
                                                 ],
                                               ),
                                             ),
