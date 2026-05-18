@@ -56,6 +56,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _zoomEnabled = true;
 
   BitmapDescriptor poi = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor poio = BitmapDescriptor.defaultMarker;
 
   static const TextStyle optionStyle =
       TextStyle(fontSize: 30, fontWeight: FontWeight.bold);

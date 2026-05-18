@@ -220,6 +220,23 @@ class FirebaseUsersUtility {
         .fold<int>(0, (sum, value) => sum + value.toInt());
   }
 
+  Future<List<Map<String, dynamic>>> retrieveAllUserMarkerData(
+      CollectionReference users) async {
+    QuerySnapshot querySnapshot = await users.get();
+    return querySnapshot.docs.map((doc) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      String firstname = data['first_name'] ?? '';
+      String lastname = data['last_name'] ?? '';
+      GeoPoint latlng = data['location'] ?? const GeoPoint(0, 0);
+      return {
+        'uid': data['user_uid'],
+        'name': '$firstname $lastname',
+        'lat': latlng.latitude,
+        'lng': latlng.longitude,
+      };
+    }).toList();
+  }
+
   Future<List<String>> retrieveAllUserUid(CollectionReference users) async {
     List<String> uids = [];
 

@@ -66,7 +66,7 @@ extension _HomeMapLogic on _MyHomePageState {
 
   Set<String> _getMarkersToShowAsLabels(double currentZoom) {
     const double minLabelZoom = 2.0;
-    const double alwaysLabelDistance = 1000000; // 10km for always label markers distances
+    const double alwaysLabelDistance = 1000000; // 1000km for always label markers distances
 
     Set<String> showAsLabels = {};
 
@@ -77,24 +77,36 @@ extension _HomeMapLogic on _MyHomePageState {
       markerPositions.add(MapEntry(marker.markerId.value, marker.position));
     }
 
-    for (int i = 0; i < markerPositions.length; i++) {
+    int n = markerPositions.length;
+    
+    for (int i = 0; i < n; i++) {
       double minDistanceToAnyMarker = double.infinity;
+      LatLng p1 = markerPositions[i].value;
 
-      for (int j = 0; j < markerPositions.length; j++) {
-        if (i != j) {
-          double distance = _calculateDistance(
-            markerPositions[i].value,
-            markerPositions[j].value,
-          );
+      for (int j = 0; j < n; j++) {
+        if (i == j) continue;
+        
+        LatLng p2 = markerPositions[j].value;
+        
+      
+        double latDelta = (p1.latitude - p2.latitude).abs();
+        double lngDelta = (p1.longitude - p2.longitude).abs();
+        
+        if (latDelta > 10 || lngDelta > 10) {
+           continue; 
+        }
 
-          if (distance < minDistanceToAnyMarker) {
-            minDistanceToAnyMarker = distance;
+        double distance = _calculateDistance(p1, p2);
+
+        if (distance < minDistanceToAnyMarker) {
+          minDistanceToAnyMarker = distance;
+          if (currentZoom >= minLabelZoom && distance < proximityThreshold) {
+            break; 
           }
         }
       }
 
       if (minDistanceToAnyMarker > alwaysLabelDistance) {
-        print('loner markers' + markerPositions[i].value.toString());
         showAsLabels.add(markerPositions[i].key);
       } else if (currentZoom >= minLabelZoom && minDistanceToAnyMarker >= proximityThreshold) {
         showAsLabels.add(markerPositions[i].key);
@@ -433,51 +445,112 @@ extension _HomeMapLogic on _MyHomePageState {
 
   Future<bool> loadMarkers(bool loadUserMarker) async {
     if (searchTerm == '') {
-      //Call this if your are dragging the marker!!
-      await Future.delayed(Duration(milliseconds: 1500));
       setState(() {
-        //markers = {};
         labelMarkers = {};
         poiMarkers = {};
       });
-      Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
-      poi = await BitmapDescriptor.bytes(imageData,
-          width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+
+      if (poi == BitmapDescriptor.defaultMarker) {
+        Uint8List imageData = await loadAssetAsByteData('assets/poi.png');
+        poi = await BitmapDescriptor.bytes(imageData,
+            width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+      }
+      if (poio == BitmapDescriptor.defaultMarker) {
+        Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
+        poio = await BitmapDescriptor.bytes(userImageData,
+            width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
+      }
+
       CollectionReference users =
       FirebaseFirestore.instance.collection('users');
-      //user
-      if (loadUserMarker) {
-        Uint8List userImageData = await loadAssetAsByteData('assets/poio.png');
-        BitmapDescriptor poio = await BitmapDescriptor.bytes(userImageData,
-            width: 50.0, height: 50.0, bitmapScaling: MapBitmapScaling.auto);
-        var signedInUserMarkerData =
-        await fu.lookUpNameAndLocationByUserUid(users, _uid);
-        //This is where we load the signed in users marker
-        await addMarker(
-            signedInUserMarkerData[0],
-            signedInUserMarkerData[1],
-            signedInUserMarkerData[2],
-            _retrieveDraggabilityUserModel(),
-            poio,
-            _uid,
-            true);
-      }
-      print('loadMarkers is working');
-      var uids = await fu.retrieveAllUserUid(users);
-      for (final uid in uids) {
-        var markerData = await fu.lookUpNameAndLocationByUserUid(users, uid);
-        if (uid != _uid) {
-          await addMarker(
-              markerData[0], markerData[1], markerData[2], false, poi,
-              uid, false);
+
+      print('loadMarkers is starting batched fetch');
+      
+      // i made this batched fetch of all users' marker data
+      List<Map<String, dynamic>> allUserData = await fu.retrieveAllUserMarkerData(users);
+      
+      // these sets represent the batches
+      Set<Marker> newPoiMarkers = {};
+      Set<LabelMarker> newLabelMarkers = {};
+
+      List<Future<void>> markerCreationFutures = [];
+
+      for (var userData in allUserData) {
+        String uid = userData['uid'];
+        String name = userData['name'];
+        double lat = userData['lat'];
+        double lng = userData['lng'];
+        bool isCurrentUser = (uid == _uid);
+
+        if (isCurrentUser && !loadUserMarker) continue;
+
+        // Common onTap logic
+        void Function() handleTap(bool isPoi) {
+          return () {
+            setState(() {
+              markers = {};
+            });
+            handleMarkerTap(name, uid, isPoi);
+          };
         }
+
+        Future<void> handleDragEnd(LatLng newPosition) async {
+          fu.updateUserLocation(
+              FirebaseFirestore.instance.collection('users'),
+              FirebaseAuth.instance.currentUser!.uid,
+              GeoPoint(newPosition.latitude, newPosition.longitude));
+          await loadMarkers(true);
+          setState(() {
+            _markersLoadingSignedIn = false;
+            _markersLoadingSignedInBannerText = 'loading markers...';
+          });
+        }
+
+        bool draggable = isCurrentUser ? _retrieveDraggabilityUserModel() : false;
+        BitmapDescriptor icon = isCurrentUser ? poio : poi;
+        int zIndex = draggable ? 10 : (isCurrentUser ? 5 : 1);
+        Color labelColor = isCurrentUser ? const Color(0xFFff673a) : Colors.white;
+
+        newPoiMarkers.add(Marker(
+          icon: icon,
+          markerId: MarkerId(uid),
+          anchor: const Offset(0.5, 0.5),
+          position: LatLng(lat, lng),
+          draggable: draggable,
+          zIndex: zIndex.toDouble(),
+          onTap: handleTap(true),
+          onDragEnd: isCurrentUser ? handleDragEnd : null,
+        ));
+
+        newLabelMarkers.add(LabelMarker(
+          icon: BitmapDescriptor.defaultMarker,
+          label: name,
+          textStyle: TextStyle(
+            color: labelColor,
+            fontSize: 27.0,
+            letterSpacing: 1.0,
+            fontFamily: 'Roboto Bold',
+          ),
+          markerId: MarkerId(uid),
+          anchor: const Offset(0.5, 0.5),
+          position: LatLng(lat, lng),
+          backgroundColor: const Color(0x00000000),
+          draggable: draggable,
+          zIndex: zIndex.toDouble(),
+          onTap: handleTap(false),
+          onDragEnd: isCurrentUser ? handleDragEnd : null,
+        ));
       }
+
+      setState(() {
+        poiMarkers = newPoiMarkers;
+      });
+      
+      for (var lm in newLabelMarkers) {
+        await labelMarkers.addLabelMarker(lm);
+      }
+
       _onCameraMove(_currentZoom);
-    } else {
-      //any logic if search term is empty
-      /*setState(() {
-        markers = searchFilteredMarkers;
-      }); */
     }
     setState(() {
       _markersLoadingSignedIn = false;
