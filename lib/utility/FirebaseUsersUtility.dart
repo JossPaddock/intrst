@@ -1254,9 +1254,17 @@ class FirebaseUsersUtility {
 
     try {
       final decoded = jsonDecode(text);
+      List<dynamic>? ops;
+
       if (decoded is List) {
+        ops = decoded;
+      } else if (decoded is Map<String, dynamic> && decoded['ops'] is List) {
+        ops = decoded['ops'];
+      }
+
+      if (ops != null) {
         final buffer = StringBuffer();
-        for (final operation in decoded) {
+        for (final operation in ops) {
           if (operation is Map<String, dynamic> &&
               operation['insert'] is String) {
             buffer.write(operation['insert'] as String);

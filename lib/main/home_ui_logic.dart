@@ -84,10 +84,6 @@ extension _HomeUiLogic on _MyHomePageState {
                   print('user deleted a character from searchbar');
                 }
 
-                setState(() {
-                  searchTerm = value;
-                });
-
                 CollectionReference users =
                     FirebaseFirestore.instance.collection('users');
 
@@ -100,6 +96,7 @@ extension _HomeUiLogic on _MyHomePageState {
                 print("interests: $interests");
 
                 setState(() {
+                  searchTerm = value;
                   searchFilteredMarkers = markers;
                   searchFilteredResults = uid_results;
                   _onCameraMove(_currentZoom);
@@ -178,9 +175,17 @@ extension _HomeUiLogic on _MyHomePageState {
                   ),
                 );
               },
-              onSelected: (selection) {
+              onSelected: (selection) async {
+                CollectionReference users =
+                    FirebaseFirestore.instance.collection('users');
+
+                List<String> uid_results = await fu
+                    .searchForPeopleAndInterestsReturnUIDs(users, selection, true);
+
                 setState(() {
                   searchTerm = selection;
+                  searchFilteredResults = uid_results;
+                  _onCameraMove(_currentZoom);
                 });
                 print('Selected: $selection');
               },

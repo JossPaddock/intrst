@@ -64,7 +64,7 @@ extension _HomeMapLogic on _MyHomePageState {
     }
   }
 
-  Set<String> _getMarkersToShowAsLabels(double currentZoom) {
+  Set<String> _getMarkersToShowAsLabels(double currentZoom, {List<String>? filteredUids}) {
     const double minLabelZoom = 2.0;
     const double alwaysLabelDistance = 1000000; // 1000km for always label markers distances
 
@@ -74,7 +74,9 @@ extension _HomeMapLogic on _MyHomePageState {
 
     List<MapEntry<String, LatLng>> markerPositions = [];
     for (var marker in poiMarkers) {
-      markerPositions.add(MapEntry(marker.markerId.value, marker.position));
+      if (filteredUids == null || filteredUids.isEmpty || filteredUids.contains(marker.markerId.value)) {
+        markerPositions.add(MapEntry(marker.markerId.value, marker.position));
+      }
     }
 
     int n = markerPositions.length;
@@ -120,7 +122,8 @@ extension _HomeMapLogic on _MyHomePageState {
   void _onCameraMove(double zoom) {
     const double minLabelZoom = 2.0;
 
-    Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom);
+    Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom, 
+        filteredUids: searchTerm.isEmpty ? null : searchFilteredResults);
 
     setState(() {
       markers = {};

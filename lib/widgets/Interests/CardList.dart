@@ -10,7 +10,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import '../../login/LoginScreen.dart';
 import '../../models/Interest.dart';
-import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
 import '../../rich_text_editor/rich_text_document.dart';
 import '../../rich_text_editor/rich_text_editor_controller.dart';

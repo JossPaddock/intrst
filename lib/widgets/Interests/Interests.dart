@@ -8,8 +8,7 @@ import 'package:intrst/models/UserModel.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import '../../models/Interest.dart';
-import 'package:flutter_quill/flutter_quill.dart';
-import 'dart:convert';
+// Removed flutter_quill and dart:convert imports as they are unused
 
 class Interests extends StatefulWidget {
   final String name;
