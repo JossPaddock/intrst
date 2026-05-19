@@ -323,7 +323,7 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
 
   Widget _buildViewMode() {
     final doc = _controller.document;
-    final baseStyle = widget.style ?? const TextStyle();
+    final baseStyle = DefaultTextStyle.of(context).style.merge(widget.style);
 
     // Build an inline span tree from the document ops.
     final spans = <InlineSpan>[];
