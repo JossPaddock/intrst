@@ -266,7 +266,7 @@ extension _HomeUiLogic on _MyHomePageState {
                 ),
               )
             : _signedIn // _signedInGoogleMap
-                ? <Widget>[
+                ? IndexedStack( index: _selectedIndex, children: <Widget>[
                     Scaffold(
                       body: Container(
                         color: Color(0xFF082D38),
@@ -572,7 +572,7 @@ extension _HomeUiLogic on _MyHomePageState {
                       openWithUserUid: _openMessagesWithUserUid,
                     ),
           FriendsManagerWidget(currentUserUid: _uid)
-                  ][_selectedIndex]
+                  ])
                 : <Widget>[
                     Stack(children: [
                       GoogleMap(
