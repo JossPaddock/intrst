@@ -28,7 +28,7 @@ class _MessagingState extends State<Messaging> {
   final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
   final CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
+  FirebaseFirestore.instance.collection('users');
   final TextEditingController _searchController = TextEditingController();
 
   final Set<String> selectedItems = <String>{};
@@ -103,7 +103,7 @@ class _MessagingState extends State<Messaging> {
     if (widget.user_uid.trim().isEmpty) return;
 
     final notificationSettings =
-        await FirebaseMessaging.instance.requestPermission(provisional: true);
+    await FirebaseMessaging.instance.requestPermission(provisional: true);
     print(notificationSettings.authorizationStatus);
 
     final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
@@ -152,11 +152,11 @@ class _MessagingState extends State<Messaging> {
     final data = await fmu.getMessageDocumentsByUserUid(widget.user_uid);
     final extractedList = data.map((entry) => entry.values.first).toList();
     final extractedDocumentReference =
-        data.map((entry) => entry.keys.first).toList();
+    data.map((entry) => entry.keys.first).toList();
 
     final combinedList = List.generate(
       extractedList.length,
-      (index) =>
+          (index) =>
           MapEntry(extractedList[index], extractedDocumentReference[index]),
     );
 
@@ -215,8 +215,8 @@ class _MessagingState extends State<Messaging> {
   String? _findConversationPathForUser(String otherUid) {
     for (int i = 0; i < messageData.length; i++) {
       final participants = (messageData[i]['user_uids'] as List?)
-              ?.map((value) => value.toString())
-              .toList() ??
+          ?.map((value) => value.toString())
+          .toList() ??
           <String>[];
 
       if (participants.contains(widget.user_uid) &&
@@ -296,9 +296,9 @@ class _MessagingState extends State<Messaging> {
     final filtered = results
         .map((value) => value.trim())
         .where((value) =>
-            value.isNotEmpty &&
-            value != widget.user_uid &&
-            !selectedItems.contains(value))
+    value.isNotEmpty &&
+        value != widget.user_uid &&
+        !selectedItems.contains(value))
         .toSet()
         .toList();
 
@@ -479,12 +479,24 @@ class _MessagingState extends State<Messaging> {
       return const Center(child: Text('No chats yet.'));
     }
 
+    // When a chat is expanded, only show that one chat. When none
+    // are expanded, show all of them.
+    final bool hasOpenChat = _openChatDocumentPath != null;
+
+    final visibleIndices = hasOpenChat
+        ? List.generate(messageDocumentReference.length, (i) => i)
+        .where((i) =>
+    messageDocumentReference[i].path == _openChatDocumentPath)
+        .toList()
+        : List.generate(messageDocumentReference.length, (i) => i);
+
     return RefreshIndicator(
       onRefresh: getMessages,
       child: ListView.builder(
         padding: EdgeInsets.fromLTRB(kIsWeb ? 10 : 0, 10, kIsWeb ? 10 : 0, 20),
-        itemCount: messageData.length,
-        itemBuilder: (context, index) {
+        itemCount: visibleIndices.length,
+        itemBuilder: (context, listIndex) {
+          final index = visibleIndices[listIndex];
           final documentReference = messageDocumentReference[index];
           final isExpanded = documentReference.path == _openChatDocumentPath;
 

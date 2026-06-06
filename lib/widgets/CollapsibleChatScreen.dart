@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
 import 'ChatScreen.dart';
@@ -36,11 +39,16 @@ class CollapsibleChatScreen extends StatefulWidget {
 
 class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   static const double _webConversationMaxWidth = 500;
+
+  // Maximum number of visible lines before the input scrolls internally.
+  static const int _inputMaxLines = 3;
+
   final TextEditingController _sendMessageController = TextEditingController();
   final FirebaseMessagesUtility fmu = FirebaseMessagesUtility();
   final FirebaseUsersUtility fuu = FirebaseUsersUtility();
-  final CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
+  final CollectionReference users = FirebaseFirestore.instance.collection(
+    'users',
+  );
 
   bool _isExpanded = false;
   bool _isLoading = false;
@@ -48,6 +56,14 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   int notificationCount = 0;
   List<String> _participantNames = <String>[];
   String _participantKey = '';
+  Timer? _readTimer;
+
+  // --- Stable stream subscription ---
+  late Stream<DocumentSnapshot> _conversationStream;
+  StreamSubscription<DocumentSnapshot>? _conversationSub;
+  Map<String, dynamic>? _latestConversationData;
+  bool _streamLoading = true;
+  Object? _streamError;
 
   @override
   void initState() {
@@ -56,6 +72,12 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     _participantKey = _participantUidsKey(widget.documentData);
     _loadParticipantNames();
     _loadNotificationCount();
+
+    _latestConversationData = Map<String, dynamic>.from(widget.documentData);
+    _streamLoading = false;
+
+    _subscribeToConversation();
+
     if (_isExpanded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _markConversationRead();
@@ -63,9 +85,37 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     }
   }
 
+  void _subscribeToConversation() {
+    _conversationSub?.cancel();
+    _conversationStream = widget.documentReference.snapshots();
+    _conversationSub = _conversationStream.listen(
+          (snapshot) {
+        if (!mounted) return;
+        if (!snapshot.exists) return;
+        setState(() {
+          _latestConversationData =
+          snapshot.data() as Map<String, dynamic>?;
+          _streamLoading = false;
+          _streamError = null;
+        });
+      },
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _streamError = error;
+          _streamLoading = false;
+        });
+      },
+    );
+  }
+
   @override
   void didUpdateWidget(covariant CollapsibleChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.documentReference.path != oldWidget.documentReference.path) {
+      _subscribeToConversation();
+    }
 
     final latestParticipantKey = _participantUidsKey(widget.documentData);
     if (latestParticipantKey != _participantKey) {
@@ -90,12 +140,29 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
   @override
   void dispose() {
+    _conversationSub?.cancel();
+    _readTimer?.cancel();
     _sendMessageController.dispose();
     super.dispose();
   }
 
+  void _startReadTimer() {
+    _readTimer?.cancel();
+    _readTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_isExpanded) {
+        _markConversationRead();
+      }
+    });
+  }
+
+  void _stopReadTimer() {
+    _readTimer?.cancel();
+    _readTimer = null;
+  }
+
   String _participantUidsKey(Map<String, dynamic> data) {
-    final userUids = ((data['user_uids'] as List?) ?? <dynamic>[])
+    final userUids =
+    ((data['user_uids'] as List?) ?? <dynamic>[])
         .map((value) => value.toString().trim())
         .where((value) => value.isNotEmpty)
         .toList()
@@ -105,10 +172,10 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
   Future<void> _loadParticipantNames() async {
     final otherUids =
-        ((widget.documentData['user_uids'] as List?) ?? <dynamic>[])
-            .map((value) => value.toString().trim())
-            .where((value) => value.isNotEmpty && value != widget.uid)
-            .toList();
+    ((widget.documentData['user_uids'] as List?) ?? <dynamic>[])
+        .map((value) => value.toString().trim())
+        .where((value) => value.isNotEmpty && value != widget.uid)
+        .toList();
 
     if (otherUids.isEmpty) {
       if (!mounted) return;
@@ -126,12 +193,12 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     setState(() {
       _participantNames = names
           .map((name) {
-            final cleaned = name.trim();
-            if (cleaned.isEmpty || cleaned.length == 1) {
-              return 'Deleted account';
-            }
-            return cleaned;
-          })
+        final cleaned = name.trim();
+        if (cleaned.isEmpty || cleaned.length == 1) {
+          return 'Deleted account';
+        }
+        return cleaned;
+      })
           .where((name) => name.isNotEmpty)
           .toList();
     });
@@ -158,7 +225,9 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
   Future<void> _markConversationRead() async {
     await fuu.removeUnreadNotifications(
-        widget.documentReference.path, widget.uid);
+      widget.documentReference.path,
+      widget.uid,
+    );
     await _loadNotificationCount();
   }
 
@@ -177,6 +246,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       _isLoading = false;
     });
 
+    _startReadTimer();
+
     if (notifyParent) {
       widget.onOpen?.call();
     }
@@ -184,7 +255,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
   void _collapseChat({required bool notifyParent}) {
     if (!_isExpanded) return;
-
+    _stopReadTimer();
     setState(() {
       _isExpanded = false;
     });
@@ -244,19 +315,24 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                   ),
                   onPressed: isCorrect
                       ? () async {
-                          Navigator.of(context).pop();
-                          final userUids =
-                              await fmu.retrieveMessageDocumentUserUids(
-                            widget.documentReference,
-                          );
-                          await Future.wait(userUids.map((userUid) =>
-                              fuu.removeUnreadNotifications(
-                                  widget.documentReference.path,
-                                  userUid.toString())));
-                          await fmu
-                              .deleteMessageDocument(widget.documentReference);
-                          widget.getMessages?.call();
-                        }
+                    Navigator.of(context).pop();
+                    final userUids = await fmu
+                        .retrieveMessageDocumentUserUids(
+                      widget.documentReference,
+                    );
+                    await Future.wait(
+                      userUids.map(
+                            (userUid) => fuu.removeUnreadNotifications(
+                          widget.documentReference.path,
+                          userUid.toString(),
+                        ),
+                      ),
+                    );
+                    await fmu.deleteMessageDocument(
+                      widget.documentReference,
+                    );
+                    widget.getMessages?.call();
+                  }
                       : null,
                   child: const Text('Really Delete!'),
                 ),
@@ -269,7 +345,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   }
 
   Map<String, dynamic>? _latestMessageData() {
-    final conversationRaw = widget.documentData['conversation'];
+    final data = _latestConversationData ?? widget.documentData;
+    final conversationRaw = data['conversation'];
     if (conversationRaw is! Map || conversationRaw.isEmpty) {
       return null;
     }
@@ -281,8 +358,9 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       if (value is! Map) continue;
       final message = Map<String, dynamic>.from(value);
       final timestampRaw = message['timestamp'];
-      final timestamp =
-          timestampRaw is Timestamp ? timestampRaw.toDate() : DateTime.now();
+      final timestamp = timestampRaw is Timestamp
+          ? timestampRaw.toDate()
+          : DateTime.now();
 
       if (timestamp.isAfter(latestTimestamp)) {
         latestTimestamp = timestamp;
@@ -325,8 +403,11 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
   String _formatTimestampLabel(BuildContext context, DateTime timestamp) {
     final now = DateTime.now();
-    final timestampDate =
-        DateTime(timestamp.year, timestamp.month, timestamp.day);
+    final timestampDate = DateTime(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+    );
     final nowDate = DateTime(now.year, now.month, now.day);
 
     if (timestampDate == nowDate) {
@@ -409,8 +490,9 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
     await fuu.incrementSentMessageCount(users, widget.uid, 1);
 
-    final userUids =
-        await fmu.retrieveMessageDocumentUserUids(widget.documentReference);
+    final userUids = await fmu.retrieveMessageDocumentUserUids(
+      widget.documentReference,
+    );
 
     for (final id in userUids) {
       final recipientUid = id.toString();
@@ -420,7 +502,11 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
 
       await fuu.incrementReceivedMessageCount(users, recipientUid, 1);
       await fuu.addUnreadNotification(
-          'users', recipientUid, widget.documentReference.path, messageUuid);
+        'users',
+        recipientUid,
+        widget.documentReference.path,
+        messageUuid,
+      );
       await fuu.createMessageActivity(
         senderUid: widget.uid,
         recipientUid: recipientUid,
@@ -445,7 +531,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
             backgroundColor: const Color(0xFF0D3B66),
             foregroundColor: Colors.white,
             child: Icon(
-                _participantNames.length > 1 ? Icons.groups_2 : Icons.person),
+              _participantNames.length > 1 ? Icons.groups_2 : Icons.person,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -470,10 +557,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                   _latestMessagePreview(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[700],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                 ),
                 _buildParticipantScroller(),
               ],
@@ -486,10 +570,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                 if (latestTimestamp != null)
                   Text(
                     _formatTimestampLabel(context, latestTimestamp),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 const SizedBox(height: 6),
                 Row(
@@ -499,7 +580,9 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                       Container(
                         margin: const EdgeInsets.only(right: 4),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.red,
                           borderRadius: BorderRadius.circular(12),
@@ -516,13 +599,15 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                     IconButton(
                       icon: _isLoading
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(_isExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down),
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                          : Icon(
+                        _isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                      ),
                       onPressed: _isLoading ? null : _toggleExpanded,
                       tooltip: _isExpanded ? 'Collapse' : 'Expand',
                     ),
@@ -549,9 +634,55 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     );
   }
 
+  Widget _buildMessageInput() {
+    // On web/desktop, Enter sends and Shift+Enter inserts a newline.
+    // On mobile, the send button is the primary action and Enter
+    // behaves as a newline (standard mobile chat UX).
+    if (kIsWeb) {
+      return _WebMessageInput(
+        controller: _sendMessageController,
+        maxLines: _inputMaxLines,
+        onSend: _handleSendMessage,
+      );
+    }
+
+    // Mobile: multiline field, send button triggers send.
+    return TextField(
+      controller: _sendMessageController,
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.newline,
+      minLines: 1,
+      maxLines: _inputMaxLines,
+      decoration: InputDecoration(
+        fillColor: Colors.white,
+        filled: true,
+        hintText: 'Send message',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24.0),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+      ),
+    );
+  }
+
   Widget _buildExpandedBody() {
     if (!_isExpanded) {
       return const SizedBox.shrink();
+    }
+
+    Widget chatContent;
+    if (_streamError != null) {
+      chatContent = const Center(child: Text('Something went wrong.'));
+    } else if (_streamLoading || _latestConversationData == null) {
+      chatContent = const Center(child: CircularProgressIndicator());
+    } else {
+      chatContent = ChatScreen(
+        uid: widget.uid,
+        documentData: _latestConversationData!,
+      );
     }
 
     return Column(
@@ -559,58 +690,17 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
         const Divider(height: 1),
         SizedBox(
           height: widget.autoOpen ? 150 : 300,
-          child: StreamBuilder<DocumentSnapshot>(
-            stream: widget.documentReference.snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Center(child: Text('Something went wrong.'));
-              }
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData || !snapshot.data!.exists) {
-                return const Center(child: Text('No messages found'));
-              }
-
-              final data = snapshot.data!.data() as Map<String, dynamic>;
-              if (_isLoading) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    setState(() {
-                      _isLoading = false;
-                    });
-                  }
-                });
-              }
-
-              return ChatScreen(
-                uid: widget.uid,
-                documentData: data,
-              );
-            },
-          ),
+          child: chatContent,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _sendMessageController,
-                  decoration: InputDecoration(
-                    fillColor: Colors.white,
-                    filled: true,
-                    hintText: 'Send message',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24.0),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                  ),
-                  onSubmitted: (_) => _handleSendMessage(),
-                ),
-              ),
+              Expanded(child: _buildMessageInput()),
               const SizedBox(width: 8),
+              // Pin the send button to the bottom of the row so it stays
+              // aligned to the last line of text as the input grows.
               DecoratedBox(
                 decoration: const BoxDecoration(
                   color: Color(0xFF0D3B66),
@@ -643,7 +733,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
               elevation: 1.5,
               shadowColor: Colors.black12,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: AnimatedSize(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeInOut,
@@ -657,6 +748,68 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Web/desktop-specific input: Enter sends, Shift+Enter inserts newline.
+// Implemented as a Focus + RawKeyboardListener wrapper around TextField so
+// we can intercept the Enter key before Flutter's default handling.
+// ---------------------------------------------------------------------------
+class _WebMessageInput extends StatelessWidget {
+  const _WebMessageInput({
+    required this.controller,
+    required this.maxLines,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final int maxLines;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return CallbackShortcuts(
+      bindings: {
+        // Plain Enter → send.
+        const SingleActivator(LogicalKeyboardKey.enter): onSend,
+        // Shift+Enter → newline (let it fall through to the field).
+        const SingleActivator(LogicalKeyboardKey.enter, shift: true): () {
+          final text = controller.text;
+          final selection = controller.selection;
+          final newText = text.replaceRange(
+            selection.start,
+            selection.end,
+            '\n',
+          );
+          controller.value = TextEditingValue(
+            text: newText,
+            selection: TextSelection.collapsed(
+              offset: selection.start + 1,
+            ),
+          );
+        },
+      },
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
+        minLines: 1,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          fillColor: Colors.white,
+          filled: true,
+          hintText: 'Send message  (Shift+Enter for newline)',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24.0),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
           ),
         ),
       ),
