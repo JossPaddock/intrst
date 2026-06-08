@@ -9,15 +9,12 @@ class DateTimeUtility {
     final DateTime todayMidnight = DateTime(localNow.year, localNow.month, localNow.day);
     final DateTime inputMidnight = DateTime(localDt.year, localDt.month, localDt.day);
     final int dayDifference = inputMidnight.difference(todayMidnight).inDays;
-    final Duration absoluteDiff = localDt.difference(localNow).abs();
-    final bool isWithin7Days = absoluteDiff.inHours < 168;
+    final bool isWithin7Days = dayDifference.abs() < 7;
 
     String timeStr = _formatTime(localDt);
 
     // Today
-    if (dayDifference == 0) {
-      return 'Today at $timeStr';
-    }
+    if (dayDifference == 0) return 'Today at $timeStr';
 
     // Yesterday / Tomorrow
     if (dayDifference == -1) return 'Yesterday at $timeStr';
