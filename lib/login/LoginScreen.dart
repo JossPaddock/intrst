@@ -2,7 +2,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
-//this is for Firebase
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -36,36 +35,41 @@ class _LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   Duration get loginTime => const Duration(milliseconds: 2250);
 
-  void askNotificationSetting(String uid) async{
-    final notificationSettings = await FirebaseMessaging.instance
-        .requestPermission(provisional: true);
+  void askNotificationSetting(String uid) async {
+    final notificationSettings =
+    await FirebaseMessaging.instance.requestPermission(provisional: true);
 
-// For apple platforms, ensure the APNS token is available before making any FCM plugin API calls
     final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
     if (apnsToken != null) {
-      // APNS token is available, make FCM plugin API requests...
-      print('APNs token is available: ${apnsToken}');
+      print('APNs token is available: $apnsToken');
     } else {
       print('APNs token is NOT available');
     }
+
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken != null) {
-      print('fcm token is available: ${fcmToken}');
+      print('fcm token is available: $fcmToken');
       fu.addFcmTokenForUser(uid, fcmToken);
     } else {
       print('fcm token is NOT available');
     }
-    NotificationSettings notifSettings = await FirebaseMessaging
-        .instance
-        .requestPermission(alert: true, badge: true, sound: true);
-    String permissionMessage = '';
-    switch(notifSettings.authorizationStatus.name) {
-      case 'authorized' : permissionMessage = "Thank you, the intrst app can now send you notifications!";
-      case 'denied' : permissionMessage = "The intrst app is not authorized to create notifications.";
-      case 'notDetermined' : permissionMessage = "Your permission status for notifications is not determined yet";
-      case 'provisional' : permissionMessage = "The intrst app is currently authorized to post non-interrupting user notifications.";
-      default: permissionMessage = "There has been an error";
 
+    NotificationSettings notifSettings =
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    String permissionMessage = switch (notifSettings.authorizationStatus.name) {
+      'authorized' =>
+      'Thank you, the intrst app can now send you notifications!',
+      'denied' => 'The intrst app is not authorized to create notifications.',
+      'notDetermined' =>
+      'Your permission status for notifications is not determined yet',
+      'provisional' =>
+      'The intrst app is currently authorized to post non-interrupting user notifications.',
+      _ => 'There has been an error',
     };
     print(permissionMessage);
   }
@@ -73,131 +77,153 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<String?> _signInUser(LoginData data) {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
     return Future.delayed(loginTime).then((_) async {
-      String email = data.name ?? "";
-      String password = data.password ?? "";
-      bool result = await _signIn(email, password);
-      if (result == false) {
-        if (!users.containsKey(data.name) &&
-            users[data.name] != data.password) {
-          return 'User does not exist or password does not match';
-        }
-      }
-      return null;
+      String email = data.name ?? '';
+      String password = data.password ?? '';
+      return await _signIn(email, password);
     });
   }
 
-  Future<bool> _signIn(String email, String password) async {
-    var result = false;
+  /// Returns null on success, or an error string to display to the user.
+  Future<String?> _signIn(String email, String password) async {
     try {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
-      result = true;
+
+      final user = credential.user;
+
+      // --- Email verification gate (skipped in debug mode) ---
+      if (!kDebugMode && user != null && !user.emailVerified) {
+        await FirebaseAuth.instance.signOut();
+        return 'Please verify your email before logging in. '
+            'Check your inbox for the verification link.';
+      }
+
       if (kIsWeb) {
         await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
         print('Web persistence set to LOCAL');
       } else {
         print('Skipping setPersistence on non-web platform');
       }
-      print(FirebaseAuth.instance.currentUser?.uid);
+
+      final localUid = user!.uid;
       CollectionReference users =
-          FirebaseFirestore.instance.collection('users');
-      String localUid = FirebaseAuth.instance.currentUser!.uid;
+      FirebaseFirestore.instance.collection('users');
       String name = await fu.lookUpNameByUserUid(users, localUid);
       print(name);
       widget.onNameChanged(name);
       widget.onUidChanged(localUid);
       askNotificationSetting(localUid);
+
+      return null; // success
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        print('No user found for that email.');
-      } else if (e.code == 'wrong-password') {
-        print('Wrong password provided for that user.');
-      } else {
-        print(
-            'some login error has occured e.code: ${e.code} and e.detailMessage: ${e.message} and e.stackTrace: ${e.stackTrace.toString()}');
+      switch (e.code) {
+        case 'user-not-found':
+          return 'No account found for that email.';
+        case 'wrong-password':
+          return 'Incorrect password.';
+        case 'invalid-credential':
+          return 'Invalid email or password.';
+        default:
+          print(
+              'Login error — code: ${e.code}, message: ${e.message}, stack: ${e.stackTrace}');
+          return 'An error occurred. Please try again.';
       }
-      result = false;
     }
-    return result;
   }
 
   Future<String?> _signupUser(SignupData data) async {
     debugPrint('Signup Name: ${data.name}, Password: ${data.password}');
+
     if (data.name is String && data.password is String) {
-      String email = data.name ?? "";
-      String password = data.password ?? "";
-      await _createNewUser(email, password);
-      CollectionReference users =
-          FirebaseFirestore.instance.collection('users');
-      User? userSnapshot;
-      if (FirebaseAuth.instance.currentUser != null) {
-        print(FirebaseAuth.instance.currentUser?.uid);
-        userSnapshot = FirebaseAuth.instance.currentUser;
-      } else {
-        print('the current user is null');
+      String email = data.name ?? '';
+      String password = data.password ?? '';
+
+      final credential = await _createNewUser(email, password);
+      if (credential == null) {
+        return 'Sign-up failed. The email may already be in use.';
       }
+
+      final user = credential.user!;
+
+      // Send verification email in production; skip in debug for convenience.
+      if (!kDebugMode) {
+        await user.sendEmailVerification();
+        print('Verification email sent to ${user.email}');
+      } else {
+        print('Debug mode: skipping email verification for ${user.email}');
+      }
+
+      CollectionReference users =
+      FirebaseFirestore.instance.collection('users');
+
       var firstname = data.additionalSignupData?.entries
-              .firstWhere((element) => element.key == 'firstname')
-              .value ??
+          .firstWhere((e) => e.key == 'firstname')
+          .value ??
           'Bob';
       var lastname = data.additionalSignupData?.entries
-              .firstWhere((element) => element.key == 'lastname')
-              .value ??
+          .firstWhere((e) => e.key == 'lastname')
+          .value ??
           'Watkins';
+
       fu.addUserToFirestore(
-          users, userSnapshot!.uid, firstname, lastname, GeoPoint(0, 0));
+          users, user.uid, firstname, lastname, GeoPoint(0, 0));
+
       widget.onNameChanged('$firstname $lastname');
-      widget.onUidChanged(userSnapshot.uid);
-      askNotificationSetting(userSnapshot.uid);
+      widget.onUidChanged(user.uid);
+      askNotificationSetting(user.uid);
+
+      // In production, sign out so they must verify before entering the app.
+      if (!kDebugMode) {
+        await FirebaseAuth.instance.signOut();
+      }
     }
-    return Future.delayed(loginTime).then((_) {
-      return null;
-    });
+
+    return Future.delayed(loginTime).then((_) => null);
   }
 
-  Future<UserCredential?> _createNewUser(String email, String password) async {
-    var credential = null;
+  Future<UserCredential?> _createNewUser(
+      String email, String password) async {
     try {
-      credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      return await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'weak-password') {
-        print('The password provided is too weak.');
-      } else if (e.code == 'email-already-in-use') {
-        print('The account already exists for that email.');
+      switch (e.code) {
+        case 'weak-password':
+          print('The password provided is too weak.');
+        case 'email-already-in-use':
+          print('The account already exists for that email.');
+        default:
+          print('Sign-up error: ${e.code}');
       }
     } catch (e) {
       print(e);
     }
-    return credential;
+    return null;
   }
 
   Future<String?> _recoverPassword(String email) async {
     debugPrint('Email: $email');
-    bool result = await _sendPasswordResetEmail(email);
+    await _sendPasswordResetEmail(email);
     return Future.delayed(loginTime).then((_) {
-      return "sent reset email to $email";
+      return 'Sent reset email to $email';
     });
   }
 
   Future<bool> _sendPasswordResetEmail(String email) async {
-    var result = false;
     try {
-      final credential = await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: email,
-      );
-      result = true;
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      return true;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        print('No user found for that email.');
-      } else if (e.code == 'invalid-email') {
-        print('This is not a valid email');
+      switch (e.code) {
+        case 'user-not-found':
+          print('No user found for that email.');
+        case 'invalid-email':
+          print('This is not a valid email.');
       }
-      result = false;
+      return false;
     }
-    return result;
   }
 
   @override
@@ -205,31 +231,33 @@ class _LoginScreenState extends State<LoginScreen> {
     return FlutterLogin(
       headerWidget: kDebugMode
           ? ElevatedButton(
-              onPressed: () {
-                _signInUser(LoginData(name: 'permanent@test.com', password: 'password'));
-                widget.onSignInChanged(true);
-                widget.onSelectedIndexChanged(0);
-              },
-              child: Text('auto login : ${FirebaseAuth.instance.currentUser?.uid}'))
+          onPressed: () {
+            _signInUser(LoginData(
+                name: 'permanent@test.com', password: 'password'));
+            widget.onSignInChanged(true);
+            widget.onSelectedIndexChanged(0);
+          },
+          child: Text(
+              'auto login : ${FirebaseAuth.instance.currentUser?.uid}'))
           : null,
       title: '',
-      //if you want a logo above the login widget, add the path to a png, eg below:
       logo: const AssetImage('assets/intrstlogo2.20White.png'),
       onLogin: _signInUser,
       onSignup: _signupUser,
-      messages: LoginMessages(signUpSuccess: 'You have signed up'),
+      messages: LoginMessages(
+        signUpSuccess: kDebugMode
+            ? 'Account created!'
+            : 'Account created! Please check your email to verify your address before logging in.',
+      ),
       theme: LoginTheme(
-        primaryColor: Color(0xFF082D38), // Overall primary color
-        accentColor: Colors
-            .amber, // Secondary color (e.g., for title text, loading icon)
-        errorColor: Colors.red, // Color for input validation errors
-        pageColorLight:
-            Color(0xFF082D38), // Light background color for the page
-        pageColorDark:
-            Colors.blueGrey[900], // Dark background color for the page
+        primaryColor: Color(0xFF082D38),
+        accentColor: Colors.amber,
+        errorColor: Colors.red,
+        pageColorLight: Color(0xFF082D38),
+        pageColorDark: Colors.blueGrey[900],
       ),
       onSubmitAnimationCompleted: () {
-        debugPrint("onSubmitAnimationCompleted: User logged in");
+        debugPrint('onSubmitAnimationCompleted: User logged in');
         widget.onSignInChanged(true);
         widget.onSelectedIndexChanged(0);
       },
@@ -240,15 +268,10 @@ class _LoginScreenState extends State<LoginScreen> {
           displayName: 'First Name',
           userType: LoginUserType.firstName,
           fieldValidator: (value) {
-            if (value == null) {
-              return "Value was null!";
-            } else {
-              if (value.isEmpty) {
-                return "Please enter a First Name";
-              } else {
-                return null;
-              }
+            if (value == null || value.isEmpty) {
+              return 'Please enter a First Name';
             }
+            return null;
           },
         ),
         UserFormField(
@@ -256,15 +279,10 @@ class _LoginScreenState extends State<LoginScreen> {
           displayName: 'Last Name',
           userType: LoginUserType.lastName,
           fieldValidator: (value) {
-            if (value == null) {
-              return "Value was null!";
-            } else {
-              if (value.isEmpty) {
-                return "Please enter a Last Name";
-              } else {
-                return null;
-              }
+            if (value == null || value.isEmpty) {
+              return 'Please enter a Last Name';
             }
+            return null;
           },
         ),
       ],
