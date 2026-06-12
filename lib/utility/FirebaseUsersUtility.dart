@@ -1615,8 +1615,6 @@ class FirebaseUsersUtility {
 
                   await user.reauthenticateWithCredential(credential);
 
-                  await user.delete();
-
                   final usersRef =
                   FirebaseFirestore.instance.collection('users');
 
@@ -1630,13 +1628,16 @@ class FirebaseUsersUtility {
                         "Deleted document: ${doc.id} as part of account deletion");
                   }
 
+                  await user.delete();
+                  await FirebaseAuth.instance.signOut();
+
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text(
                             "Account deleted successfully! Sorry to see you go")),
                   );
-                  await Future.delayed(Duration(seconds: 3));
+                  await Future.delayed(const Duration(seconds: 3));
                   await Restart.restartApp(
                       notificationTitle: 'User account deleted',
                       notificationBody: 'tap here to reopen the interest app');

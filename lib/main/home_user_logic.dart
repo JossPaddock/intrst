@@ -54,6 +54,11 @@ extension _HomeUserLogic on _MyHomePageState {
         _hasPerformedInitialSignedInMapSetup = false;
         _pendingMapFocusUserUid = null;
         _lastTrackedUsageDayKey = '';
+        setState(() {
+          _signedIn = false;
+          _uid = '';
+          _name = '';
+        });
       } else {
         CollectionReference users =
             FirebaseFirestore.instance.collection('users');
