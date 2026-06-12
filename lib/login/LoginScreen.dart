@@ -156,17 +156,18 @@ class _LoginScreenState extends State<LoginScreen> {
       CollectionReference users =
       FirebaseFirestore.instance.collection('users');
 
-      var firstname = data.additionalSignupData?.entries
-          .firstWhere((e) => e.key == 'firstname')
-          .value ??
-          'Bob';
-      var lastname = data.additionalSignupData?.entries
-          .firstWhere((e) => e.key == 'lastname')
-          .value ??
-          'Watkins';
+      // Safely access additional signup data to avoid crashes.
+      var firstname = data.additionalSignupData?['firstname'] ?? 'Bob';
+      var lastname = data.additionalSignupData?['lastname'] ?? 'Watkins';
 
-      fu.addUserToFirestore(
-          users, user.uid, firstname, lastname, GeoPoint(0, 0));
+      try {
+        // MUST await this call before potential sign-out to ensure document creation.
+        await fu.addUserToFirestore(
+            users, user.uid, firstname, lastname, GeoPoint(0, 0));
+      } catch (e) {
+        print('Failed to create user doc: $e');
+        return 'Failed to create user profile. Please try again.';
+      }
 
       widget.onNameChanged('$firstname $lastname');
       widget.onUidChanged(user.uid);
