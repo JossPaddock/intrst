@@ -265,8 +265,8 @@ class FirebaseUsersUtility {
   }
 
   FirebaseMappers fm = FirebaseMappers();
-  void addUserToFirestore(CollectionReference users, String userUid,
-      String firstName, String lastName, GeoPoint geoPoint) {
+  Future<void> addUserToFirestore(CollectionReference users, String userUid,
+      String firstName, String lastName, GeoPoint geoPoint) async {
     Map<String, dynamic> userData = {
       'user_uid': userUid,
       'first_name': firstName,
@@ -288,10 +288,13 @@ class FirebaseUsersUtility {
         'profile_created_at': FieldValue.serverTimestamp(),
       },
     };
-    users
-        .add(userData)
-        .then((value) => print("User added to Firestore"))
-        .catchError((error) => print("Failed to add user: $error"));
+    try {
+      await users.add(userData);
+      print("User added to Firestore");
+    } catch (error) {
+      print("Failed to add user: $error");
+      rethrow;
+    }
   }
 
   Future<void> setFirstRunExperienceComplete(
@@ -1348,6 +1351,12 @@ class FirebaseUsersUtility {
     }
     QuerySnapshot querySnapshot =
     await users.where('user_uid', isEqualTo: uid).get();
+
+    if (querySnapshot.docs.isEmpty) {
+      print('addInterestForUser: UH OH, No user doc found for uid: $uid');
+      return;
+    }
+
     for (final doc in querySnapshot.docs) {
       DocumentReference documentRef =
       FirebaseFirestore.instance.collection('users').doc(doc.id);
@@ -1360,7 +1369,7 @@ class FirebaseUsersUtility {
         array.add(interest_map);
         await documentRef.update({'interests': array});
       } else {
-        print('UH OH Could not find the doc');
+        print('UH OH Could not find the doc data for ${doc.id}');
       }
     }
 
@@ -1606,8 +1615,6 @@ class FirebaseUsersUtility {
 
                   await user.reauthenticateWithCredential(credential);
 
-                  await user.delete();
-
                   final usersRef =
                   FirebaseFirestore.instance.collection('users');
 
@@ -1621,13 +1628,16 @@ class FirebaseUsersUtility {
                         "Deleted document: ${doc.id} as part of account deletion");
                   }
 
+                  await user.delete();
+                  await FirebaseAuth.instance.signOut();
+
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text(
                             "Account deleted successfully! Sorry to see you go")),
                   );
-                  await Future.delayed(Duration(seconds: 3));
+                  await Future.delayed(const Duration(seconds: 3));
                   await Restart.restartApp(
                       notificationTitle: 'User account deleted',
                       notificationBody: 'tap here to reopen the interest app');
