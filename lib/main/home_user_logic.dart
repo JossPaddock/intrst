@@ -58,6 +58,7 @@ extension _HomeUserLogic on _MyHomePageState {
           _signedIn = false;
           _uid = '';
           _name = '';
+          _selectedIndex = 0;
         });
       } else {
         CollectionReference users =
