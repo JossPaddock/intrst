@@ -13,6 +13,12 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _signedIn = false;
   String _name = '';
   String _uid = '';
+
+  // Monotonic counter used to discard stale `authStateChanges` continuations.
+  // Each auth event bumps this; an event that awaits and then finds the
+  // counter has moved on knows a newer event superseded it and must not
+  // commit its (now stale) state. See [initializeFirebase].
+  int _authStateGeneration = 0;
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
   int _selectedIndex = 0;

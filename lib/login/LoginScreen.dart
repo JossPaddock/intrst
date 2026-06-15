@@ -14,16 +14,13 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.signedIn = false,
-    required this.onSignInChanged,
-    required this.onNameChanged,
-    required this.onUidChanged,
     required this.onSelectedIndexChanged,
   });
 
+  // Sign-in state (_signedIn/_name/_uid) is owned entirely by the
+  // authStateChanges listener in home_user_logic. LoginScreen only needs to
+  // request navigation once an auth flow completes, hence the lone callback.
   final bool signedIn;
-  final ValueChanged<bool> onSignInChanged;
-  final ValueChanged<String> onNameChanged;
-  final ValueChanged<String> onUidChanged;
   final ValueChanged<int> onSelectedIndexChanged;
 
   @override
@@ -74,6 +71,77 @@ class _LoginScreenState extends State<LoginScreen> {
     print(permissionMessage);
   }
 
+  /// Blocking dialog shown to an authenticated-but-unverified user. Must be
+  /// called while [user] is still signed in (before any signOut) so the
+  /// "Resend email" action can use the live [User] object. Returns once the
+  /// user dismisses it; the caller is responsible for signing out afterwards.
+  Future<void> _showVerifyEmailDialog(User user) async {
+    if (!mounted) return;
+    final String emailLabel = user.email ?? 'your email address';
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        String? statusMessage;
+        bool isError = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Verify your email'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Please verify your email to continue using the intrst app.\n\n'
+                    'We sent a verification link to $emailLabel. '
+                    'Please check your inbox — and your junk/spam folder.',
+                  ),
+                  if (statusMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        statusMessage!,
+                        style: TextStyle(
+                          color: isError ? Colors.red : Colors.green,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await user.sendEmailVerification();
+                      setDialogState(() {
+                        isError = false;
+                        statusMessage = 'Verification email resent to $emailLabel.';
+                      });
+                    } catch (e) {
+                      print('Failed to resend verification email: $e');
+                      setDialogState(() {
+                        isError = true;
+                        statusMessage =
+                            'Could not resend right now. Please try again shortly.';
+                      });
+                    }
+                  },
+                  child: const Text('Resend email'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<String?> _signInUser(LoginData data) {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
     return Future.delayed(loginTime).then((_) async {
@@ -92,10 +160,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = credential.user;
 
       // --- Email verification gate (skipped in debug mode) ---
+      // Unverified users cannot enter the app. Show a blocking dialog (with a
+      // "Resend email" action) while still signed in, then sign out so the
+      // authStateChanges listener keeps the app in its signed-out state.
       if (!kDebugMode && user != null && !user.emailVerified) {
+        await _showVerifyEmailDialog(user);
         await FirebaseAuth.instance.signOut();
-        return 'Please verify your email before logging in. '
-            'Check your inbox for the verification link.';
+        return null; // Dialog already informed the user; stay signed-out.
       }
 
       if (kIsWeb) {
@@ -105,13 +176,10 @@ class _LoginScreenState extends State<LoginScreen> {
         print('Skipping setPersistence on non-web platform');
       }
 
+      // NOTE: Do NOT set _signedIn/_name/_uid here. The authStateChanges
+      // listener in home_user_logic is the single source of truth and will
+      // populate them once it observes this verified sign-in.
       final localUid = user!.uid;
-      CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
-      String name = await fu.lookUpNameByUserUid(users, localUid);
-      print(name);
-      widget.onNameChanged(name);
-      widget.onUidChanged(localUid);
       askNotificationSetting(localUid);
 
       return null; // success
@@ -146,9 +214,16 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = credential.user!;
 
       // Send verification email in production; skip in debug for convenience.
+      // The account already exists at this point, so a send failure is
+      // non-fatal: we log it and continue. The user can get a fresh link by
+      // attempting to log in (the sign-in gate resends — see _signIn).
       if (!kDebugMode) {
-        await user.sendEmailVerification();
-        print('Verification email sent to ${user.email}');
+        try {
+          await user.sendEmailVerification();
+          print('Verification email sent to ${user.email}');
+        } catch (e) {
+          print('Failed to send verification email: $e');
+        }
       } else {
         print('Debug mode: skipping email verification for ${user.email}');
       }
@@ -169,12 +244,15 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Failed to create user profile. Please try again.';
       }
 
-      widget.onNameChanged('$firstname $lastname');
-      widget.onUidChanged(user.uid);
       askNotificationSetting(user.uid);
 
-      // In production, sign out so they must verify before entering the app.
+      // In production, block the user behind the verification dialog and then
+      // sign out so they must verify before entering the app. We deliberately
+      // do NOT set _signedIn/_name/_uid: the user is not verified yet, and the
+      // authStateChanges listener keeps the app in a clean signed-out state
+      // until they verify and sign in.
       if (!kDebugMode) {
+        await _showVerifyEmailDialog(user);
         await FirebaseAuth.instance.signOut();
       }
     }
@@ -233,9 +311,10 @@ class _LoginScreenState extends State<LoginScreen> {
       headerWidget: kDebugMode
           ? ElevatedButton(
           onPressed: () {
+            // The authStateChanges listener flips _signedIn once Firebase
+            // reports the signed-in user; we only handle navigation here.
             _signInUser(LoginData(
                 name: 'permanent@test.com', password: 'password'));
-            widget.onSignInChanged(true);
             widget.onSelectedIndexChanged(0);
           },
           child: Text(
@@ -246,9 +325,9 @@ class _LoginScreenState extends State<LoginScreen> {
       onLogin: _signInUser,
       onSignup: _signupUser,
       messages: LoginMessages(
-        signUpSuccess: kDebugMode
-            ? 'Account created!'
-            : 'Account created! Please check your email to verify your address before logging in.',
+        // The verification instructions are delivered via the blocking dialog
+        // (_showVerifyEmailDialog), so this just confirms account creation.
+        signUpSuccess: 'Account created!',
       ),
       theme: LoginTheme(
         primaryColor: Color(0xFF082D38),
@@ -258,8 +337,11 @@ class _LoginScreenState extends State<LoginScreen> {
         pageColorDark: Colors.blueGrey[900],
       ),
       onSubmitAnimationCompleted: () {
-        debugPrint('onSubmitAnimationCompleted: User logged in');
-        widget.onSignInChanged(true);
+        debugPrint('onSubmitAnimationCompleted: animation finished');
+        // Do NOT force _signedIn=true here. After a production sign-up the
+        // user has been signed out for verification, and forcing signed-in
+        // was the cause of the "half signed-in" state. Sign-in state is
+        // owned solely by the authStateChanges listener; we only navigate.
         widget.onSelectedIndexChanged(0);
       },
       onRecoverPassword: _recoverPassword,

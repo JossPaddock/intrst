@@ -629,10 +629,7 @@ extension _HomeUiLogic on _MyHomePageState {
                     ]),
                     LoginScreen(
                       signedIn: _signedIn,
-                      onSignInChanged: _handleSignInChanged,
                       onSelectedIndexChanged: _onItemTapped,
-                      onNameChanged: _handleNameChanged,
-                      onUidChanged: _handleUidChanged,
                     ),
                   ][_selectedIndex],
       ),
@@ -722,8 +719,10 @@ extension _HomeUiLogic on _MyHomePageState {
                       decoration: BoxDecoration(
                         color: Color(0xFF082D38),
                       ),
+                      // Signed-out drawer: never render identity here. In
+                      // debug we keep it visible to aid troubleshooting.
                       child: Text(
-                        "$_name : $_uid",
+                        kDebugMode ? "$_name : $_uid" : "Welcome to intrst",
                         style: TextStyle(
                             color: Colors.white), // Set your desired color),
                       ),

@@ -47,37 +47,72 @@ extension _HomeUserLogic on _MyHomePageState {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     await captureInitialMessage();
+    // The Firebase auth listener is the SINGLE source of truth for sign-in
+    // state. Nothing else (LoginScreen callbacks, animation completion, etc.)
+    // should set `_signedIn`/`_name`/`_uid` — doing so previously let the UI
+    // and the real auth state diverge into a "half signed-in" state.
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
-      if (user == null) {
-        print('User is currently signed out!');
+      // Bump the generation for every event. Any continuation that awaits
+      // below must re-check this before committing state.
+      final int generation = ++_authStateGeneration;
+
+      // A user is only "effectively" signed in once their email is verified.
+      // In debug we bypass verification for convenience. An unverified user
+      // (e.g. the brief window right after sign-up, or an unverified sign-in
+      // attempt) is treated exactly like signed-out so no identity leaks.
+      final bool effectivelySignedIn =
+          user != null && (kDebugMode || user.emailVerified);
+
+      if (!effectivelySignedIn) {
+        print('User is currently signed out (or unverified)!');
         _notificationLoading?.cancel();
         _hasPerformedInitialSignedInMapSetup = false;
         _pendingMapFocusUserUid = null;
         _lastTrackedUsageDayKey = '';
+        if (!mounted) return;
         setState(() {
           _signedIn = false;
           _uid = '';
           _name = '';
           _selectedIndex = 0;
         });
-      } else {
-        CollectionReference users =
-            FirebaseFirestore.instance.collection('users');
-        print('User is signed in!');
+        _handleUserModel('');
+        return;
+      }
+
+      print('User is signed in!');
+      final CollectionReference users =
+          FirebaseFirestore.instance.collection('users');
+      final String localUid = user!.uid;
+
+      // Resolve the display name BEFORE committing signed-in state. If a newer
+      // auth event (e.g. an immediate sign-out from the verification gate)
+      // arrives while we await, the generation check below cancels this stale
+      // continuation so it can't re-populate name/uid after the cleanup.
+      String name;
+      try {
+        name = await fu.lookUpNameByUserUid(users, localUid);
+      } catch (e) {
+        print('Failed to look up user name: $e');
+        name = '';
+      }
+
+      if (!mounted || generation != _authStateGeneration) {
+        print('Stale auth event ($generation); skipping signed-in commit.');
+        return;
+      }
+
+      _hasPerformedInitialSignedInMapSetup = false;
+      _lastTrackedUsageDayKey = '';
+      setState(() {
         _signedIn = true;
-        _hasPerformedInitialSignedInMapSetup = false;
-        _lastTrackedUsageDayKey = '';
-        _selectedIndex = 0;
-        String localUid = FirebaseAuth.instance.currentUser!.uid;
-        setState(() {});
-        String name = await fu.lookUpNameByUserUid(users, localUid);
         _name = name;
         _uid = localUid;
-        _handleUserModel(localUid);
-        setState(() {});
-        loadUserContext();
-        await flushInitialMessage();
-      }
+        _selectedIndex = 0;
+      });
+      _handleUserModel(localUid);
+      loadUserContext();
+      await flushInitialMessage();
     });
   }
 
