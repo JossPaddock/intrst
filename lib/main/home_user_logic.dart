@@ -53,67 +53,147 @@ extension _HomeUserLogic on _MyHomePageState {
     // and the real auth state diverge into a "half signed-in" state.
     FirebaseAuth.instance.authStateChanges().listen((User? user) async {
       // Bump the generation for every event. Any continuation that awaits
-      // below must re-check this before committing state.
+      // before committing state must re-check this to discard stale events.
       final int generation = ++_authStateGeneration;
 
-      // A user is only "effectively" signed in once their email is verified.
-      // In debug we bypass verification for convenience. An unverified user
-      // (e.g. the brief window right after sign-up, or an unverified sign-in
-      // attempt) is treated exactly like signed-out so no identity leaks.
-      final bool effectivelySignedIn =
-          user != null && (kDebugMode || user.emailVerified);
-
-      if (!effectivelySignedIn) {
-        print('User is currently signed out (or unverified)!');
-        _notificationLoading?.cancel();
-        _hasPerformedInitialSignedInMapSetup = false;
-        _pendingMapFocusUserUid = null;
-        _lastTrackedUsageDayKey = '';
-        if (!mounted) return;
-        setState(() {
-          _signedIn = false;
-          _uid = '';
-          _name = '';
-          _selectedIndex = 0;
-        });
-        _handleUserModel('');
+      // Truly signed out.
+      if (user == null) {
+        _enterSignedOutState();
         return;
       }
 
-      print('User is signed in!');
-      final CollectionReference users =
-          FirebaseFirestore.instance.collection('users');
-      final String localUid = user!.uid;
-
-      // Resolve the display name BEFORE committing signed-in state. If a newer
-      // auth event (e.g. an immediate sign-out from the verification gate)
-      // arrives while we await, the generation check below cancels this stale
-      // continuation so it can't re-populate name/uid after the cleanup.
-      String name;
-      try {
-        name = await fu.lookUpNameByUserUid(users, localUid);
-      } catch (e) {
-        print('Failed to look up user name: $e');
-        name = '';
-      }
-
-      if (!mounted || generation != _authStateGeneration) {
-        print('Stale auth event ($generation); skipping signed-in commit.');
+      // Authenticated but email not verified (bypassed in debug): hold the user
+      // on the "verify your email" screen and poll until they verify, then log
+      // them in automatically — no second sign-in required.
+      if (!kDebugMode && !user.emailVerified) {
+        _enterPendingVerificationState(user);
         return;
       }
 
-      _hasPerformedInitialSignedInMapSetup = false;
-      _lastTrackedUsageDayKey = '';
+      // Authenticated and verified — enter the app.
+      await _enterSignedInState(user, generation);
+    });
+  }
+
+  /// Resets all session state to signed-out. Single place that clears identity.
+  void _enterSignedOutState() {
+    print('User is currently signed out!');
+    _notificationLoading?.cancel();
+    _emailVerificationPoll?.cancel();
+    _emailVerificationPoll = null;
+    _hasPerformedInitialSignedInMapSetup = false;
+    _pendingMapFocusUserUid = null;
+    _lastTrackedUsageDayKey = '';
+    if (!mounted) return;
+    setState(() {
+      _signedIn = false;
+      _awaitingEmailVerification = false;
+      _uid = '';
+      _name = '';
+      _selectedIndex = 0;
+    });
+    _handleUserModel('');
+  }
+
+  /// Holds an authenticated-but-unverified user on the verification screen and
+  /// begins polling for verification. We intentionally keep their Firebase
+  /// session alive (no signOut) so that verifying logs them straight in.
+  void _enterPendingVerificationState(User user) {
+    print('User signed in but email not verified; awaiting verification.');
+    _notificationLoading?.cancel();
+    _hasPerformedInitialSignedInMapSetup = false;
+    _pendingMapFocusUserUid = null;
+    _lastTrackedUsageDayKey = '';
+    if (mounted) {
       setState(() {
-        _signedIn = true;
-        _name = name;
-        _uid = localUid;
+        _signedIn = false;
+        _awaitingEmailVerification = true;
+        _uid = '';
+        _name = '';
         _selectedIndex = 0;
       });
-      _handleUserModel(localUid);
-      loadUserContext();
-      await flushInitialMessage();
+    }
+    _handleUserModel('');
+    _startEmailVerificationPolling(user);
+  }
+
+  /// Periodically reloads [user] until their email is verified, then enters the
+  /// signed-in state. `reload()` does not fire authStateChanges, so we drive the
+  /// transition ourselves here.
+  void _startEmailVerificationPolling(User user) {
+    _emailVerificationPoll?.cancel();
+    _emailVerificationPoll =
+        Timer.periodic(const Duration(seconds: 3), (timer) async {
+      try {
+        await user.reload();
+      } catch (e) {
+        print('Verification reload failed: $e');
+        return;
+      }
+      final refreshed = FirebaseAuth.instance.currentUser;
+      if (refreshed == null) {
+        timer.cancel();
+        return;
+      }
+      if (refreshed.emailVerified) {
+        timer.cancel();
+        _emailVerificationPoll = null;
+        await _enterSignedInState(refreshed, ++_authStateGeneration);
+      }
     });
+  }
+
+  /// Commits the verified, signed-in session. [generation] is checked after the
+  /// async name lookup so a newer auth event can cancel this stale continuation.
+  Future<void> _enterSignedInState(User user, int generation) async {
+    print('User is signed in!');
+    _emailVerificationPoll?.cancel();
+    _emailVerificationPoll = null;
+    final CollectionReference users =
+        FirebaseFirestore.instance.collection('users');
+    final String localUid = user.uid;
+
+    String name;
+    try {
+      name = await fu.lookUpNameByUserUid(users, localUid);
+    } catch (e) {
+      print('Failed to look up user name: $e');
+      name = '';
+    }
+
+    if (!mounted || generation != _authStateGeneration) {
+      print('Stale auth event ($generation); skipping signed-in commit.');
+      return;
+    }
+
+    _hasPerformedInitialSignedInMapSetup = false;
+    _lastTrackedUsageDayKey = '';
+    setState(() {
+      _signedIn = true;
+      _awaitingEmailVerification = false;
+      _name = name;
+      _uid = localUid;
+      _selectedIndex = 0;
+    });
+    _handleUserModel(localUid);
+    loadUserContext();
+    await flushInitialMessage();
+  }
+
+  /// Resends the verification email to the currently pending user. Used by the
+  /// verify-email screen's "Resend email" action.
+  Future<void> _resendVerificationEmail() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await user.sendEmailVerification();
+      _showTemporaryBottomMessage(
+          'Verification email resent. Check your inbox and junk folder.');
+    } catch (e) {
+      print('Resend verification failed: $e');
+      _showTemporaryBottomMessage(
+          'Could not resend right now. Please try again shortly.');
+    }
   }
 
   void _loadNotificationCount() async {

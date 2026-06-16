@@ -71,77 +71,6 @@ class _LoginScreenState extends State<LoginScreen> {
     print(permissionMessage);
   }
 
-  /// Blocking dialog shown to an authenticated-but-unverified user. Must be
-  /// called while [user] is still signed in (before any signOut) so the
-  /// "Resend email" action can use the live [User] object. Returns once the
-  /// user dismisses it; the caller is responsible for signing out afterwards.
-  Future<void> _showVerifyEmailDialog(User user) async {
-    if (!mounted) return;
-    final String emailLabel = user.email ?? 'your email address';
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        String? statusMessage;
-        bool isError = false;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Verify your email'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Please verify your email to continue using the intrst app.\n\n'
-                    'We sent a verification link to $emailLabel. '
-                    'Please check your inbox — and your junk/spam folder.',
-                  ),
-                  if (statusMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        statusMessage!,
-                        style: TextStyle(
-                          color: isError ? Colors.red : Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    try {
-                      await user.sendEmailVerification();
-                      setDialogState(() {
-                        isError = false;
-                        statusMessage = 'Verification email resent to $emailLabel.';
-                      });
-                    } catch (e) {
-                      print('Failed to resend verification email: $e');
-                      setDialogState(() {
-                        isError = true;
-                        statusMessage =
-                            'Could not resend right now. Please try again shortly.';
-                      });
-                    }
-                  },
-                  child: const Text('Resend email'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
   Future<String?> _signInUser(LoginData data) {
     debugPrint('Name: ${data.name}, Password: ${data.password}');
     return Future.delayed(loginTime).then((_) async {
@@ -159,15 +88,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final user = credential.user;
 
-      // --- Email verification gate (skipped in debug mode) ---
-      // Unverified users cannot enter the app. Show a blocking dialog (with a
-      // "Resend email" action) while still signed in, then sign out so the
-      // authStateChanges listener keeps the app in its signed-out state.
-      if (!kDebugMode && user != null && !user.emailVerified) {
-        await _showVerifyEmailDialog(user);
-        await FirebaseAuth.instance.signOut();
-        return null; // Dialog already informed the user; stay signed-out.
-      }
+      // No verification gate here: the authStateChanges listener decides what
+      // to do. A verified user enters the app; an unverified one is routed to
+      // the "verify your email" screen and auto-logged-in once they verify.
 
       if (kIsWeb) {
         await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
@@ -215,8 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Send verification email in production; skip in debug for convenience.
       // The account already exists at this point, so a send failure is
-      // non-fatal: we log it and continue. The user can get a fresh link by
-      // attempting to log in (the sign-in gate resends — see _signIn).
+      // non-fatal: we log it and continue. The user is kept signed in and the
+      // authStateChanges listener routes them to the "verify your email"
+      // screen, which also offers a resend.
       if (!kDebugMode) {
         try {
           await user.sendEmailVerification();
@@ -246,15 +170,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       askNotificationSetting(user.uid);
 
-      // In production, block the user behind the verification dialog and then
-      // sign out so they must verify before entering the app. We deliberately
-      // do NOT set _signedIn/_name/_uid: the user is not verified yet, and the
-      // authStateChanges listener keeps the app in a clean signed-out state
-      // until they verify and sign in.
-      if (!kDebugMode) {
-        await _showVerifyEmailDialog(user);
-        await FirebaseAuth.instance.signOut();
-      }
+      // We deliberately keep the user signed in (no signOut) even though they
+      // are unverified. The authStateChanges listener sees the unverified
+      // session and shows the "verify your email" screen, then polls and logs
+      // them in automatically the moment they verify — no second sign-in.
     }
 
     return Future.delayed(loginTime).then((_) => null);
@@ -325,8 +244,8 @@ class _LoginScreenState extends State<LoginScreen> {
       onLogin: _signInUser,
       onSignup: _signupUser,
       messages: LoginMessages(
-        // The verification instructions are delivered via the blocking dialog
-        // (_showVerifyEmailDialog), so this just confirms account creation.
+        // After sign-up the app routes straight to the "verify your email"
+        // screen (driven by the auth listener), so this just confirms creation.
         signUpSuccess: 'Account created!',
       ),
       theme: LoginTheme(

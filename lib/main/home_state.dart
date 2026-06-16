@@ -14,6 +14,12 @@ class _MyHomePageState extends State<MyHomePage> {
   String _name = '';
   String _uid = '';
 
+  // True while the user is authenticated but has not yet verified their email.
+  // The app shows a dedicated "verify your email" screen and polls until they
+  // verify, at which point they are logged in automatically (no re-login).
+  bool _awaitingEmailVerification = false;
+  Timer? _emailVerificationPoll;
+
   // Monotonic counter used to discard stale `authStateChanges` continuations.
   // Each auth event bumps this; an event that awaits and then finds the
   // counter has moved on knows a newer event superseded it and must not
@@ -87,6 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void dispose() {
     _notificationLoading?.cancel();
+    _emailVerificationPoll?.cancel();
     super.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();

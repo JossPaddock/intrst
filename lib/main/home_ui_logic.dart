@@ -19,6 +19,81 @@ extension _HomeUiLogic on _MyHomePageState {
     return iconBuilder(local.value);
   }
 
+  /// Full-screen state shown while an account exists but its email is not yet
+  /// verified. The app polls in the background (see _startEmailVerification
+  /// Polling); the moment verification is detected the user is logged straight
+  /// in, so they never have to come back and sign in a second time.
+  Widget _buildVerifyEmailScreen() {
+    final String email =
+        FirebaseAuth.instance.currentUser?.email ?? 'your email address';
+    return Container(
+      color: const Color(0xFF082D38),
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: SafeArea(
+        child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.mark_email_unread_outlined,
+              color: Colors.amber, size: 72),
+          const SizedBox(height: 24),
+          const Text(
+            'Verify your email',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "We sent a verification link to $email.\n\n"
+            'Open it to finish setting up your account — please check your '
+            'junk/spam folder too. This screen will continue automatically '
+            'once you verify.',
+            style: const TextStyle(color: Colors.white70, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.amber),
+              ),
+              SizedBox(width: 12),
+              Text('Waiting for verification…',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+            ],
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: _resendVerificationEmail,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: const Color(0xFF082D38),
+            ),
+            child: const Text('Resend email'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Bail out of sign-up: signing out routes through
+              // _enterSignedOutState (cancels polling, clears pending state).
+              FirebaseAuth.instance.signOut();
+            },
+            child: const Text('Use a different account',
+                style: TextStyle(color: Colors.white70)),
+          ),
+        ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHomePage(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     //padding.top represents the height of the status bar which varies by device
@@ -33,7 +108,9 @@ extension _HomeUiLogic on _MyHomePageState {
       endDrawerEnableOpenDragGesture: false,
       resizeToAvoidBottomInset: false,
       key: _scaffoldKey,
-      appBar: AppBar(
+      appBar: _awaitingEmailVerification
+          ? null
+          : AppBar(
         toolbarHeight: toolbarHeight,
         leading: Builder(
           builder: (BuildContext context) {
@@ -265,7 +342,9 @@ extension _HomeUiLogic on _MyHomePageState {
                   ),
                 ),
               )
-            : _signedIn // _signedInGoogleMap
+            : _awaitingEmailVerification
+                ? _buildVerifyEmailScreen()
+                : _signedIn // _signedInGoogleMap
                 ? IndexedStack( index: _selectedIndex, children: <Widget>[
                     Scaffold(
                       body: Container(
