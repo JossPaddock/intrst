@@ -22,6 +22,7 @@ import 'package:intrst/widgets/Messaging.dart';
 import 'package:intrst/widgets/FollowingFeed.dart';
 import 'package:intrst/widgets/Preview.dart' as custom_preview;
 import 'package:provider/provider.dart';
+import 'legal_pages.dart';
 import 'login/LoginScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -62,18 +63,39 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   static const appTitle = 'intrst';
-
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      localizationsDelegates: [
+    final path = Uri.base.path;
+
+    // Web deep-link routing
+    if (path == '/support' || path == '/support/') {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: SupportPage(),
+      );
+    }
+    if (path == '/terms' || path == '/terms/') {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: TermsOfServicePage(),
+      );
+    }
+    if (path == '/privacy' || path == '/privacy/') {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: PrivacyPolicyPage(),
+      );
+    }
+
+    return MaterialApp(
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
       ],
       debugShowCheckedModeBanner: false,
       title: appTitle,
-      home: MyHomePage(title: appTitle),
+      home: const MyHomePage(title: appTitle),
     );
   }
 }

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 
+import '../legal_pages.dart';
+
 // change this to true to show the admin controls to plus or minus profile stats, or false to hide.
 const bool kShowProfileStatsAdminControls = false;
 
@@ -511,6 +513,20 @@ class _Account extends State<Account> {
               ],
             ),
             const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.help_outline),
+              title: const Text('Support & Legal'),
+              subtitle: const Text('Help, terms, and privacy policy'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SupportPage()),
+              ),
+            ),
+            const SizedBox(height: 8),
             TextButton(
               onPressed: () {
                 fu.showReauthAndDeleteDialog(context, widget.uid);

@@ -468,10 +468,10 @@ extension _HomeMapLogic on _MyHomePageState {
       FirebaseFirestore.instance.collection('users');
 
       print('loadMarkers is starting batched fetch');
-      
+
       // i made this batched fetch of all users' marker data
       List<Map<String, dynamic>> allUserData = await fu.retrieveAllUserMarkerData(users);
-      
+
       // these sets represent the batches
       Set<Marker> newPoiMarkers = {};
       Set<LabelMarker> newLabelMarkers = {};
@@ -525,14 +525,30 @@ extension _HomeMapLogic on _MyHomePageState {
           onDragEnd: isCurrentUser ? handleDragEnd : null,
         ));
 
+// Determine platform-specific label styles
+        final double labelFontSize = kIsWeb ? 15.0 : 45.0;
+        /*final List<Shadow> labelShadows = [
+          Shadow(
+            color: Colors.white.withOpacity(0.0),
+            blurRadius: 2.0,
+            offset: Offset.zero,
+          ),
+          Shadow(
+            color: Colors.white.withOpacity(0.0),
+            blurRadius: 12.0,
+            offset: Offset.zero,
+          ),
+        ];*/
+
         newLabelMarkers.add(LabelMarker(
           icon: BitmapDescriptor.defaultMarker,
           label: name,
           textStyle: TextStyle(
             color: labelColor,
-            fontSize: 27.0,
+            fontSize: labelFontSize,
             letterSpacing: 1.0,
             fontFamily: 'Roboto Bold',
+            //shadows: labelShadows,
           ),
           markerId: MarkerId(uid),
           anchor: const Offset(0.5, 0.5),
@@ -548,7 +564,7 @@ extension _HomeMapLogic on _MyHomePageState {
       setState(() {
         poiMarkers = newPoiMarkers;
       });
-      
+
       for (var lm in newLabelMarkers) {
         await labelMarkers.addLabelMarker(lm);
       }
