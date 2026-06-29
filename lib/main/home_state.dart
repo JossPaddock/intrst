@@ -7,6 +7,12 @@ class _MyHomePageState extends State<MyHomePage> {
   late PermissionStatus _permissionGranted;
   late bool _serviceEnabled;
   double _currentZoom = 10;
+  // Marker display mode toggle:
+  //   true  -> original behavior: POI and label are mutually exclusive
+  //            (the POI dot is replaced by the label when zoomed/spaced).
+  //   false -> new behavior: the POI dot is always shown and the label is
+  //            layered on top using the same zoom + proximity logic.
+  bool _useOriginalMarkerBehavior = false;
   bool _markersLoadingSignedIn = true;
   String _markersLoadingSignedInBannerText = 'loading markers...';
   bool _markersLoadingSignedOut = false;

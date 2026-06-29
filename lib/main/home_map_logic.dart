@@ -119,41 +119,76 @@ extension _HomeMapLogic on _MyHomePageState {
     return showAsLabels;
   }
 
+  // Label markers carry this suffix on their MarkerId so they can be shown on
+  // top of the always-visible POI marker (which uses the bare uid) instead of
+  // replacing it.
+  static const String _labelIdSuffix = '_label';
+
+  String _labelMarkerId(String uid) => '$uid$_labelIdSuffix';
+
+  String _uidFromLabelMarkerId(String labelMarkerId) =>
+      labelMarkerId.endsWith(_labelIdSuffix)
+          ? labelMarkerId.substring(
+              0, labelMarkerId.length - _labelIdSuffix.length)
+          : labelMarkerId;
+
   void _onCameraMove(double zoom) {
     const double minLabelZoom = 2.0;
 
-    Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom, 
+    Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom,
         filteredUids: searchTerm.isEmpty ? null : searchFilteredResults);
 
     setState(() {
       markers = {};
 
-      if (searchTerm == '') {
-        if (zoom < minLabelZoom) {
-          markers = poiMarkers;
+      if (_useOriginalMarkerBehavior) {
+        // Original behavior: POI and label are mutually exclusive — a marker
+        // shows as a label when in `showAsLabels`, otherwise as a POI dot.
+        if (searchTerm == '') {
+          if (zoom < minLabelZoom) {
+            markers.addAll(poiMarkers);
+          } else {
+            markers.addAll(labelMarkers.where((marker) =>
+                showAsLabels.contains(_uidFromLabelMarkerId(marker.markerId.value))));
+            markers.addAll(poiMarkers
+                .where((marker) => !showAsLabels.contains(marker.markerId.value)));
+          }
         } else {
-          markers.addAll(
-              labelMarkers.where((marker) => showAsLabels.contains(marker.markerId.value))
-          );
-          markers.addAll(
-              poiMarkers.where((marker) => !showAsLabels.contains(marker.markerId.value))
-          );
+          if (zoom < minLabelZoom) {
+            markers.addAll(poiMarkers.where(
+                (marker) => searchFilteredResults.contains(marker.markerId.value)));
+          } else {
+            markers.addAll(labelMarkers.where((marker) {
+              final String uid = _uidFromLabelMarkerId(marker.markerId.value);
+              return searchFilteredResults.contains(uid) &&
+                  showAsLabels.contains(uid);
+            }));
+            markers.addAll(poiMarkers.where((marker) =>
+                searchFilteredResults.contains(marker.markerId.value) &&
+                !showAsLabels.contains(marker.markerId.value)));
+          }
         }
       } else {
-        if (zoom < minLabelZoom) {
-          markers = poiMarkers
-              .where((marker) => searchFilteredResults.contains(marker.markerId.value))
-              .toSet();
-        } else {
+        // New behavior: POI markers are always shown (respecting the active
+        // search filter)...
+        markers.addAll(
+          poiMarkers.where((marker) =>
+              searchTerm == '' ||
+              searchFilteredResults.contains(marker.markerId.value)),
+        );
+
+        // ...and label markers are layered on top, shown/hidden by the same
+        // zoom + proximity logic as before.
+        if (zoom >= minLabelZoom) {
           markers.addAll(
-              labelMarkers.where((marker) =>
-              searchFilteredResults.contains(marker.markerId.value) &&
-                  showAsLabels.contains(marker.markerId.value))
-          );
-          markers.addAll(
-              poiMarkers.where((marker) =>
-              searchFilteredResults.contains(marker.markerId.value) &&
-                  !showAsLabels.contains(marker.markerId.value))
+            labelMarkers.where((marker) {
+              final String uid = _uidFromLabelMarkerId(marker.markerId.value);
+              if (!showAsLabels.contains(uid)) return false;
+              if (searchTerm != '' && !searchFilteredResults.contains(uid)) {
+                return false;
+              }
+              return true;
+            }),
           );
         }
       }
@@ -420,28 +455,21 @@ extension _HomeMapLogic on _MyHomePageState {
           letterSpacing: 1.0,
           fontFamily: 'Roboto Bold',
         ),
-        markerId: MarkerId(uid),
+        // Distinct id so the label can coexist with the always-shown POI
+        // marker (which uses the bare uid).
+        markerId: MarkerId(_labelMarkerId(uid)),
         //maybe someday this offset below will work. It should!
         anchor: Offset(0.5, 0.5),
         position: LatLng(lat, lng),
         backgroundColor: const Color(0x00000000),
-        draggable: drag,
-        zIndex: drag ? 10 : (user ? 5 : 1),
+        // The POI marker (always visible) handles dragging; the label sits on
+        // top of it and renders above all POI dots.
+        draggable: false,
+        zIndex: (drag ? 10 : (user ? 5 : 1)) + 1000,
         onTap: () {
           markers = {};
           handleMarkerTap(title, uid, false);
           setState(() {});
-        },
-        onDragEnd: (LatLng newPosition) async {
-          fu.updateUserLocation(
-              FirebaseFirestore.instance.collection('users'),
-              FirebaseAuth.instance.currentUser!.uid,
-              GeoPoint(newPosition.latitude, newPosition.longitude));
-          await loadMarkers(true);
-          setState(() {
-            _markersLoadingSignedIn = false;
-            _markersLoadingSignedInBannerText = 'loading markers...';
-          });
         }));
     setState(() {});
   }
@@ -550,14 +578,17 @@ extension _HomeMapLogic on _MyHomePageState {
             fontFamily: 'Roboto Bold',
             //shadows: labelShadows,
           ),
-          markerId: MarkerId(uid),
+          // Distinct id so the label can coexist with the always-shown POI
+          // marker (which uses the bare uid).
+          markerId: MarkerId(_labelMarkerId(uid)),
           anchor: const Offset(0.5, 0.5),
           position: LatLng(lat, lng),
           backgroundColor: const Color(0x00000000),
-          draggable: draggable,
-          zIndex: zIndex.toDouble(),
+          // The POI marker (always visible) handles dragging; the label sits
+          // on top of it and renders above all POI dots.
+          draggable: false,
+          zIndex: zIndex.toDouble() + 1000,
           onTap: handleTap(false),
-          onDragEnd: isCurrentUser ? handleDragEnd : null,
         ));
       }
 
