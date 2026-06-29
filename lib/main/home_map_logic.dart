@@ -555,18 +555,28 @@ extension _HomeMapLogic on _MyHomePageState {
 
 // Determine platform-specific label styles
         final double labelFontSize = kIsWeb ? 15.0 : 45.0;
-        /*final List<Shadow> labelShadows = [
+        final List<Shadow> labelShadows = [
+          // White glow (existing)
           Shadow(
-            color: Colors.white.withOpacity(0.0),
-            blurRadius: 2.0,
+            color: Colors.white.withOpacity(0.9),
+            blurRadius: 0.0,
             offset: Offset.zero,
           ),
           Shadow(
-            color: Colors.white.withOpacity(0.0),
-            blurRadius: 12.0,
+            color: Colors.white.withOpacity(0.6),
+            blurRadius: 0.0,
             offset: Offset.zero,
           ),
-        ];*/
+          // Dark outline
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(-0.65, -0.65)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(0.65, -0.65)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(-0.65, 0.65)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(0.65, 0.65)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(0, -0.65)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(0, 0.65)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(-0.65, 0)),
+          Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(0.65, 0)),
+        ];
 
         newLabelMarkers.add(LabelMarker(
           icon: BitmapDescriptor.defaultMarker,
@@ -576,7 +586,7 @@ extension _HomeMapLogic on _MyHomePageState {
             fontSize: labelFontSize,
             letterSpacing: 1.0,
             fontFamily: 'Roboto Bold',
-            //shadows: labelShadows,
+            shadows: labelShadows,
           ),
           // Distinct id so the label can coexist with the always-shown POI
           // marker (which uses the bare uid).
