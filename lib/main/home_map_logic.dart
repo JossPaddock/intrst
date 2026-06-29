@@ -132,11 +132,20 @@ extension _HomeMapLogic on _MyHomePageState {
               0, labelMarkerId.length - _labelIdSuffix.length)
           : labelMarkerId;
 
-  // Builds a label bitmap containing only the text, with symmetric padding, so
-  // the text is exactly centered in the image. Combined with an anchor of
-  // (0.5, 0.5) this lands the text dead-center on the POI dot. (The label_marker
-  // package instead paints the text high in a taller bitmap with an arrow/dead
-  // space below it, which makes the label float above the dot.)
+  // Vertical nudge for the label text relative to the POI dot.
+  //   0.0  -> text centered on the dot.
+  //   > 0  -> text moves UP.
+  //   < 0  -> text moves DOWN.
+  // Expressed as a fraction of the label's text height, so a single value looks
+  // consistent on both mobile (large font) and web (small font). e.g. 0.5 moves
+  // the text up by half its height; -0.25 moves it down by a quarter.
+  static const double _labelVerticalNudge = 0.0;
+
+  // Builds a label bitmap containing only the text, with padding, so the text
+  // is centered in the image (then shifted by _labelVerticalNudge). Combined
+  // with an anchor of (0.5, 0.5) this lands the text on the POI dot. (The
+  // label_marker package instead paints the text high in a taller bitmap with
+  // an arrow/dead space below it, which makes the label float above the dot.)
   Future<BitmapDescriptor> _buildLabelBitmap(
       String text, TextStyle textStyle) async {
     final TextPainter painter = TextPainter(
@@ -145,20 +154,32 @@ extension _HomeMapLogic on _MyHomePageState {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    // Symmetric padding keeps the text centered and gives the shadows room so
-    // they are not clipped at the edges.
+    // Base symmetric padding gives the shadows room so they are not clipped.
     const double pad = 8.0;
+
+    // The nudge is baked into the bitmap as extra padding on one side, which
+    // keeps the anchor at (0.5, 0.5) (no anchor clamping on Android/web) and
+    // allows an arbitrary offset range. Positive nudge => pad the bottom so the
+    // text sits above center (moves up); negative => pad the top (moves down).
+    final double nudgePx = _labelVerticalNudge * painter.height;
+    final double topPad = pad + (nudgePx < 0 ? -nudgePx : 0);
+    final double bottomPad = pad + (nudgePx > 0 ? nudgePx : 0);
+
     final int width = (painter.width + pad * 2).ceil();
-    final int height = (painter.height + pad * 2).ceil();
+    final int height = (painter.height + topPad + bottomPad).ceil();
 
     final ui.PictureRecorder recorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(recorder);
-    painter.paint(canvas, const Offset(pad, pad));
+    painter.paint(canvas, Offset(pad, topPad));
 
     final ui.Image image = await recorder.endRecording().toImage(width, height);
     final ByteData? bytes =
         await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+    // Use fromBytes (no device-pixel-ratio scaling), matching how the
+    // label_marker package rendered the bitmap. BitmapDescriptor.bytes applies
+    // auto DPR scaling, which made the text massive on high-DPI mobile screens.
+    // ignore: deprecated_member_use
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
   }
 
   void _onCameraMove(double zoom) {
