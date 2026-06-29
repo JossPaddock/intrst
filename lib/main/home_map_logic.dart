@@ -132,6 +132,24 @@ extension _HomeMapLogic on _MyHomePageState {
               0, labelMarkerId.length - _labelIdSuffix.length)
           : labelMarkerId;
 
+  // The label_marker package paints the text near the top of the bitmap and
+  // leaves a fixed block of dead space (arrow + padding) at the bottom: the
+  // bitmap height is textHeight + 50, with the text drawn at y = 10. A centered
+  // anchor (0.5, 0.5) therefore lands the geo-point on the bitmap's center,
+  // which sits ~15px below the text center, making the label float above the
+  // POI dot. This returns the anchor whose y aligns the *text* center with the
+  // point so the label sits directly on the dot.
+  Offset _labelAnchor(String text, TextStyle textStyle) {
+    final TextPainter painter = TextPainter(
+      text: TextSpan(text: text, style: textStyle),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final double bitmapHeight = painter.height + 50;
+    final double textCenter = 10 + painter.height / 2;
+    return Offset(0.5, textCenter / bitmapHeight);
+  }
+
   void _onCameraMove(double zoom) {
     const double minLabelZoom = 2.0;
 
@@ -445,21 +463,24 @@ extension _HomeMapLogic on _MyHomePageState {
       color = Color(0xFFff673a);
     }
 
+    final TextStyle labelTextStyle = TextStyle(
+      color: color,
+      fontSize: 27.0,
+      letterSpacing: 1.0,
+      fontFamily: 'Roboto Bold',
+    );
+
     await labelMarkers
         .addLabelMarker(LabelMarker(
         icon: BitmapDescriptor.defaultMarker,
         label: title,
-        textStyle: TextStyle(
-          color: color,
-          fontSize: 27.0,
-          letterSpacing: 1.0,
-          fontFamily: 'Roboto Bold',
-        ),
+        textStyle: labelTextStyle,
         // Distinct id so the label can coexist with the always-shown POI
         // marker (which uses the bare uid).
         markerId: MarkerId(_labelMarkerId(uid)),
-        //maybe someday this offset below will work. It should!
-        anchor: Offset(0.5, 0.5),
+        // Anchor so the label text centers on the POI dot instead of floating
+        // above it.
+        anchor: _labelAnchor(title, labelTextStyle),
         position: LatLng(lat, lng),
         backgroundColor: const Color(0x00000000),
         // The POI marker (always visible) handles dragging; the label sits on
@@ -578,20 +599,24 @@ extension _HomeMapLogic on _MyHomePageState {
           Shadow(color: Colors.black87, blurRadius: 0.0, offset: const Offset(0.65, 0)),
         ];
 
+        final TextStyle labelTextStyle = TextStyle(
+          color: labelColor,
+          fontSize: labelFontSize,
+          letterSpacing: 1.0,
+          fontFamily: 'Roboto Bold',
+          shadows: labelShadows,
+        );
+
         newLabelMarkers.add(LabelMarker(
           icon: BitmapDescriptor.defaultMarker,
           label: name,
-          textStyle: TextStyle(
-            color: labelColor,
-            fontSize: labelFontSize,
-            letterSpacing: 1.0,
-            fontFamily: 'Roboto Bold',
-            shadows: labelShadows,
-          ),
+          textStyle: labelTextStyle,
           // Distinct id so the label can coexist with the always-shown POI
           // marker (which uses the bare uid).
           markerId: MarkerId(_labelMarkerId(uid)),
-          anchor: const Offset(0.5, 0.5),
+          // Anchor so the label text centers on the POI dot instead of
+          // floating above it.
+          anchor: _labelAnchor(name, labelTextStyle),
           position: LatLng(lat, lng),
           backgroundColor: const Color(0x00000000),
           // The POI marker (always visible) handles dragging; the label sits
