@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/rendering.dart';
@@ -26,7 +27,6 @@ import 'legal_pages.dart';
 import 'login/LoginScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:label_marker/label_marker.dart';
 import 'package:location/location.dart';
 import 'package:animated_toggle_switch/animated_toggle_switch.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';

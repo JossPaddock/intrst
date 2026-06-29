@@ -132,22 +132,33 @@ extension _HomeMapLogic on _MyHomePageState {
               0, labelMarkerId.length - _labelIdSuffix.length)
           : labelMarkerId;
 
-  // The label_marker package paints the text near the top of the bitmap and
-  // leaves a fixed block of dead space (arrow + padding) at the bottom: the
-  // bitmap height is textHeight + 50, with the text drawn at y = 10. A centered
-  // anchor (0.5, 0.5) therefore lands the geo-point on the bitmap's center,
-  // which sits ~15px below the text center, making the label float above the
-  // POI dot. This returns the anchor whose y aligns the *text* center with the
-  // point so the label sits directly on the dot.
-  Offset _labelAnchor(String text, TextStyle textStyle) {
+  // Builds a label bitmap containing only the text, with symmetric padding, so
+  // the text is exactly centered in the image. Combined with an anchor of
+  // (0.5, 0.5) this lands the text dead-center on the POI dot. (The label_marker
+  // package instead paints the text high in a taller bitmap with an arrow/dead
+  // space below it, which makes the label float above the dot.)
+  Future<BitmapDescriptor> _buildLabelBitmap(
+      String text, TextStyle textStyle) async {
     final TextPainter painter = TextPainter(
       text: TextSpan(text: text, style: textStyle),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
     )..layout();
-    final double bitmapHeight = painter.height + 50;
-    final double textCenter = 10 + painter.height / 2;
-    return Offset(0.5, textCenter / bitmapHeight);
+
+    // Symmetric padding keeps the text centered and gives the shadows room so
+    // they are not clipped at the edges.
+    const double pad = 8.0;
+    final int width = (painter.width + pad * 2).ceil();
+    final int height = (painter.height + pad * 2).ceil();
+
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder);
+    painter.paint(canvas, const Offset(pad, pad));
+
+    final ui.Image image = await recorder.endRecording().toImage(width, height);
+    final ByteData? bytes =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   void _onCameraMove(double zoom) {
@@ -470,23 +481,22 @@ extension _HomeMapLogic on _MyHomePageState {
       fontFamily: 'Roboto Bold',
     );
 
-    await labelMarkers
-        .addLabelMarker(LabelMarker(
-        icon: BitmapDescriptor.defaultMarker,
-        label: title,
-        textStyle: labelTextStyle,
+    final BitmapDescriptor labelIcon =
+        await _buildLabelBitmap(title, labelTextStyle);
+
+    labelMarkers.add(Marker(
+        icon: labelIcon,
         // Distinct id so the label can coexist with the always-shown POI
         // marker (which uses the bare uid).
         markerId: MarkerId(_labelMarkerId(uid)),
-        // Anchor so the label text centers on the POI dot instead of floating
-        // above it.
-        anchor: _labelAnchor(title, labelTextStyle),
+        // Text bitmap is centered, so a centered anchor lands it exactly on the
+        // POI dot.
+        anchor: const Offset(0.5, 0.5),
         position: LatLng(lat, lng),
-        backgroundColor: const Color(0x00000000),
         // The POI marker (always visible) handles dragging; the label sits on
         // top of it and renders above all POI dots.
         draggable: false,
-        zIndex: (drag ? 10 : (user ? 5 : 1)) + 1000,
+        zIndex: ((drag ? 10 : (user ? 5 : 1)) + 1000).toDouble(),
         onTap: () {
           markers = {};
           handleMarkerTap(title, uid, false);
@@ -523,7 +533,7 @@ extension _HomeMapLogic on _MyHomePageState {
 
       // these sets represent the batches
       Set<Marker> newPoiMarkers = {};
-      Set<LabelMarker> newLabelMarkers = {};
+      Set<Marker> newLabelMarkers = {};
 
       List<Future<void>> markerCreationFutures = [];
 
@@ -607,18 +617,18 @@ extension _HomeMapLogic on _MyHomePageState {
           shadows: labelShadows,
         );
 
-        newLabelMarkers.add(LabelMarker(
-          icon: BitmapDescriptor.defaultMarker,
-          label: name,
-          textStyle: labelTextStyle,
+        final BitmapDescriptor labelIcon =
+            await _buildLabelBitmap(name, labelTextStyle);
+
+        newLabelMarkers.add(Marker(
+          icon: labelIcon,
           // Distinct id so the label can coexist with the always-shown POI
           // marker (which uses the bare uid).
           markerId: MarkerId(_labelMarkerId(uid)),
-          // Anchor so the label text centers on the POI dot instead of
-          // floating above it.
-          anchor: _labelAnchor(name, labelTextStyle),
+          // Text bitmap is centered, so a centered anchor lands it exactly on
+          // the POI dot.
+          anchor: const Offset(0.5, 0.5),
           position: LatLng(lat, lng),
-          backgroundColor: const Color(0x00000000),
           // The POI marker (always visible) handles dragging; the label sits
           // on top of it and renders above all POI dots.
           draggable: false,
@@ -631,9 +641,7 @@ extension _HomeMapLogic on _MyHomePageState {
         poiMarkers = newPoiMarkers;
       });
 
-      for (var lm in newLabelMarkers) {
-        await labelMarkers.addLabelMarker(lm);
-      }
+      labelMarkers = newLabelMarkers;
 
       _onCameraMove(_currentZoom);
     }
