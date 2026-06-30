@@ -381,6 +381,18 @@ class FirebaseUsersUtility {
     await batch.commit();
   }
 
+  Future<List<String>> retrieveFriendUids(String userUid) async {
+    if (userUid.isEmpty) return [];
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userUid)
+        .collection('friendships')
+        .where('status', isEqualTo: 'approved')
+        .get();
+
+    return snapshot.docs.map((doc) => doc.id).toList();
+  }
+
   Future<List<String>> retrieveIncomingRequests(String userUid) async {
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('users')

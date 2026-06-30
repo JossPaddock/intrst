@@ -178,11 +178,69 @@ extension _HomeMapLogic on _MyHomePageState {
     return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
   }
 
+  // Refreshes the friend/follower/following uid sets backing the marker filter
+  // toggles. Failures are swallowed (the filter just shows nothing for that
+  // group) so a relationship lookup never blocks marker loading.
+  Future<void> _loadRelationshipFilterUids(CollectionReference users) async {
+    if (_uid.isEmpty) return;
+    try {
+      final List<List<String>> results = await Future.wait([
+        fu.retrieveFriendUids(_uid),
+        fu.retrieveFollowerUids(_uid),
+        fu.retrieveFollowingUids(users, _uid),
+      ]);
+      _friendUids = results[0].toSet();
+      _followerUids = results[1].toSet();
+      _followingUids = results[2].toSet();
+    } catch (e) {
+      print('Failed to load relationship filter uids: $e');
+    }
+  }
+
+  // Returns the set of uids allowed by the relationship filter toggles, or null
+  // when no toggle is active (meaning: show everyone). The user's own marker is
+  // always included so they never filter themselves off the map.
+  Set<String>? _relationshipFilterUids() {
+    if (!_filterFriends && !_filterFollowers && !_filterFollowing) return null;
+    final Set<String> allowed = {};
+    if (_filterFriends) allowed.addAll(_friendUids);
+    if (_filterFollowers) allowed.addAll(_followerUids);
+    if (_filterFollowing) allowed.addAll(_followingUids);
+    if (_uid.isNotEmpty) allowed.add(_uid);
+    return allowed;
+  }
+
+  // Whether a marker (by uid) should be visible given the active search term
+  // and relationship filter. [relUids] is the result of
+  // _relationshipFilterUids() hoisted out so it is computed once per pass.
+  bool _markerVisible(String uid, Set<String>? relUids) {
+    if (searchTerm.isNotEmpty && !searchFilteredResults.contains(uid)) {
+      return false;
+    }
+    if (relUids != null && !relUids.contains(uid)) return false;
+    return true;
+  }
+
   void _onCameraMove(double zoom) {
     const double minLabelZoom = 2.0;
 
-    Set<String> showAsLabels = _getMarkersToShowAsLabels(zoom,
-        filteredUids: searchTerm.isEmpty ? null : searchFilteredResults);
+    // While searching, ignore the relationship filters so search results behave
+    // as if no filters are applied.
+    final Set<String>? relUids =
+        searchTerm.isEmpty ? _relationshipFilterUids() : null;
+
+    // Effective visible-uid filter (search ∩ relationship) used by the label
+    // proximity computation. Null means no filtering is active.
+    List<String>? visibleFilter;
+    if (searchTerm.isNotEmpty || relUids != null) {
+      visibleFilter = poiMarkers
+          .map((marker) => marker.markerId.value)
+          .where((uid) => _markerVisible(uid, relUids))
+          .toList();
+    }
+
+    Set<String> showAsLabels =
+        _getMarkersToShowAsLabels(zoom, filteredUids: visibleFilter);
 
     setState(() {
       markers = {};
@@ -190,52 +248,31 @@ extension _HomeMapLogic on _MyHomePageState {
       if (_useOriginalMarkerBehavior) {
         // Original behavior: POI and label are mutually exclusive — a marker
         // shows as a label when in `showAsLabels`, otherwise as a POI dot.
-        if (searchTerm == '') {
-          if (zoom < minLabelZoom) {
-            markers.addAll(poiMarkers);
-          } else {
-            markers.addAll(labelMarkers.where((marker) =>
-                showAsLabels.contains(_uidFromLabelMarkerId(marker.markerId.value))));
-            markers.addAll(poiMarkers
-                .where((marker) => !showAsLabels.contains(marker.markerId.value)));
-          }
+        if (zoom < minLabelZoom) {
+          markers.addAll(poiMarkers.where(
+              (marker) => _markerVisible(marker.markerId.value, relUids)));
         } else {
-          if (zoom < minLabelZoom) {
-            markers.addAll(poiMarkers.where(
-                (marker) => searchFilteredResults.contains(marker.markerId.value)));
-          } else {
-            markers.addAll(labelMarkers.where((marker) {
-              final String uid = _uidFromLabelMarkerId(marker.markerId.value);
-              return searchFilteredResults.contains(uid) &&
-                  showAsLabels.contains(uid);
-            }));
-            markers.addAll(poiMarkers.where((marker) =>
-                searchFilteredResults.contains(marker.markerId.value) &&
-                !showAsLabels.contains(marker.markerId.value)));
-          }
+          markers.addAll(labelMarkers.where((marker) {
+            final String uid = _uidFromLabelMarkerId(marker.markerId.value);
+            return _markerVisible(uid, relUids) && showAsLabels.contains(uid);
+          }));
+          markers.addAll(poiMarkers.where((marker) =>
+              _markerVisible(marker.markerId.value, relUids) &&
+              !showAsLabels.contains(marker.markerId.value)));
         }
       } else {
-        // New behavior: POI markers are always shown (respecting the active
-        // search filter)...
-        markers.addAll(
-          poiMarkers.where((marker) =>
-              searchTerm == '' ||
-              searchFilteredResults.contains(marker.markerId.value)),
-        );
+        // New behavior: POI markers are always shown (within the active
+        // filter)...
+        markers.addAll(poiMarkers
+            .where((marker) => _markerVisible(marker.markerId.value, relUids)));
 
         // ...and label markers are layered on top, shown/hidden by the same
         // zoom + proximity logic as before.
         if (zoom >= minLabelZoom) {
-          markers.addAll(
-            labelMarkers.where((marker) {
-              final String uid = _uidFromLabelMarkerId(marker.markerId.value);
-              if (!showAsLabels.contains(uid)) return false;
-              if (searchTerm != '' && !searchFilteredResults.contains(uid)) {
-                return false;
-              }
-              return true;
-            }),
-          );
+          markers.addAll(labelMarkers.where((marker) {
+            final String uid = _uidFromLabelMarkerId(marker.markerId.value);
+            return _markerVisible(uid, relUids) && showAsLabels.contains(uid);
+          }));
         }
       }
     });
@@ -659,6 +696,8 @@ extension _HomeMapLogic on _MyHomePageState {
       });
 
       labelMarkers = newLabelMarkers;
+
+      await _loadRelationshipFilterUids(users);
 
       _onCameraMove(_currentZoom);
     }
