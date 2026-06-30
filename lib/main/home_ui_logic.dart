@@ -574,7 +574,7 @@ extension _HomeUiLogic on _MyHomePageState {
                                   children: [
                                     // Title at the top
                                     Text(
-                                      'Marker Settings',
+                                      'Map Settings',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
@@ -648,7 +648,7 @@ extension _HomeUiLogic on _MyHomePageState {
                                     SizedBox(height: 16),
                                     // Relationship filters
                                     Text(
-                                      'Show on map',
+                                      'Only Show',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 12,
