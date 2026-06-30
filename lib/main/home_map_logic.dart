@@ -132,13 +132,9 @@ extension _HomeMapLogic on _MyHomePageState {
               0, labelMarkerId.length - _labelIdSuffix.length)
           : labelMarkerId;
 
-  // Vertical nudge for the label text relative to the POI dot.
   //   0.0  -> text centered on the dot.
   //   > 0  -> text moves UP.
   //   < 0  -> text moves DOWN.
-  // Expressed as a fraction of the label's text height, so a single value looks
-  // consistent on both mobile (large font) and web (small font). e.g. 0.5 moves
-  // the text up by half its height; -0.25 moves it down by a quarter.
   static const double _labelVerticalNudge = 0.0;
 
   // Builds a label bitmap containing only the text, with padding, so the text
