@@ -192,6 +192,10 @@ extension _HomeMapLogic on _MyHomePageState {
       _friendUids = results[0].toSet();
       _followerUids = results[1].toSet();
       _followingUids = results[2].toSet();
+      print('friendUids: ' + _friendUids.toString());
+      print('followerUids: ' + _followerUids.toString());
+      print('followingUids: ' + _followingUids.toString());
+
     } catch (e) {
       print('Failed to load relationship filter uids: $e');
     }
