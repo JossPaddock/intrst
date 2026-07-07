@@ -381,6 +381,31 @@ class FirebaseUsersUtility {
     await batch.commit();
   }
 
+  Future<String?> getDocIdFromUserUid(String userUid) async {
+    if (userUid.isEmpty) return null;
+
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('user_uid', isEqualTo: userUid)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    return snapshot.docs.first.id;
+  }
+
+  Future<List<String>> retrieveFriendUids(String userUid) async {
+    if (userUid.isEmpty) return [];
+    String id = await getDocIdFromUserUid(userUid) ?? '';
+    DocumentSnapshot snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(id)
+        .get();
+    if (!snapshot.exists) return [];
+    return List<String>.from(snapshot['friends_uids'] ?? []);
+  }
+
   Future<List<String>> retrieveIncomingRequests(String userUid) async {
     QuerySnapshot snapshot = await FirebaseFirestore.instance
         .collection('users')

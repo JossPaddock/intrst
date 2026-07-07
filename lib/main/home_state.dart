@@ -46,6 +46,18 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isLoading = false;
   int toggleIndex = 0;
   bool mapOptionsVisibility = false;
+
+  // Map marker relationship filters. When all are false, every marker is shown.
+  // When one or more are enabled, only markers matching the enabled
+  // relationship(s) — plus the user's own marker — are shown.
+  bool _filterFriends = false;
+  bool _filterFollowers = false;
+  bool _filterFollowing = false;
+
+  // Uid sets backing the relationship filters above; refreshed in loadMarkers.
+  Set<String> _friendUids = {};
+  Set<String> _followerUids = {};
+  Set<String> _followingUids = {};
   String _markerDraggabilityText = 'not moveable';
   bool hasNotification = false;
   int notificationCount = 0;

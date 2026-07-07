@@ -9,6 +9,38 @@ extension _HomeUiLogic on _MyHomePageState {
     return rollingIconBuilder(value, false);
   }
 
+  // A single relationship-filter chip for the Marker Settings menu.
+  Widget _buildMarkerFilterChip(
+      String label, bool selected, ValueChanged<bool> onSelected) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: onSelected,
+      showCheckmark: true,
+      checkmarkColor: Colors.white,
+      backgroundColor: const Color(0xFF0E3D4A),
+      selectedColor: const Color(0xFFff673a),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.white70,
+        fontSize: 12,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: selected ? const Color(0xFFff673a) : Colors.white24,
+        ),
+      ),
+    );
+  }
+
+  // Refreshes the relationship uid sets and re-applies the marker filter after
+  // a filter chip is toggled.
+  Future<void> _onMarkerFilterChanged() async {
+    await _loadRelationshipFilterUids(
+        FirebaseFirestore.instance.collection('users'));
+    _onCameraMove(_currentZoom);
+  }
+
   IconData iconDataByValue(int? value) => switch (value) {
         0 => Icons.disabled_by_default,
         _ => Icons.swipe,
@@ -101,7 +133,8 @@ extension _HomeUiLogic on _MyHomePageState {
         MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top;
     double toolbarHeight = 56;
     // Updated bottom bar height - doubled from 80 to 160
-    double bottomBarHeight = 164;
+    // Raised to fit the relationship filter chips below the draggability toggle.
+    double bottomBarHeight = 252;
 
     return Scaffold(
       drawerEnableOpenDragGesture: false,
@@ -541,7 +574,7 @@ extension _HomeUiLogic on _MyHomePageState {
                                   children: [
                                     // Title at the top
                                     Text(
-                                      'Marker Settings',
+                                      'Map Settings',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
@@ -613,19 +646,46 @@ extension _HomeUiLogic on _MyHomePageState {
                                       ],
                                     ),
                                     SizedBox(height: 16),
-                                    // Button on its own row, centered
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        moveUserMarkerToCurrentLocation();
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 12),
+                                    // Relationship filters
+                                    Text(
+                                      'Only Show',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      child: Text(
-                                        "move to my exact location",
-                                        style: TextStyle(fontSize: 12),
-                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      alignment: WrapAlignment.center,
+                                      children: [
+                                        _buildMarkerFilterChip(
+                                          'Friends',
+                                          _filterFriends,
+                                          (v) async {
+                                            setState(() => _filterFriends = v);
+                                            await _onMarkerFilterChanged();
+                                          },
+                                        ),
+                                        _buildMarkerFilterChip(
+                                          'Followers',
+                                          _filterFollowers,
+                                          (v) async {
+                                            setState(() => _filterFollowers = v);
+                                            await _onMarkerFilterChanged();
+                                          },
+                                        ),
+                                        _buildMarkerFilterChip(
+                                          'Following',
+                                          _filterFollowing,
+                                          (v) async {
+                                            setState(() => _filterFollowing = v);
+                                            await _onMarkerFilterChanged();
+                                          },
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
