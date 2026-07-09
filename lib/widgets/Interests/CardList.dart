@@ -76,6 +76,7 @@ class CardListState extends State<CardList>
 
   final Map<String, TextEditingController> _titleControllers = {};
   final Map<String, TextEditingController> _linkControllers = {};
+  final Map<String, TextEditingController> _imageUrlControllers = {};
   final Map<String, RichTextEditorController> _richTextControllers = {};
   bool _isFriend = false;
   bool _isFollowing = false;
@@ -697,6 +698,10 @@ class CardListState extends State<CardList>
       if (!_linkControllers.containsKey(id)) {
         _linkControllers[id] = TextEditingController(text: interest.link ?? '');
       }
+      if (!_imageUrlControllers.containsKey(id)) {
+        _imageUrlControllers[id] =
+            TextEditingController(text: interest.imageUrl ?? '');
+      }
     }
   }
 
@@ -754,6 +759,8 @@ class CardListState extends State<CardList>
     _richTextControllers.remove(id);
     _linkControllers[id]?.dispose();
     _linkControllers.remove(id);
+    _imageUrlControllers[id]?.dispose();
+    _imageUrlControllers.remove(id);
   }
 
   @override
@@ -762,6 +769,9 @@ class CardListState extends State<CardList>
       controller.dispose();
     }
     for (var controller in _linkControllers.values) {
+      controller.dispose();
+    }
+    for (var controller in _imageUrlControllers.values) {
       controller.dispose();
     }
     for (var controller in _richTextControllers.values) {
@@ -993,16 +1003,19 @@ class CardListState extends State<CardList>
       TextEditingController linkController,
       int index,
       String id,
-      String toggleKey) async {
+      String toggleKey,
+      TextEditingController imageUrlController) async {
     if (toggle) {
       CollectionReference users =
           FirebaseFirestore.instance.collection('users');
+      final rawImageUrl = imageUrlController.text.trim();
       Interest newInterest = interest.copyWith(
         name: titleController.text,
         description: _getRichTextJson(richTextController),
         link: linkController.text,
         created_timestamp: interest.created_timestamp,
         updated_timestamp: DateTime.now(),
+        imageUrl: rawImageUrl.isEmpty ? null : rawImageUrl,
       );
       final isBlank = _isInterestBlank(
         titleController: titleController,
@@ -1209,6 +1222,8 @@ class CardListState extends State<CardList>
                             _createRichTextController(interest.description);
                         final linkController =
                             _linkControllers[editingId] ?? TextEditingController();
+                        final imageUrlController =
+                            _imageUrlControllers[editingId] ?? TextEditingController();
 
                         await editing(
                           interest,
@@ -1219,6 +1234,7 @@ class CardListState extends State<CardList>
                           idx,
                           editingId,
                           editingId,
+                          imageUrlController,
                         );
                       }
                     }
@@ -1276,6 +1292,8 @@ class CardListState extends State<CardList>
                         _createRichTextController(interest.description);
                     final linkController =
                         _linkControllers[id] ?? TextEditingController();
+                    final imageUrlController =
+                        _imageUrlControllers[id] ?? TextEditingController();
 
                     return Padding(
                       padding: const EdgeInsets.symmetric(
@@ -1326,6 +1344,22 @@ class CardListState extends State<CardList>
                                         ),
                                 ),
                                 SizedBox(height: 4),
+                                if (!toggle &&
+                                    (interest.imageUrl ?? '').trim().isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        interest.imageUrl!.trim(),
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                const SizedBox.shrink(),
+                                      ),
+                                    ),
+                                  ),
                                 toggle
                                     ? Column(
                                         children: [
@@ -1333,6 +1367,17 @@ class CardListState extends State<CardList>
                                             controller: linkController,
                                             decoration: InputDecoration(
                                               labelText: 'Edit link here',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                          ),
+                                          SizedBox(height: 8),
+                                          TextField(
+                                            controller: imageUrlController,
+                                            decoration: InputDecoration(
+                                              labelText:
+                                                  'Image URL (optional)',
+                                              hintText:
+                                                  'https://example.com/photo.jpg',
                                               border: OutlineInputBorder(),
                                             ),
                                           ),
@@ -1504,7 +1549,8 @@ class CardListState extends State<CardList>
                                             linkController,
                                             index,
                                             id,
-                                            toggleKey);
+                                            toggleKey,
+                                            imageUrlController);
                                       },
                                     ),
                                   if (widget.showInputForm && !toggle)

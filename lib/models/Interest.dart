@@ -14,6 +14,7 @@ class Interest {
   DateTime updated_timestamp;
   final int privacy;
   final List<String> sharedWithUids;
+  final String? imageUrl;
 
   Interest({
     String? id,
@@ -28,6 +29,7 @@ class Interest {
     required this.updated_timestamp,
     this.privacy = 4,
     List<String>? sharedWithUids,
+    this.imageUrl,
   }) : id = id ?? UuidV4().generate(),
         sharedWithUids = sharedWithUids ?? [];
 
@@ -51,6 +53,7 @@ class Interest {
           .where((e) => e.isNotEmpty)
           .toList() ??
           [],
+      imageUrl: map['image_url'] as String?,
     );
   }
 
@@ -68,6 +71,7 @@ class Interest {
       'updated_timestamp': updated_timestamp,
       'privacy': privacy,
       'shared_with_uids': sharedWithUids,
+      'image_url': imageUrl,
     };
   }
 
@@ -84,6 +88,7 @@ class Interest {
     DateTime? updated_timestamp,
     int? privacy,
     List<String>? sharedWithUids,
+    Object? imageUrl = _sentinel,
   }) {
     return Interest(
       id: id ?? this.id,
@@ -98,6 +103,9 @@ class Interest {
       updated_timestamp: updated_timestamp ?? this.updated_timestamp,
       privacy: privacy ?? this.privacy,
       sharedWithUids: sharedWithUids ?? this.sharedWithUids,
+      imageUrl: imageUrl == _sentinel ? this.imageUrl : imageUrl as String?,
     );
   }
+
+  static const Object _sentinel = Object();
 }

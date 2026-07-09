@@ -15,7 +15,8 @@ class FirebaseMappers{
         favorite: interest['favorite'],
         favorited_timestamp: interest['favorited_timestamp'],
         created_timestamp: interest['created_timestamp'],
-        updated_timestamp: interest['updated_timestamp']
+        updated_timestamp: interest['updated_timestamp'],
+        imageUrl: interest['image_url'] as String?,
       ));
     });
     return localList;
