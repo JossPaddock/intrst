@@ -72,6 +72,7 @@ class CardListState extends State<CardList>
   // True while the search field has focus (keyboard is up). Used to hide the
   // title, link, and description fields so the search results have full room.
   bool _searchKeyboardActive = false;
+  final Map<String, bool> _expandedDescriptions = {};
 
   final Map<String, TextEditingController> _titleControllers = {};
   final Map<String, TextEditingController> _linkControllers = {};
@@ -1076,6 +1077,53 @@ class CardListState extends State<CardList>
     );
   }
 
+  static const double _collapsedDescriptionHeight = 60.0;
+  static const int _descriptionCollapseThreshold = 150;
+
+  Widget _buildDescriptionView(
+      String id, RichTextEditorController richTextController) {
+    final plainText = _getRichTextPlainText(richTextController);
+    final bool isLong = plainText.length > _descriptionCollapseThreshold;
+    final bool isExpanded = _expandedDescriptions[id] ?? false;
+
+    final Widget descContent = Container(
+      padding: const EdgeInsets.all(8),
+      child: RichTextEditorWidget(
+        mode: RichTextEditorMode.view,
+        controller: richTextController,
+        maxLines: null,
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isLong && !isExpanded)
+          SizedBox(
+            height: _collapsedDescriptionHeight,
+            child: ClipRect(child: descContent),
+          )
+        else
+          descContent,
+        if (isLong)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _expandedDescriptions[id] = !isExpanded;
+              });
+            },
+            child: Center(
+              child: Icon(
+                isExpanded ? Icons.expand_less : Icons.expand_more,
+                color: Colors.grey[400],
+                size: 20,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1336,14 +1384,8 @@ class CardListState extends State<CardList>
                                           ),
                                         ],
                                       )
-                                    : Container(
-                                        padding: EdgeInsets.all(8),
-                                        child: RichTextEditorWidget(
-                                          mode: RichTextEditorMode.view,
-                                          controller: richTextController,
-                                          maxLines: null,
-                                        ),
-                                      ),
+                                    : _buildDescriptionView(
+                                        id, richTextController),
                                 Container(
                                   alignment: Alignment.bottomRight,
                                   child: Text(
