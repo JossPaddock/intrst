@@ -547,9 +547,11 @@ extension _HomeMapLogic on _MyHomePageState {
         // Distinct id so the label can coexist with the always-shown POI
         // marker (which uses the bare uid).
         markerId: MarkerId(_labelMarkerId(uid)),
-        // Text bitmap is centered, so a centered anchor lands it exactly on the
-        // POI dot.
-        anchor: const Offset(0.5, 0.5),
+        // On web, fromBytes defaults to bottom-center anchoring (Google Maps JS
+        // default), so (0.5, 0.5) already floats the label above the dot. On
+        // mobile, anchor (0.5, 1.0) replicates that by placing the bitmap
+        // bottom at the geographic point so the text appears above the POI.
+        anchor: kIsWeb ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0),
         position: LatLng(lat, lng),
         // The POI marker (always visible) handles dragging; the label sits on
         // top of it and renders above all POI dots.
@@ -683,9 +685,11 @@ extension _HomeMapLogic on _MyHomePageState {
           // Distinct id so the label can coexist with the always-shown POI
           // marker (which uses the bare uid).
           markerId: MarkerId(_labelMarkerId(uid)),
-          // Text bitmap is centered, so a centered anchor lands it exactly on
-          // the POI dot.
-          anchor: const Offset(0.5, 0.5),
+          // On web, fromBytes defaults to bottom-center anchoring (Google Maps
+          // JS default), so (0.5, 0.5) already floats the label above the dot.
+          // On mobile, anchor (0.5, 1.0) replicates that by placing the bitmap
+          // bottom at the geographic point so the text appears above the POI.
+          anchor: kIsWeb ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0),
           position: LatLng(lat, lng),
           // The POI marker (always visible) handles dragging; the label sits
           // on top of it and renders above all POI dots.
