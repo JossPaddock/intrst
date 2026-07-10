@@ -504,7 +504,7 @@ extension _HomeMapLogic on _MyHomePageState {
           icon: poi,
           markerId: MarkerId(uid),
           //maybe someday this offset below will work. It should!
-          anchor: Offset(0.5, 0.5),
+          anchor: kIsWeb ? const Offset(0.5, 0.5) : const Offset(0.5, 0.35),
           position: LatLng(lat, lng),
           draggable: drag,
           zIndex: drag ? 10 : (user ? 5 : 1),
@@ -636,7 +636,7 @@ extension _HomeMapLogic on _MyHomePageState {
         newPoiMarkers.add(Marker(
           icon: icon,
           markerId: MarkerId(uid),
-          anchor: const Offset(0.5, 0.5),
+          anchor: kIsWeb ? const Offset(0.5, 0.5) : const Offset(0.5, 0.35),
           position: LatLng(lat, lng),
           draggable: draggable,
           zIndex: zIndex.toDouble(),
