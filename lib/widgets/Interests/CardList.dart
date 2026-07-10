@@ -1093,7 +1093,6 @@ class CardListState extends State<CardList>
     final plainText = _getRichTextPlainText(richTextController);
     final bool isLong = plainText.length > _descriptionCollapseThreshold;
     final bool isExpanded = _expandedDescriptions[id] ?? false;
-    final List<String> imageUrls = _extractImageUrls(plainText);
 
     final Widget descContent = Container(
       padding: const EdgeInsets.all(8),
@@ -1104,31 +1103,44 @@ class CardListState extends State<CardList>
       ),
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (isLong && !isExpanded)
+    if (isLong && !isExpanded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           SizedBox(
             height: _collapsedDescriptionHeight,
             child: ClipRect(child: descContent),
-          )
-        else
-          descContent,
-        if (isLong)
+          ),
           GestureDetector(
-            onTap: () {
-              setState(() {
-                _expandedDescriptions[id] = !isExpanded;
-              });
-            },
+            onTap: () => setState(() => _expandedDescriptions[id] = true),
             child: Center(
-              child: Icon(
-                isExpanded ? Icons.expand_less : Icons.expand_more,
-                color: Colors.grey[400],
-                size: 20,
-              ),
+              child: Icon(Icons.expand_more, color: Colors.grey[400], size: 20),
             ),
           ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        descContent,
+        if (isLong)
+          GestureDetector(
+            onTap: () => setState(() => _expandedDescriptions[id] = false),
+            child: Center(
+              child: Icon(Icons.expand_less, color: Colors.grey[400], size: 20),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildEmbeddedImages(List<String> imageUrls) {
+    if (imageUrls.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         for (final url in imageUrls)
           Padding(
             padding: const EdgeInsets.only(top: 6.0),
@@ -1408,8 +1420,18 @@ class CardListState extends State<CardList>
                                           ),
                                         ],
                                       )
-                                    : _buildDescriptionView(
-                                        id, richTextController),
+                                    : Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          _buildDescriptionView(
+                                              id, richTextController),
+                                          _buildEmbeddedImages(
+                                              _extractImageUrls(
+                                                  _getRichTextPlainText(
+                                                      richTextController))),
+                                        ],
+                                      ),
                                 Container(
                                   alignment: Alignment.bottomRight,
                                   child: Text(
