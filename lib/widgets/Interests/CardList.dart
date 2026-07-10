@@ -1080,13 +1080,26 @@ class CardListState extends State<CardList>
   static const double _collapsedDescriptionHeight = 60.0;
   static const int _descriptionCollapseThreshold = 150;
 
+  static const double _defaultImageMaxHeight = 160.0;
+
+  // Matches an image URL optionally followed by |<pixels> to set max height.
+  // The | and pixel characters are excluded from the URL character class so
+  // the suffix is unambiguous, e.g. "https://example.com/photo.jpg|300".
   static final RegExp _imageUrlPattern = RegExp(
-    r'https?://[^\s<>"{}|\\^`\[\]]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s]*)?',
+    r'(https?://[^\s<>"{}|\\^`\[\]]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s|]*)?)(?:\|(\d+))?',
     caseSensitive: false,
   );
 
-  List<String> _extractImageUrls(String plainText) =>
-      _imageUrlPattern.allMatches(plainText).map((m) => m.group(0)!).toList();
+  List<({String url, double maxHeight})> _extractImageUrls(String plainText) {
+    return _imageUrlPattern.allMatches(plainText).map((m) {
+      final url = m.group(1)!;
+      final heightStr = m.group(2);
+      final maxHeight = heightStr != null
+          ? double.tryParse(heightStr) ?? _defaultImageMaxHeight
+          : _defaultImageMaxHeight;
+      return (url: url, maxHeight: maxHeight.clamp(40.0, 800.0));
+    }).toList();
+  }
 
   Widget _buildDescriptionView(
       String id, RichTextEditorController richTextController) {
@@ -1136,20 +1149,21 @@ class CardListState extends State<CardList>
     );
   }
 
-  Widget _buildEmbeddedImages(List<String> imageUrls) {
-    if (imageUrls.isEmpty) return const SizedBox.shrink();
+  Widget _buildEmbeddedImages(
+      List<({String url, double maxHeight})> images) {
+    if (images.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final url in imageUrls)
+        for (final img in images)
           Padding(
             padding: const EdgeInsets.only(top: 6.0),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 160),
+                constraints: BoxConstraints(maxHeight: img.maxHeight),
                 child: Image.network(
-                  url,
+                  img.url,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
