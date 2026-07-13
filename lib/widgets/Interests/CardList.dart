@@ -742,7 +742,7 @@ class CardListState extends State<CardList>
                 autofocus: true,
                 maxLines: null,
                 decoration:
-                    const InputDecoration(hintText: 'enter your interest here'),
+                    const InputDecoration(hintText: 'enter your interest description here'),
               )),
         );
       },
