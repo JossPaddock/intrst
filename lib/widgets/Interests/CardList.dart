@@ -1143,7 +1143,7 @@ class CardListState extends State<CardList>
     );
   }
 
-  static const double _collapsedDescriptionHeight = 60.0;
+  static const double _collapsedDescriptionHeight = 50.0;
   static const int _descriptionCollapseThreshold = 150;
 
   static const double _defaultImageMaxHeight = 160.0;
