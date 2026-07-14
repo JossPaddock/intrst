@@ -1696,6 +1696,40 @@ class FirebaseUsersUtility {
     }
   }
 
+  // Persists a drag-and-drop reorder: rewrites the stored interests array in
+  // [orderedInterests] order and stamps each entry's sort_order from the
+  // passed objects. Stored entries missing from [orderedInterests] keep their
+  // data and are appended at the end in their existing order, so a stale
+  // client can never drop interests it didn't know about.
+  Future<void> persistInterestOrder(CollectionReference users, String uid,
+      List<Interest> orderedInterests) async {
+    QuerySnapshot querySnapshot =
+    await users.where('user_uid', isEqualTo: uid).get();
+
+    for (var doc in querySnapshot.docs) {
+      DocumentReference documentRef =
+      FirebaseFirestore.instance.collection('users').doc(doc.id);
+
+      List<dynamic> stored = (doc['interests'] ?? []) as List<dynamic>;
+      final Map<String, Map<String, dynamic>> byId = {};
+      for (final item in stored) {
+        final map = Map<String, dynamic>.from(item as Map);
+        byId[map['id'].toString()] = map;
+      }
+
+      final List<Map<String, dynamic>> reordered = [];
+      for (final interest in orderedInterests) {
+        final map = byId.remove(interest.id);
+        if (map == null) continue;
+        map['sort_order'] = interest.sort_order;
+        reordered.add(map);
+      }
+      reordered.addAll(byId.values);
+
+      await documentRef.update({'interests': reordered});
+    }
+  }
+
   Future<List<Interest>> pullInterestsForUser(
       CollectionReference users, String uid) async {
     List<Interest> interests = [];

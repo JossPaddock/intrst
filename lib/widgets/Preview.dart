@@ -54,6 +54,7 @@ class _InterestAlertDialogState extends State<Preview> {
 
   Future<void> _fetchNameAndButtonLabels() async {
     List<Interest> interests = await fuu.pullInterestsForUser(users, widget.alternateUid);
+    interests.sort(Interest.compareForDisplay);
     String name = await fuu.lookUpNameByUserUid(users, widget.alternateUid);
     if (!mounted) return;
     setState(() {

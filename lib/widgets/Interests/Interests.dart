@@ -67,8 +67,7 @@ class _InterestsState extends State<Interests> {
   Future<List<Interest>> _fetchSortedInterestsForUser(String userUid) async {
     CollectionReference users = FirebaseFirestore.instance.collection('users');
     List<Interest> interests = await fu.pullInterestsForUser(users, userUid);
-    interests
-        .sort((x, y) => y.updated_timestamp.compareTo(x.updated_timestamp));
+    interests.sort(Interest.compareForDisplay);
     return interests;
   }
 
