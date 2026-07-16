@@ -1712,10 +1712,7 @@ class CardListState extends State<CardList>
           _createRichTextController(interest.description);
       final linkController = _linkControllers[id] ?? TextEditingController();
 
-      return Padding(
-        // ReorderableListView needs the key on the widget the
-        // item builder returns, not on a descendant.
-        key: ValueKey(id),
+      final Widget card = Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
         child: Card(
           color: shouldHighlightFromFeed ? const Color(0xFFFFF3CD) : null,
@@ -2044,11 +2041,59 @@ class CardListState extends State<CardList>
           ),
         ),
       );
+
+      // ReorderableListView needs the key on the widget the
+      // item builder returns, not on a descendant.
+      if (!canReorder) {
+        return KeyedSubtree(key: ValueKey(id), child: card);
+      }
+
+      switch (Theme.of(context).platform) {
+        case TargetPlatform.linux:
+        case TargetPlatform.windows:
+        case TargetPlatform.macOS:
+          // Custom drag handle: the framework default sits flush against
+          // the card edge, so give it its own padding and inset.
+          return Stack(
+            key: ValueKey(id),
+            children: [
+              card,
+              Positioned.directional(
+                textDirection: Directionality.of(context),
+                top: 8,
+                bottom: 8,
+                end: 12,
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: ReorderableDragStartListener(
+                    index: index,
+                    child: const MouseRegion(
+                      cursor: SystemMouseCursors.grab,
+                      child: Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: Icon(Icons.drag_handle),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        case TargetPlatform.android:
+        case TargetPlatform.iOS:
+        case TargetPlatform.fuchsia:
+          return ReorderableDelayedDragStartListener(
+            key: ValueKey(id),
+            index: index,
+            child: card,
+          );
+      }
     }
 
     if (canReorder) {
       return ReorderableListView.builder(
         padding: EdgeInsets.zero,
+        buildDefaultDragHandles: false,
         itemCount: visibleInterests.length,
         onReorderItem: _handleReorder,
         itemBuilder: buildItem,
