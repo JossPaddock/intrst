@@ -155,7 +155,7 @@ class _InterestAlertDialogState extends State<Preview> {
       userModel.changeAlternateName(_name);
 
       final sanitizedInterestId = highlightedInterestId.trim();
-      if (sanitizedInterestId.isNotEmpty) {
+     if (sanitizedInterestId.isNotEmpty) {
         userModel.setFeedInterestHighlight(ownerUid: widget.alternateUid, interestId: sanitizedInterestId);
       } else {
         userModel.clearFeedInterestHighlight();
@@ -203,10 +203,13 @@ class _InterestAlertDialogState extends State<Preview> {
 
     return _previewInterests.where((interest) {
       if (interest.privacy == 4) return true; // Public
-      if (interest.privacy == 3 && _friendshipStatus == 'approved') return true; // Friends only
-      if (interest.privacy == 2 && (_friendshipStatus == 'approved' || _isFollowing)) return true; // Friends & followers
+      //if (interest.privacy == 3 && _friendshipStatus == 'approved') return true; // Friends only
+      //if (interest.privacy == 2 && (_friendshipStatus == 'approved' || _isFollowing)) return true; // Friends & followers
       return false; // Private or unmatched
-    }).toList();
+    }).toList()..sort((a, b) {
+      if (a.favorite == b.favorite) return 0;
+      return a.favorite? -1 : 1;
+    });
   }
 
   @override
