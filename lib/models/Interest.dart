@@ -14,6 +14,11 @@ class Interest {
   DateTime updated_timestamp;
   final int privacy;
   final List<String> sharedWithUids;
+  final String? imageUrl;
+  // Manual position set by drag-and-drop reordering. Null for interests the
+  // user has never reordered — those fall back to created_timestamp so new
+  // interests appear on top.
+  int? sort_order;
 
   Interest({
     String? id,
@@ -28,8 +33,26 @@ class Interest {
     required this.updated_timestamp,
     this.privacy = 4,
     List<String>? sharedWithUids,
+    this.imageUrl,
+    this.sort_order,
   }) : id = id ?? UuidV4().generate(),
-        sharedWithUids = sharedWithUids ?? [];
+       sharedWithUids = sharedWithUids ?? [];
+
+  int get effectiveSortOrder =>
+      sort_order ?? created_timestamp.millisecondsSinceEpoch;
+
+  // Display order everywhere interests are listed: starred (top 5) interests
+  // stay pinned above the rest; within each group higher effectiveSortOrder
+  // comes first, so never-reordered lists show newest created on top and
+  // editing an interest does not move it.
+  static int compareForDisplay(Interest a, Interest b) {
+    if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
+    final byOrder = b.effectiveSortOrder.compareTo(a.effectiveSortOrder);
+    if (byOrder != 0) return byOrder;
+    final byCreated = b.created_timestamp.compareTo(a.created_timestamp);
+    if (byCreated != 0) return byCreated;
+    return a.id.compareTo(b.id);
+  }
 
   factory Interest.fromMap(Map<String, dynamic> map) {
     return Interest(
@@ -46,11 +69,14 @@ class Interest {
       created_timestamp: (map['created_timestamp'] as Timestamp).toDate(),
       updated_timestamp: (map['updated_timestamp'] as Timestamp).toDate(),
       privacy: map['privacy'] ?? 4,
-      sharedWithUids: (map['shared_with_uids'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .where((e) => e.isNotEmpty)
-          .toList() ??
+      sharedWithUids:
+          (map['shared_with_uids'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .where((e) => e.isNotEmpty)
+              .toList() ??
           [],
+      imageUrl: map['image_url'] as String?,
+      sort_order: (map['sort_order'] as num?)?.toInt(),
     );
   }
 
@@ -68,6 +94,8 @@ class Interest {
       'updated_timestamp': updated_timestamp,
       'privacy': privacy,
       'shared_with_uids': sharedWithUids,
+      'image_url': imageUrl,
+      'sort_order': sort_order,
     };
   }
 
@@ -84,6 +112,8 @@ class Interest {
     DateTime? updated_timestamp,
     int? privacy,
     List<String>? sharedWithUids,
+    Object? imageUrl = _sentinel,
+    int? sort_order,
   }) {
     return Interest(
       id: id ?? this.id,
@@ -98,6 +128,10 @@ class Interest {
       updated_timestamp: updated_timestamp ?? this.updated_timestamp,
       privacy: privacy ?? this.privacy,
       sharedWithUids: sharedWithUids ?? this.sharedWithUids,
+      imageUrl: imageUrl == _sentinel ? this.imageUrl : imageUrl as String?,
+      sort_order: sort_order ?? this.sort_order,
     );
   }
+
+  static const Object _sentinel = Object();
 }
