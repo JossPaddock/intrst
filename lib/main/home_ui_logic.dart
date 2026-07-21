@@ -205,6 +205,9 @@ extension _HomeUiLogic on _MyHomePageState {
                 List<String> interests = await fu.listInterests();
                 print("interests: $interests");
 
+                if(_searchController.text != value) {
+                  return const Iterable<String>.empty();
+                }
                 setState(() {
                   searchTerm = value;
                   searchFilteredMarkers = markers;
@@ -291,6 +294,10 @@ extension _HomeUiLogic on _MyHomePageState {
 
                 List<String> uid_results = await fu
                     .searchForPeopleAndInterestsReturnUIDs(users, selection, true);
+
+                if(_searchController.text != selection) {
+                  return;
+                }
 
                 setState(() {
                   searchTerm = selection;
