@@ -818,7 +818,7 @@ extension _HomeUiLogic on _MyHomePageState {
                       Navigator.pop(context);
                     },
                   ),
-                  ListTile(
+                  if(kDebugMode)ListTile(
                     title: const Text('Feed'),
                     selected: _selectedIndex == 1,
                     onTap: () {

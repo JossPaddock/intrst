@@ -503,13 +503,6 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                           interest: interest,
                         ),
                       ),
-                Container(
-                  alignment: Alignment.bottomRight,
-                  child: Text(
-                    getStatusText(interest.privacy),
-                    style: TextStyle(fontSize: 8),
-                  ),
-                ),
               ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -617,7 +610,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                         });
                       },
                     ),
-                  if (widget.showInputForm && !toggle)
+                  if (widget.showInputForm && !toggle && kDebugMode)
                     IconButton(
                       tooltip: 'Post to my feed',
                       icon: const Icon(Icons.share),
@@ -711,6 +704,10 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                         ),
                       ),
                     ),
+                  Text(
+                    getStatusText(interest.privacy),
+                    style: TextStyle(fontSize: 8),
+                  ),
                 ],
               ),
               if (widget.showInputForm && toggle)
