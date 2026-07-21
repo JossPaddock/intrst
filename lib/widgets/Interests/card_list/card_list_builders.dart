@@ -383,6 +383,16 @@ mixin _CardListBuildersMixin on _CardListStateBase {
         _createRichTextController(interest.description);
     final linkController = _linkControllers[id] ?? TextEditingController();
 
+    // On desktop, a drag handle is overlaid on the right edge of the card
+    // (see the Stack below) — reserve space so the description text wraps
+    // before reaching it instead of running underneath.
+    final platform = Theme.of(context).platform;
+    final bool showsDesktopDragHandle =
+        dragIndex != null &&
+        (platform == TargetPlatform.linux ||
+            platform == TargetPlatform.windows ||
+            platform == TargetPlatform.macOS);
+
     final Widget card = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
       child: Card(
@@ -481,12 +491,17 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                           ),
                         ],
                       )
-                    : _buildInlineDescription(
-                        context,
-                        id,
-                        richTextController,
-                        canResize: widget.showInputForm,
-                        interest: interest,
+                    : Padding(
+                        padding: EdgeInsets.only(
+                          right: showsDesktopDragHandle ? 56.0 : 0.0,
+                        ),
+                        child: _buildInlineDescription(
+                          context,
+                          id,
+                          richTextController,
+                          canResize: widget.showInputForm,
+                          interest: interest,
+                        ),
                       ),
                 Container(
                   alignment: Alignment.bottomRight,
@@ -716,7 +731,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
       return KeyedSubtree(key: ValueKey(id), child: card);
     }
 
-    switch (Theme.of(context).platform) {
+    switch (platform) {
       case TargetPlatform.linux:
       case TargetPlatform.windows:
       case TargetPlatform.macOS:
