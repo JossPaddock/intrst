@@ -1,8 +1,35 @@
+from typing import Any
+
 import firebase_admin
-from firebase_admin import firestore, messaging
-from firebase_functions import firestore_fn
+from firebase_admin import auth, firestore, messaging
+from firebase_functions import firestore_fn, https_fn
 
 firebase_admin.initialize_app()
+
+# ---------------------------------------------------------------------------
+# Admin allowlist
+# ---------------------------------------------------------------------------
+# Emails permitted to call admin-only callable functions (see
+# `admin_delete_user`). A caller is also authorized if their auth token carries
+# a custom claim `admin == true`. This server-side check is the real security
+# boundary: the Flutter admin dashboard is gated to web + debug builds, but the
+# callable function itself is reachable by anyone on the internet, so it must
+# never trust the client gate alone.
+ADMIN_EMAILS = {
+    "joss.self@gmail.com",
+    "josspaddock@hotmail.com",
+}
+
+
+def _is_admin_caller(auth_data) -> bool:
+    """True when the callable request comes from an authorized admin."""
+    if auth_data is None:
+        return False
+    token = getattr(auth_data, "token", None) or {}
+    if token.get("admin") is True:
+        return True
+    email = token.get("email")
+    return bool(email) and email.lower() in {e.lower() for e in ADMIN_EMAILS}
 
 
 def _cleanup_stale_tokens(users_ref, uid, all_tokens, response):
@@ -255,3 +282,262 @@ def on_message_updated(
             )
         except Exception as e:
             print(f"Error processing receiver {receiver_uid}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Admin: fully delete a user (Firebase Auth account + all Firestore data)
+# ---------------------------------------------------------------------------
+def _commit_in_batches(db, operations):
+    """Apply a list of (kind, ref, payload) ops in <=400-write batches.
+
+    kind is 'delete' or 'update'; payload is ignored for deletes.
+    """
+    batch = db.batch()
+    count = 0
+    committed = 0
+    for kind, ref, payload in operations:
+        if kind == "delete":
+            batch.delete(ref)
+        else:
+            batch.update(ref, payload)
+        count += 1
+        if count >= 400:
+            batch.commit()
+            committed += count
+            batch = db.batch()
+            count = 0
+    if count:
+        batch.commit()
+        committed += count
+    return committed
+
+
+def _delete_subcollection(doc_ref, subcollection):
+    """Delete every document in a subcollection (subcollections are not removed
+    automatically when their parent document is deleted)."""
+    deleted = 0
+    for sub_doc in doc_ref.collection(subcollection).stream():
+        sub_doc.reference.delete()
+        deleted += 1
+    return deleted
+
+
+def _purge_user_firestore_data(db, target_uid):
+    """Remove the user's own document(s) plus every cross-reference to them.
+
+    Returns a summary dict describing what was cleaned up.
+    """
+    users_ref = db.collection("users")
+    summary = {
+        "user_docs_deleted": 0,
+        "friendship_docs_deleted": 0,
+        "following_or_friend_refs_removed": 0,
+        "activity_feed_docs_deleted": 0,
+        "activity_feed_targets_scrubbed": 0,
+        "message_threads_deleted": 0,
+    }
+
+    # 1. The user's own document(s) and their friendships subcollection.
+    own_docs = list(
+        users_ref.where(
+            filter=firestore.FieldFilter("user_uid", "==", target_uid)
+        ).stream()
+    )
+    for doc in own_docs:
+        summary["friendship_docs_deleted"] += _delete_subcollection(
+            doc.reference, "friendships"
+        )
+        doc.reference.delete()
+        summary["user_docs_deleted"] += 1
+
+    # 2. Other users referencing the target in following_uids / friends_uids,
+    #    plus a friendships/{target_uid} doc pointing back at them.
+    ops = []
+    referencing_ids = set()
+    for field in ("following_uids", "friends_uids"):
+        for doc in users_ref.where(
+            filter=firestore.FieldFilter(field, "array_contains", target_uid)
+        ).stream():
+            ops.append((
+                "update",
+                doc.reference,
+                {field: firestore.ArrayRemove([target_uid])},
+            ))
+            referencing_ids.add(doc.id)
+    summary["following_or_friend_refs_removed"] += len(ops)
+    if ops:
+        _commit_in_batches(db, ops)
+
+    # Delete the reciprocal friendship doc other users hold for the target.
+    for doc in users_ref.stream():
+        friendship_ref = doc.reference.collection("friendships").document(
+            target_uid
+        )
+        if friendship_ref.get().exists:
+            friendship_ref.delete()
+            summary["friendship_docs_deleted"] += 1
+
+    # 3. Activity feed: delete items authored by the target, and scrub the
+    #    target out of other people's target_uids arrays.
+    activity_ref = db.collection("activity_feed")
+    del_ops = [
+        ("delete", doc.reference, None)
+        for doc in activity_ref.where(
+            filter=firestore.FieldFilter("actor_uid", "==", target_uid)
+        ).stream()
+    ]
+    summary["activity_feed_docs_deleted"] = len(del_ops)
+    if del_ops:
+        _commit_in_batches(db, del_ops)
+
+    scrub_ops = [
+        ("update", doc.reference, {
+            "target_uids": firestore.ArrayRemove([target_uid])
+        })
+        for doc in activity_ref.where(
+            filter=firestore.FieldFilter(
+                "target_uids", "array_contains", target_uid
+            )
+        ).stream()
+    ]
+    summary["activity_feed_targets_scrubbed"] = len(scrub_ops)
+    if scrub_ops:
+        _commit_in_batches(db, scrub_ops)
+
+    # 4. Message threads the target participated in.
+    messages_ref = db.collection("messages")
+    msg_ops = [
+        ("delete", doc.reference, None)
+        for doc in messages_ref.where(
+            filter=firestore.FieldFilter(
+                "user_uids", "array_contains", target_uid
+            )
+        ).stream()
+    ]
+    summary["message_threads_deleted"] = len(msg_ops)
+    if msg_ops:
+        _commit_in_batches(db, msg_ops)
+
+    return summary
+
+
+@https_fn.on_call()
+def admin_delete_user(req: https_fn.CallableRequest) -> Any:
+    """Callable: permanently delete a user's Firebase Auth account and every
+    trace of their data in Firestore. Admin-only.
+
+    Request data: { "target_uid": "<user_uid>" }
+    """
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="You must be signed in to perform this action.",
+        )
+    if not _is_admin_caller(req.auth):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="You are not authorized to delete users.",
+        )
+
+    data = req.data if isinstance(req.data, dict) else {}
+    target_uid = (data.get("target_uid") or "").strip()
+    if not target_uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="A non-empty 'target_uid' is required.",
+        )
+    if target_uid == req.auth.uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="Admins cannot delete their own account here.",
+        )
+
+    db = firestore.client()
+
+    # Clean Firestore first so that, even if auth deletion fails, we do not
+    # leave the user's data behind.
+    try:
+        summary = _purge_user_firestore_data(db, target_uid)
+    except Exception as e:
+        print(f"admin_delete_user: Firestore purge failed for {target_uid}: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message=f"Failed to delete user data: {e}",
+        )
+
+    # Delete the Firebase Auth account. A missing auth user is not fatal — the
+    # Firestore data is already gone, so we report it and succeed.
+    auth_deleted = False
+    try:
+        auth.delete_user(target_uid)
+        auth_deleted = True
+    except auth.UserNotFoundError:
+        print(f"admin_delete_user: no auth account for {target_uid}.")
+    except Exception as e:
+        print(f"admin_delete_user: auth deletion failed for {target_uid}: {e}")
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message=(
+                "User data was deleted, but removing the auth account failed: "
+                f"{e}"
+            ),
+        )
+
+    print(
+        f"admin_delete_user: {req.auth.uid} deleted {target_uid} "
+        f"(auth_deleted={auth_deleted}, summary={summary})"
+    )
+    return {
+        "success": True,
+        "target_uid": target_uid,
+        "auth_deleted": auth_deleted,
+        "summary": summary,
+    }
+
+
+@https_fn.on_call()
+def admin_get_user_emails(req: https_fn.CallableRequest) -> Any:
+    """Callable: return { uid: email } for the requested user uids. Admin-only.
+
+    Emails are stored in Firebase Auth, not Firestore, so the admin dashboard
+    looks them up here (via the Admin SDK) to display alongside each user.
+
+    Request data: { "uids": ["<uid>", ...] }
+    """
+    if req.auth is None:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="You must be signed in to perform this action.",
+        )
+    if not _is_admin_caller(req.auth):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="You are not authorized to view user emails.",
+        )
+
+    data = req.data if isinstance(req.data, dict) else {}
+    raw_uids = data.get("uids") or []
+
+    # Normalize + de-duplicate while preserving order.
+    seen = set()
+    unique_uids = []
+    for value in raw_uids:
+        uid = str(value).strip()
+        if uid and uid not in seen:
+            seen.add(uid)
+            unique_uids.append(uid)
+
+    emails = {}
+    # auth.get_users accepts at most 100 identifiers per call.
+    for start in range(0, len(unique_uids), 100):
+        chunk = unique_uids[start:start + 100]
+        try:
+            result = auth.get_users(
+                [auth.UidIdentifier(uid) for uid in chunk]
+            )
+            for user in result.users:
+                emails[user.uid] = user.email or ""
+        except Exception as e:
+            print(f"admin_get_user_emails: lookup failed for a chunk: {e}")
+
+    return {"emails": emails}

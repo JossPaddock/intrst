@@ -16,6 +16,7 @@ class Preview extends StatefulWidget {
     required this.signedIn,
     required this.onDrawerOpened,
     required this.onOpenMessages,
+    this.firestore,
   });
   final String uid;
   final String alternateUid;
@@ -25,6 +26,11 @@ class Preview extends StatefulWidget {
   final VoidCallback onDrawerOpened;
   final void Function(String userUid, String userName) onOpenMessages;
 
+  // Firestore instance backing this dialog. Defaults to
+  // [FirebaseFirestore.instance] in production; tests inject a fake so the
+  // widget can be exercised without a live Firebase project.
+  final FirebaseFirestore? firestore;
+
   @override
   _InterestAlertDialogState createState() => _InterestAlertDialogState();
 }
@@ -33,7 +39,11 @@ class _InterestAlertDialogState extends State<Preview> {
   List<Interest> _previewInterests = [];
   String _name = '';
   FirebaseUsersUtility fuu = FirebaseUsersUtility();
-  CollectionReference users = FirebaseFirestore.instance.collection('users');
+  // `late` so the fallback to FirebaseFirestore.instance is only evaluated on
+  // first use — this lets a test inject widget.firestore without ever touching
+  // the (uninitialized) default Firebase app.
+  late final CollectionReference users =
+      (widget.firestore ?? FirebaseFirestore.instance).collection('users');
 
   bool _isFollowing = false;
   bool _followStateLoading = false;

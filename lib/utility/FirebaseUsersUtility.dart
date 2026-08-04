@@ -266,11 +266,13 @@ class FirebaseUsersUtility {
 
   FirebaseMappers fm = FirebaseMappers();
   Future<void> addUserToFirestore(CollectionReference users, String userUid,
-      String firstName, String lastName, GeoPoint geoPoint) async {
+      String firstName, String lastName, GeoPoint geoPoint,
+      DateTime birthday) async {
     Map<String, dynamic> userData = {
       'user_uid': userUid,
       'first_name': firstName,
       'last_name': lastName,
+      'birthday': Timestamp.fromDate(birthday),
       'interests': [],
       'location': geoPoint,
       'following_uids': [],
@@ -946,6 +948,26 @@ class FirebaseUsersUtility {
       if (operationsInBatch > 0) {
         await batch.commit();
       }
+    }
+
+    return true;
+  }
+
+  Future<bool> updateUserBirthday(
+      CollectionReference users, String userUid, DateTime birthday) async {
+    final sanitizedUid = userUid.trim();
+    if (sanitizedUid.isEmpty) {
+      return false;
+    }
+
+    final querySnapshot =
+    await users.where('user_uid', isEqualTo: sanitizedUid).get();
+    if (querySnapshot.docs.isEmpty) {
+      return false;
+    }
+
+    for (final doc in querySnapshot.docs) {
+      await doc.reference.update({'birthday': Timestamp.fromDate(birthday)});
     }
 
     return true;

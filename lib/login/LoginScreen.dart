@@ -122,12 +122,81 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Parses a birthday entered as `MM/DD/YYYY`. Returns null if the string
+  /// isn't a valid calendar date in that format.
+  DateTime? _parseBirthday(String input) {
+    final match =
+    RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(input.trim());
+    if (match == null) return null;
+
+    final month = int.parse(match.group(1)!);
+    final day = int.parse(match.group(2)!);
+    final year = int.parse(match.group(3)!);
+
+    final date = DateTime(year, month, day);
+    // DateTime normalizes out-of-range values (e.g. month 13) instead of
+    // throwing, so confirm the parts round-trip to catch invalid dates.
+    if (date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
+    return date;
+  }
+
+  int _calculateAge(DateTime birthday) {
+    final now = DateTime.now();
+    int age = now.year - birthday.year;
+    if (now.month < birthday.month ||
+        (now.month == birthday.month && now.day < birthday.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<void> _showUnderageDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Age Restriction'),
+          content: const Text(
+              'You must be at least 13 years of age to use the intrst app.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<String?> _signupUser(SignupData data) async {
     debugPrint('Signup Name: ${data.name}, Password: ${data.password}');
 
     if (data.name is String && data.password is String) {
       String email = data.name ?? '';
       String password = data.password ?? '';
+
+      // Safely access additional signup data to avoid crashes.
+      var firstname = data.additionalSignupData?['firstname'] ?? 'Bob';
+      var lastname = data.additionalSignupData?['lastname'] ?? 'Watkins';
+      final birthdayInput = data.additionalSignupData?['birthday'];
+      final birthday =
+      birthdayInput is String ? _parseBirthday(birthdayInput) : null;
+
+      if (birthday == null) {
+        return 'Please enter a valid birthday as MM/DD/YYYY.';
+      }
+
+      // Enforce the age gate before creating the Firebase Auth account so
+      // no account is ever created for an underage signup attempt.
+      if (_calculateAge(birthday) < 13) {
+        if (mounted) {
+          await _showUnderageDialog();
+        }
+        return 'You must be at least 13 years of age to use the intrst app.';
+      }
 
       final credential = await _createNewUser(email, password);
       if (credential == null) {
@@ -155,14 +224,10 @@ class _LoginScreenState extends State<LoginScreen> {
       CollectionReference users =
       FirebaseFirestore.instance.collection('users');
 
-      // Safely access additional signup data to avoid crashes.
-      var firstname = data.additionalSignupData?['firstname'] ?? 'Bob';
-      var lastname = data.additionalSignupData?['lastname'] ?? 'Watkins';
-
       try {
         // MUST await this call before potential sign-out to ensure document creation.
         await fu.addUserToFirestore(
-            users, user.uid, firstname, lastname, GeoPoint(0, 0));
+            users, user.uid, firstname, lastname, GeoPoint(0, 0), birthday);
       } catch (e) {
         print('Failed to create user doc: $e');
         return 'Failed to create user profile. Please try again.';
@@ -283,6 +348,24 @@ class _LoginScreenState extends State<LoginScreen> {
           fieldValidator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter a Last Name';
+            }
+            return null;
+          },
+        ),
+        UserFormField(
+          keyName: 'birthday',
+          displayName: 'Birthday (MM/DD/YYYY)',
+          userType: LoginUserType.text,
+          fieldValidator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter your birthday';
+            }
+            final birthday = _parseBirthday(value);
+            if (birthday == null) {
+              return 'Please enter a valid date as MM/DD/YYYY';
+            }
+            if (birthday.isAfter(DateTime.now())) {
+              return 'Birthday cannot be in the future';
             }
             return null;
           },

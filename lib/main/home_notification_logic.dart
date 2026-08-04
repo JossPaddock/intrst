@@ -141,6 +141,9 @@ extension _HomeNotificationLogic on _MyHomePageState {
       ..showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 5),
+          // Without this, `persist` defaults to `action != null` (true here),
+          // which makes the banner ignore `duration` and stay until tapped.
+          persist: false,
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -18,8 +18,16 @@ jobs:
       - name: Run flutter version to check if we have flutter
         run: flutter --version
 
-      - name: Run tests
-        run: flutter test
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Runs the full suite and prints the formatted report
+      # (Test <name> passed ✅ / failed ❌, phase breakdown for any failures,
+      # and a Passed X/Y tally). A non-zero exit here fails the job and blocks
+      # the build/deploy steps below. This is the same command developers run
+      # locally via ./scripts/run_tests.sh.
+      - name: Run test suite (Patrol)
+        run: bash scripts/run_tests.sh
 
       - name: Build Flutter Web App
         run: flutter build web
