@@ -27,6 +27,8 @@ class _Account extends State<Account> {
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _birthdayController = TextEditingController();
+  DateTime? _birthday;
   bool _isSavingName = false;
   bool _isAdjustingProfileStatistics = false;
   bool _didHydrateInitialValues = false;
@@ -39,6 +41,8 @@ class _Account extends State<Account> {
       _didHydrateInitialValues = false;
       _firstNameController.clear();
       _lastNameController.clear();
+      _birthdayController.clear();
+      _birthday = null;
     }
   }
 
@@ -46,6 +50,7 @@ class _Account extends State<Account> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _birthdayController.dispose();
     super.dispose();
   }
 
@@ -53,7 +58,62 @@ class _Account extends State<Account> {
     if (_didHydrateInitialValues) return;
     _firstNameController.text = (userData['first_name'] ?? '').toString();
     _lastNameController.text = (userData['last_name'] ?? '').toString();
+    final birthdayRaw = userData['birthday'];
+    _birthday = birthdayRaw is Timestamp ? birthdayRaw.toDate() : null;
+    _birthdayController.text = _formatBirthday(_birthday);
     _didHydrateInitialValues = true;
+  }
+
+  int _calculateAge(DateTime birthday) {
+    final now = DateTime.now();
+    int age = now.year - birthday.year;
+    if (now.month < birthday.month ||
+        (now.month == birthday.month && now.day < birthday.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  Future<void> _showUnderageDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Age Restriction'),
+          content: const Text(
+              'You must be at least 13 years of age to use the intrst app.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthday ?? DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(now.year - 120),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() {
+        _birthday = picked;
+        _birthdayController.text = _formatBirthday(picked);
+      });
+    }
+  }
+
+  String _formatBirthday(DateTime? birthday) {
+    if (birthday == null) return '';
+    return '${birthday.month.toString().padLeft(2, '0')}/'
+        '${birthday.day.toString().padLeft(2, '0')}/'
+        '${birthday.year}';
   }
 
   // maybe im being silly for adding this lol - but it works!
@@ -166,32 +226,48 @@ class _Account extends State<Account> {
       return;
     }
 
+    final birthday = _birthday;
+    if (birthday == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide your birthday.')),
+      );
+      return;
+    }
+
+    if (_calculateAge(birthday) < 13) {
+      await _showUnderageDialog();
+      return;
+    }
+
     setState(() {
       _isSavingName = true;
     });
 
     try {
       final users = FirebaseFirestore.instance.collection('users');
-      final updated =
+      final nameUpdated =
           await fu.updateUserName(users, widget.uid, firstName, lastName);
+      final birthdayUpdated =
+          await fu.updateUserBirthday(users, widget.uid, birthday);
       if (!mounted) return;
 
-      if (!updated) {
+      if (!nameUpdated || !birthdayUpdated) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not update name right now.')),
+          const SnackBar(content: Text('Could not update profile right now.')),
         );
       } else {
         final fullName = '$firstName $lastName';
         widget.onNameChanged(fullName);
         FocusManager.instance.primaryFocus?.unfocus();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Name updated.')),
+          const SnackBar(content: Text('Profile updated.')),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update name: $e')),
+        SnackBar(content: Text('Failed to update profile: $e')),
       );
     } finally {
       if (mounted) {
@@ -408,6 +484,18 @@ class _Account extends State<Account> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              readOnly: true,
+              controller: _birthdayController,
+              onTap: _pickBirthday,
+              decoration: const InputDecoration(
+                labelText: 'Birthday',
+                hintText: 'MM/DD/YYYY',
+                border: OutlineInputBorder(),
+                suffixIcon: Icon(Icons.calendar_today),
+              ),
+            ),
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: _isSavingName ? null : _saveName,
@@ -418,7 +506,7 @@ class _Account extends State<Account> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: const Text('Save name'),
+              label: const Text('Save profile'),
             ),
             const SizedBox(height: 20),
             const Text(

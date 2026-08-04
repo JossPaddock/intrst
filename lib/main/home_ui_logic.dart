@@ -834,6 +834,20 @@ extension _HomeUiLogic on _MyHomePageState {
                       Navigator.pop(context);
                     },
                   ),
+                  // Admin dashboard: web + debug builds only. The dashboard and
+                  // its delete Cloud Function both re-check authorization.
+                  if (kIsWeb && kDebugMode)
+                    ListTile(
+                      title: const Text('Admin Dashboard'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AdminDashboard(),
+                          ),
+                        );
+                      },
+                    ),
 
                   ListTile(
                     title: const Text('Sign Out'),
