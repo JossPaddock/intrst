@@ -41,7 +41,7 @@ dev_dependencies:
     sdk: flutter
   # Patrol finder framework (https://patrol.leancode.co/) — provides the `$`
   # finder API and `patrolWidgetTest`, which run under `flutter test`.
-  patrol_finders: ^2.6.0
+  patrol_finders: ^2.9.0
   # In-memory Firestore used to seed data for widget tests without a network
   # connection or a real Firebase project.
   fake_cloud_firestore: ^3.1.0

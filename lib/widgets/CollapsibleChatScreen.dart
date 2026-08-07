@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utility/FirebaseMessagesUtility.dart';
 import '../utility/FirebaseUsersUtility.dart';
+import '../utility/MessageBlockPolicy.dart';
+import 'BlockedMessageNotice.dart';
 import 'ChatScreen.dart';
 
 class CollapsibleChatScreen extends StatefulWidget {
@@ -65,6 +67,34 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   bool _streamLoading = true;
   Object? _streamError;
 
+  // --- Blocking state (only enforced for one-to-one conversations) ---
+  // _iBlockedThem: the current user has blocked the other participant.
+  // _theyBlockedMe: the other participant has blocked the current user.
+  bool _iBlockedThem = false;
+  bool _theyBlockedMe = false;
+  StreamSubscription<QuerySnapshot>? _blockSub;
+
+  List<String> get _otherParticipantUids =>
+      ((widget.documentData['user_uids'] as List?) ?? const <dynamic>[])
+          .map((value) => value.toString().trim())
+          .where((value) => value.isNotEmpty && value != widget.uid)
+          .toList();
+
+  // Blocking is only enforced for 1:1 conversations (exactly one other user).
+  bool get _isOneToOne =>
+      MessageBlockPolicy.isOneToOne(_otherParticipantUids.length);
+
+  String get _otherUid => _isOneToOne ? _otherParticipantUids.first : '';
+
+  bool get _isBlockedConversation => MessageBlockPolicy.isBlocked(
+        otherParticipantCount: _otherParticipantUids.length,
+        iBlockedThem: _iBlockedThem,
+        theyBlockedMe: _theyBlockedMe,
+      );
+
+  String get _otherDisplayName =>
+      _participantNames.isNotEmpty ? _participantNames.first : 'this user';
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +107,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     _streamLoading = false;
 
     _subscribeToConversation();
+    _subscribeToBlockState();
 
     if (_isExpanded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -109,6 +140,48 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     );
   }
 
+  // Watch both participants' user docs so a block/unblock by either side is
+  // reflected live in this conversation. Only relevant for 1:1 chats.
+  void _subscribeToBlockState() {
+    _blockSub?.cancel();
+    _iBlockedThem = false;
+    _theyBlockedMe = false;
+
+    final otherUid = _otherUid;
+    if (widget.uid.isEmpty || otherUid.isEmpty) {
+      return;
+    }
+
+    _blockSub = users
+        .where('user_uid', whereIn: [widget.uid, otherUid])
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      bool iBlockedThem = false;
+      bool theyBlockedMe = false;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final docUid = (data['user_uid'] ?? '').toString();
+        final blocked = ((data['blocked_uids'] as List?) ?? const <dynamic>[])
+            .map((value) => value.toString());
+
+        if (docUid == widget.uid) {
+          iBlockedThem = blocked.contains(otherUid);
+        } else if (docUid == otherUid) {
+          theyBlockedMe = blocked.contains(widget.uid);
+        }
+      }
+
+      setState(() {
+        _iBlockedThem = iBlockedThem;
+        _theyBlockedMe = theyBlockedMe;
+      });
+    }, onError: (_) {
+      // A failed block lookup should never break the conversation view.
+    });
+  }
+
   @override
   void didUpdateWidget(covariant CollapsibleChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -121,6 +194,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     if (latestParticipantKey != _participantKey) {
       _participantKey = latestParticipantKey;
       _loadParticipantNames();
+      _subscribeToBlockState();
     }
 
     if (!widget.autoOpen && widget.isExpanded && !_isExpanded) {
@@ -141,6 +215,7 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   @override
   void dispose() {
     _conversationSub?.cancel();
+    _blockSub?.cancel();
     _readTimer?.cancel();
     _sendMessageController.dispose();
     super.dispose();
@@ -469,6 +544,12 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
   }
 
   Future<void> _handleSendMessage() async {
+    // Hard stop: never let a blocked conversation send, even if the input was
+    // somehow triggered (e.g. the web Enter shortcut).
+    if (_isBlockedConversation) {
+      return;
+    }
+
     final text = _sendMessageController.text.trim();
     if (text.isEmpty) {
       return;
@@ -692,28 +773,34 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
           height: widget.autoOpen ? 150 : 300,
           child: chatContent,
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(child: _buildMessageInput()),
-              const SizedBox(width: 8),
-              // Pin the send button to the bottom of the row so it stays
-              // aligned to the last line of text as the input grows.
-              DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0D3B66),
-                  shape: BoxShape.circle,
+        if (_isBlockedConversation)
+          BlockedMessageNotice(
+            viewerIsBlocker: _iBlockedThem,
+            otherDisplayName: _otherDisplayName,
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(child: _buildMessageInput()),
+                const SizedBox(width: 8),
+                // Pin the send button to the bottom of the row so it stays
+                // aligned to the last line of text as the input grows.
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF0D3B66),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white),
+                    onPressed: _handleSendMessage,
+                  ),
                 ),
-                child: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.white),
-                  onPressed: _handleSendMessage,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
