@@ -298,47 +298,49 @@ mixin _CardListDescriptionMixin on _CardListStateBase {
     );
 
     if (isLong && !isExpanded) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: _collapsedDescriptionHeight,
-            child: ClipRect(
-              // OverflowBox lets the content column lay out at its natural
-              // height (it can contain images far taller than the collapsed
-              // preview); the ClipRect shows just the top slice. Without it
-              // the column is forced into the 60px box and reports a
-              // RenderFlex overflow.
-              child: OverflowBox(
-                alignment: Alignment.topCenter,
-                minHeight: 0,
-                maxHeight: double.infinity,
-                child: inlineContent,
-              ),
-            ),
+      return SizedBox(
+        height: _collapsedDescriptionHeight,
+        child: ClipRect(
+          // OverflowBox lets the content column lay out at its natural
+          // height (it can contain images far taller than the collapsed
+          // preview); the ClipRect shows just the top slice. Without it
+          // the column is forced into the 60px box and reports a
+          // RenderFlex overflow.
+          child: OverflowBox(
+            alignment: Alignment.topCenter,
+            minHeight: 0,
+            maxHeight: double.infinity,
+            child: inlineContent,
           ),
-          GestureDetector(
-            onTap: () => setState(() => _expandedDescriptions[id] = true),
-            child: Center(
-              child: Icon(Icons.expand_more, color: Colors.grey[400], size: 20),
-            ),
-          ),
-        ],
+        ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        inlineContent,
-        if (isLong)
-          GestureDetector(
-            onTap: () => setState(() => _expandedDescriptions[id] = false),
-            child: Center(
-              child: Icon(Icons.expand_less, color: Colors.grey[400], size: 20),
-            ),
-          ),
-      ],
+    return inlineContent;
+  }
+
+  // The show-more/less chevron lives in the card's action row rather than
+  // under the description itself, so it shares the row with the
+  // favorite/edit/delete buttons. Returns null when the description is short
+  // enough that there is nothing to collapse.
+  @override
+  Widget? _buildDescriptionExpandToggle(
+    String id,
+    RichTextEditorController richTextController,
+  ) {
+    final plainText = _getRichTextPlainText(richTextController);
+    if (plainText.length <= _descriptionCollapseThreshold) return null;
+
+    final bool isExpanded = _expandedDescriptions[id] ?? false;
+
+    return GestureDetector(
+      onTap: () =>
+          setState(() => _expandedDescriptions[id] = !isExpanded),
+      child: Icon(
+        isExpanded ? Icons.expand_less : Icons.expand_more,
+        color: Colors.black,
+        size: 20,
+      ),
     );
   }
 }

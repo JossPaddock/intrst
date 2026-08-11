@@ -1065,6 +1065,84 @@ class FirebaseUsersUtility {
     return true;
   }
 
+  // ---------------------------------------------------------------------------
+  // Blocking. A user's blocked_uids array holds the uids they have blocked.
+  // Blocking is one-directional data, but messaging enforcement treats a block
+  // in either direction as sufficient to stop messages between the two users.
+  // ---------------------------------------------------------------------------
+  Future<List<String>> retrieveBlockedUids(
+      CollectionReference users, String userUid) async {
+    if (userUid.isEmpty) return [];
+    QuerySnapshot querySnapshot =
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return [];
+    }
+
+    final Map<String, dynamic> data =
+    querySnapshot.docs.first.data() as Map<String, dynamic>;
+    return (data['blocked_uids'] as List?)
+        ?.map((value) => value.toString())
+        .where((value) => value.isNotEmpty)
+        .toList() ??
+        [];
+  }
+
+  Future<bool> isBlockingUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    if (userUid.isEmpty || targetUid.isEmpty || userUid == targetUid) {
+      return false;
+    }
+    final blockedUids = await retrieveBlockedUids(users, userUid);
+    return blockedUids.contains(targetUid);
+  }
+
+  Future<void> blockUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    if (userUid.isEmpty || targetUid.isEmpty || userUid == targetUid) {
+      return;
+    }
+
+    QuerySnapshot querySnapshot =
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return;
+    }
+
+    await querySnapshot.docs.first.reference.update({
+      'blocked_uids': FieldValue.arrayUnion([targetUid]),
+    });
+  }
+
+  Future<void> unblockUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    if (userUid.isEmpty || targetUid.isEmpty || userUid == targetUid) {
+      return;
+    }
+
+    QuerySnapshot querySnapshot =
+    await users.where('user_uid', isEqualTo: userUid).limit(1).get();
+    if (querySnapshot.docs.isEmpty) {
+      return;
+    }
+
+    await querySnapshot.docs.first.reference.update({
+      'blocked_uids': FieldValue.arrayRemove([targetUid]),
+    });
+  }
+
+  Future<bool> toggleBlockUser(
+      CollectionReference users, String userUid, String targetUid) async {
+    final alreadyBlocking = await isBlockingUser(users, userUid, targetUid);
+    if (alreadyBlocking) {
+      await unblockUser(users, userUid, targetUid);
+      return false;
+    }
+
+    await blockUser(users, userUid, targetUid);
+    return true;
+  }
+
   Future<List<String>> retrieveFollowerUids(String actorUid) async {
     if (actorUid.isEmpty) return [];
 

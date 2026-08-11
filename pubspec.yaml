@@ -35,16 +35,20 @@ dependencies:
   shared_preferences: ^2.5.3
   go_router: ^17.3.0
   cloud_functions: ^5.6.2
+  # In-memory Firestore used to seed data for the Patrol scenarios in lib/qa/.
+  # It is a regular dependency (not dev-only) because those scenarios are also
+  # replayed live by the admin dashboard, which is app code. Both the dashboard
+  # and its drawer entry are gated on `kIsWeb && kDebugMode` — compile-time
+  # constants — so release builds tree-shake the dashboard, the scenarios and
+  # this package away.
+  fake_cloud_firestore: ^3.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   # Patrol finder framework (https://patrol.leancode.co/) — provides the `$`
   # finder API and `patrolWidgetTest`, which run under `flutter test`.
-  patrol_finders: ^2.6.0
-  # In-memory Firestore used to seed data for widget tests without a network
-  # connection or a real Firebase project.
-  fake_cloud_firestore: ^3.1.0
+  patrol_finders: ^2.9.0
 
 flutter_launcher_icons:
   ios: true

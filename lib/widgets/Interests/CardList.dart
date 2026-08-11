@@ -164,6 +164,10 @@ abstract class _CardListStateBase extends State<CardList> {
     bool canResize = false,
     Interest? interest,
   });
+  Widget? _buildDescriptionExpandToggle(
+    String id,
+    RichTextEditorController richTextController,
+  );
 
   // Implemented in card_list_sharing.dart:
   Widget _buildNewChatTab(Interest interest);

@@ -54,12 +54,19 @@ class _InterestAlertDialogState extends State<Preview> {
   bool _friendStateLoading = false;
   bool _friendActionLoading = false;
 
+  bool _isBlocked = false;
+  bool _blockStateLoading = false;
+  bool _blockActionLoading = false;
+
+  bool _showMoreActions = false;
+
   @override
   void initState() {
     super.initState();
     _fetchNameAndButtonLabels();
     _loadFollowState();
     _loadFriendshipState();
+    _loadBlockState();
   }
 
   Future<void> _fetchNameAndButtonLabels() async {
@@ -127,6 +134,32 @@ class _InterestAlertDialogState extends State<Preview> {
     setState(() {
       _isFollowing = nowFollowing;
       _followActionLoading = false;
+    });
+  }
+
+  Future<void> _loadBlockState() async {
+    if (!widget.signedIn || widget.uid.isEmpty || widget.alternateUid.isEmpty || widget.uid == widget.alternateUid) return;
+    setState(() => _blockStateLoading = true);
+    final isBlocked = await fuu.isBlockingUser(users, widget.uid, widget.alternateUid);
+    if (!mounted) return;
+    setState(() {
+      _isBlocked = isBlocked;
+      _blockStateLoading = false;
+    });
+  }
+
+  Future<void> _toggleBlockState() async {
+    if (!widget.signedIn) {
+      Navigator.pop(context);
+      widget.onItemTapped(1);
+      return;
+    }
+    setState(() => _blockActionLoading = true);
+    final nowBlocked = await fuu.toggleBlockUser(users, widget.uid, widget.alternateUid);
+    if (!mounted) return;
+    setState(() {
+      _isBlocked = nowBlocked;
+      _blockActionLoading = false;
     });
   }
 
@@ -207,6 +240,10 @@ class _InterestAlertDialogState extends State<Preview> {
     return buffer.toString();
   }
 
+  // The Follow, Add friend and Block actions only apply when signed in and
+  // viewing someone else's preview, so the More toggle is gated the same way.
+  bool get _hasMoreActions => widget.signedIn && widget.uid != widget.alternateUid;
+
   List<Interest> get _filteredInterests {
     // If viewing own profile, show everything
     if (widget.uid == widget.alternateUid) return _previewInterests;
@@ -286,7 +323,21 @@ class _InterestAlertDialogState extends State<Preview> {
                 icon: const Icon(Icons.add),
                 label: const Text('All interests', style: TextStyle(fontSize: 12)),
               ),
-              if (widget.signedIn && widget.uid != widget.alternateUid)
+              if (_hasMoreActions)
+                ElevatedButton.icon(
+                  onPressed: () => setState(() => _showMoreActions = !_showMoreActions),
+                  icon: Icon(_showMoreActions ? Icons.expand_less : Icons.expand_more),
+                  label: Text(_showMoreActions ? 'Less' : 'More', style: const TextStyle(fontSize: 12)),
+                ),
+            ],
+          ),
+          if (_hasMoreActions && _showMoreActions) ...[
+            const SizedBox(height: 8.0),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: [
                 ElevatedButton.icon(
                   onPressed: (_followStateLoading || _followActionLoading) ? null : _toggleFollowState,
                   icon: _followActionLoading
@@ -294,7 +345,6 @@ class _InterestAlertDialogState extends State<Preview> {
                       : Icon(_isFollowing ? Icons.person_remove : Icons.person_add),
                   label: Text(_isFollowing ? 'Unfollow' : 'Follow', style: const TextStyle(fontSize: 12)),
                 ),
-              if (widget.signedIn && widget.uid != widget.alternateUid)
                 ElevatedButton.icon(
                   onPressed: (_friendActionLoading || _friendStateLoading) ? null : _handleFriendAction,
                   icon: (_friendActionLoading || _friendStateLoading)
@@ -302,8 +352,20 @@ class _InterestAlertDialogState extends State<Preview> {
                       : Icon(friendIcon),
                   label: Text(friendLabel, style: const TextStyle(fontSize: 12)),
                 ),
-            ],
-          ),
+                ElevatedButton.icon(
+                  onPressed: (_blockStateLoading || _blockActionLoading) ? null : _toggleBlockState,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isBlocked ? Colors.grey : Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: _blockActionLoading
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(_isBlocked ? Icons.lock_open : Icons.block),
+                  label: Text(_isBlocked ? 'Unblock' : 'Block', style: const TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
