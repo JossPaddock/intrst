@@ -6,16 +6,29 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/AdminUtility.dart';
 import 'package:intrst/widgets/Admin/AdminUserCard.dart';
+import 'package:intrst/widgets/Admin/QaTestRunnerPanel.dart';
 
-/// Web + debug-only admin dashboard. Lets an admin browse every intrst user
-/// (loaded in buffered batches of [AdminUtility.pageSize] as they scroll),
-/// search across users, and permanently delete a user's account.
+/// Web + debug-only admin dashboard.
+///
+/// **Users** lets an admin browse every intrst user (loaded in buffered batches
+/// of [AdminUtility.pageSize] as they scroll), search across users, and
+/// permanently delete a user's account.
+///
+/// **Patrol tests** lists every scenario in the project's test registry and
+/// replays any of them live on screen — see [QaTestRunnerPanel].
 ///
 /// This screen is gated to `kIsWeb && kDebugMode`; the entry point that opens
 /// it (a Drawer item in the home page) applies the same gate, and the delete
 /// Cloud Function independently verifies the caller is an admin.
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key});
+  const AdminDashboard({super.key, this.initialTabIndex = 0});
+
+  /// Which tab to open on: 0 = Users, 1 = Patrol tests. The PiP's "Back to
+  /// dashboard" returns straight to the Patrol tests tab.
+  final int initialTabIndex;
+
+  /// Tab index of the Patrol tests tab.
+  static const int patrolTestsTabIndex = 1;
 
   static const Color _brand = Color(0xFF082D38);
 
@@ -388,21 +401,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F5),
-      appBar: AppBar(
-        backgroundColor: AdminDashboard._brand,
-        foregroundColor: Colors.white,
-        title: const Text('Admin Dashboard'),
-      ),
-      body: Column(
-        children: [
-          _buildSearchField(),
-          Expanded(
-            child: _searchMode ? _buildSearchResults() : _buildBrowseList(),
+    return DefaultTabController(
+      length: 2,
+      initialIndex: widget.initialTabIndex,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF2F4F5),
+        appBar: AppBar(
+          backgroundColor: AdminDashboard._brand,
+          foregroundColor: Colors.white,
+          title: const Text('Admin Dashboard'),
+          bottom: const TabBar(
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            tabs: [
+              Tab(icon: Icon(Icons.people_outline), text: 'Users'),
+              Tab(icon: Icon(Icons.science_outlined), text: 'Patrol tests'),
+            ],
           ),
-        ],
+        ),
+        body: TabBarView(
+          children: [
+            _buildUsersTab(),
+            const QaTestRunnerPanel(),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildUsersTab() {
+    return Column(
+      children: [
+        _buildSearchField(),
+        Expanded(
+          child: _searchMode ? _buildSearchResults() : _buildBrowseList(),
+        ),
+      ],
     );
   }
 }

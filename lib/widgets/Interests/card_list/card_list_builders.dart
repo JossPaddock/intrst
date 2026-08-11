@@ -411,6 +411,20 @@ mixin _CardListBuildersMixin on _CardListStateBase {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Privacy status sits in the card's top-right corner, inset on
+              // desktop so it clears the overlaid drag handle.
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: showsDesktopDragHandle ? 56.0 : 0.0,
+                  ),
+                  child: Text(
+                    getStatusText(interest.privacy),
+                    style: TextStyle(fontSize: 8),
+                  ),
+                ),
+              ),
               // While the search keyboard is active, hide
               // title/link/description to give search results
               // full vertical space. They reappear automatically
@@ -504,44 +518,40 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                         ),
                       ),
               ],
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              // Action row: star pinned to the far left, the privacy
+              // dropdown centered, and the status label plus the
+              // edit/delete controls pinned to the far right. The
+              // show-more/less chevron is overlaid rather than placed in the
+              // row: spaceBetween would only center it between the star and
+              // the (much wider) right-hand group, which reads as
+              // off-centre against the description above it.
+              Stack(
                 children: [
-                  if (widget.showInputForm && isEditingAny)
-                    // Flexible + isExpanded let the dropdown shrink below
-                    // its widest item ("Friends & followers") instead of
-                    // forcing the row past the drawer width, which was
-                    // overflowing on narrow screens. The selected label
-                    // ellipsizes when space is tight; menu items are
-                    // unaffected.
-                    Flexible(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 175),
-                        child: DropdownButton<int>(
-                          isExpanded: true,
-                          value: [0, 2, 3, 4].contains(interest.privacy)
-                              ? interest.privacy
-                              : 4,
-                          items: const [
-                            DropdownMenuItem(value: 0, child: Text("Private")),
-                            DropdownMenuItem(
-                              value: 2,
-                              child: Text(
-                                "Friends & followers",
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 3,
-                              child: Text("Friends only"),
-                            ),
-                            DropdownMenuItem(value: 4, child: Text("Public")),
-                          ],
-                          onChanged: (int? newValue) async {
-                            if (newValue == null) return;
-
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Kept in the tree (as an empty slot when hidden) so the
+                      // spaceBetween anchors don't shift for viewers.
+                      if (!widget.showInputForm)
+                        const SizedBox.shrink()
+                      else
+                        IconButton(
+                          icon: Icon(
+                            Icons.star,
+                            color: interest.favorite
+                                ? Colors.orange
+                                : Colors.blueGrey,
+                          ),
+                          onPressed: () async {
+                            CollectionReference users = FirebaseFirestore.instance
+                                .collection('users');
+                            bool favorited = !interest.favorite;
                             Interest newInterest = interest.copyWith(
-                              privacy: newValue,
+                              favorite: !interest.favorite,
+                              favorited_timestamp: favorited
+                                  ? DateTime.now()
+                                  : interest.favorited_timestamp,
                             );
 
                             setState(() {
@@ -551,163 +561,227 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                               if (li != -1) {
                                 localInterests[li] = newInterest;
                               }
+                              final nid = newInterest.id;
+                              _titleControllers[nid]?.text = newInterest.name;
+                              _linkControllers[nid]?.text = newInterest.link ?? '';
                             });
 
                             await fu.updateEditedInterest(
-                              FirebaseFirestore.instance.collection('users'),
+                              users,
                               interest,
                               newInterest,
                               widget.uid,
                             );
+                            List<Interest> updatedInterests =
+                                await refreshInterestsForUser(widget.uid);
+
+                            setState(() {
+                              localInterests = updatedInterests;
+                              _syncControllersWithInterests();
+                            });
                           },
                         ),
-                      ),
-                    ),
-                  SizedBox(width: 20),
-                  if (widget.showInputForm)
-                    IconButton(
-                      icon: Icon(
-                        Icons.star,
-                        color: interest.favorite
-                            ? Colors.orange
-                            : Colors.blueGrey,
-                      ),
-                      onPressed: () async {
-                        CollectionReference users = FirebaseFirestore.instance
-                            .collection('users');
-                        bool favorited = !interest.favorite;
-                        Interest newInterest = interest.copyWith(
-                          favorite: !interest.favorite,
-                          favorited_timestamp: favorited
-                              ? DateTime.now()
-                              : interest.favorited_timestamp,
-                        );
-
-                        setState(() {
-                          final li = localInterests.indexWhere(
-                            (i) => i.id == id,
-                          );
-                          if (li != -1) {
-                            localInterests[li] = newInterest;
-                          }
-                          final nid = newInterest.id;
-                          _titleControllers[nid]?.text = newInterest.name;
-                          _linkControllers[nid]?.text = newInterest.link ?? '';
-                        });
-
-                        await fu.updateEditedInterest(
-                          users,
-                          interest,
-                          newInterest,
-                          widget.uid,
-                        );
-                        List<Interest> updatedInterests =
-                            await refreshInterestsForUser(widget.uid);
-
-                        setState(() {
-                          localInterests = updatedInterests;
-                          _syncControllersWithInterests();
-                        });
-                      },
-                    ),
-                  if (widget.showInputForm && !toggle && kDebugMode)
-                    IconButton(
-                      tooltip: 'Post to my feed',
-                      icon: const Icon(Icons.share),
-                      onPressed: () {
-                        _showPostInterestToFeedDialog(interest);
-                      },
-                    ),
-                  if (widget.showInputForm && !_searchKeyboardActive)
-                    IconButton(
-                      icon: Icon(toggle ? Icons.save : Icons.edit),
-                      onPressed: () async {
-                        final li = localInterests.indexWhere((i) => i.id == id);
-                        await editing(
-                          interest,
-                          toggle,
-                          titleController,
-                          richTextController,
-                          linkController,
-                          li,
-                          id,
-                          toggleKey,
-                        );
-                      },
-                    ),
-                  if (widget.showInputForm && !toggle)
-                    IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () => showDialog<String>(
-                        context: context,
-                        builder: (BuildContext context) => AlertDialog(
-                          title: const Text(
-                            'Are you sure you want\nto delete this interest?',
-                          ),
-                          content: Text(
-                            'This will permanently delete\nthe interest \"${interest.name}\"',
-                            textAlign: TextAlign.center,
-                          ),
-                          actions: <Widget>[
-                            Center(
-                              child: Column(
-                                children: <Widget>[
-                                  TextButton(
-                                    onPressed: () {
-                                      CollectionReference users =
-                                          FirebaseFirestore.instance.collection(
-                                            'users',
-                                          );
-                                      Interest oldInterest = Interest(
-                                        id: interest.id,
-                                        nextInterestId: interest.nextInterestId,
-                                        active: interest.active,
-                                        name: interest.name,
-                                        description: interest.description,
-                                        link: interest.link,
-                                        favorite: interest.favorite,
-                                        favorited_timestamp:
-                                            interest.favorited_timestamp,
-                                        created_timestamp:
-                                            interest.created_timestamp,
-                                        updated_timestamp:
-                                            interest.updated_timestamp,
-                                        privacy: interest.privacy,
-                                      );
-
-                                      fu.removeInterest(
-                                        users,
-                                        oldInterest,
-                                        widget.uid,
-                                      );
-
-                                      setState(() {
-                                        _disposeControllersForId(id);
-                                        localInterests.removeWhere(
-                                          (i) => i.id == id,
-                                        );
-                                      });
-
-                                      Navigator.pop(context, 'Delete');
-                                    },
-                                    child: const Text('Yes'),
+                      // Centered privacy dropdown. Flexible + isExpanded let it
+                      // shrink below its widest item ("Friends & followers")
+                      // instead of forcing the row past the drawer width, which
+                      // was overflowing on narrow screens. The selected label
+                      // ellipsizes when space is tight; menu items are
+                      // unaffected. isDense + itemHeight: null drop it out of
+                      // the 48px interactive minimum so the row stays short, and
+                      // the row's bottom alignment sits it lower, level with the
+                      // icon buttons.
+                      if (widget.showInputForm && isEditingAny)
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 175),
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                isDense: true,
+                                itemHeight: null,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black,
+                                ),
+                                value: [0, 2, 3, 4].contains(interest.privacy)
+                                    ? interest.privacy
+                                    : 4,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 0,
+                                    child: Text("Private"),
                                   ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, 'Never mind'),
-                                    child: const Text('No'),
+                                  DropdownMenuItem(
+                                    value: 2,
+                                    child: Text(
+                                      "Friends & followers",
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 3,
+                                    child: Text("Friends only"),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 4,
+                                    child: Text("Public"),
                                   ),
                                 ],
+                                onChanged: (int? newValue) async {
+                                  if (newValue == null) return;
+
+                                  Interest newInterest = interest.copyWith(
+                                    privacy: newValue,
+                                  );
+
+                                  setState(() {
+                                    final li = localInterests.indexWhere(
+                                      (i) => i.id == id,
+                                    );
+                                    if (li != -1) {
+                                      localInterests[li] = newInterest;
+                                    }
+                                  });
+
+                                  await fu.updateEditedInterest(
+                                    FirebaseFirestore.instance.collection('users'),
+                                    interest,
+                                    newInterest,
+                                    widget.uid,
+                                  );
+                                },
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      // Right-hand group: edit/delete.
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (widget.showInputForm && !toggle && kDebugMode)
+                            IconButton(
+                              tooltip: 'Post to my feed',
+                              icon: const Icon(Icons.share),
+                              onPressed: () {
+                                _showPostInterestToFeedDialog(interest);
+                              },
+                            ),
+                          if (widget.showInputForm && !_searchKeyboardActive)
+                            IconButton(
+                              icon: Icon(toggle ? Icons.save : Icons.edit),
+                              onPressed: () async {
+                                final li = localInterests.indexWhere(
+                                  (i) => i.id == id,
+                                );
+                                await editing(
+                                  interest,
+                                  toggle,
+                                  titleController,
+                                  richTextController,
+                                  linkController,
+                                  li,
+                                  id,
+                                  toggleKey,
+                                );
+                              },
+                            ),
+                          if (widget.showInputForm && !toggle)
+                            IconButton(
+                              icon: Icon(Icons.delete),
+                              onPressed: () => showDialog<String>(
+                                context: context,
+                                builder: (BuildContext context) => AlertDialog(
+                                  title: const Text(
+                                    'Are you sure you want\nto delete this interest?',
+                                  ),
+                                  content: Text(
+                                    'This will permanently delete\nthe interest \"${interest.name}\"',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  actions: <Widget>[
+                                    Center(
+                                      child: Column(
+                                        children: <Widget>[
+                                          TextButton(
+                                            onPressed: () {
+                                              CollectionReference users =
+                                                  FirebaseFirestore.instance
+                                                      .collection('users');
+                                              Interest oldInterest = Interest(
+                                                id: interest.id,
+                                                nextInterestId:
+                                                    interest.nextInterestId,
+                                                active: interest.active,
+                                                name: interest.name,
+                                                description: interest.description,
+                                                link: interest.link,
+                                                favorite: interest.favorite,
+                                                favorited_timestamp:
+                                                    interest.favorited_timestamp,
+                                                created_timestamp:
+                                                    interest.created_timestamp,
+                                                updated_timestamp:
+                                                    interest.updated_timestamp,
+                                                privacy: interest.privacy,
+                                              );
+
+                                              fu.removeInterest(
+                                                users,
+                                                oldInterest,
+                                                widget.uid,
+                                              );
+
+                                              setState(() {
+                                                _disposeControllersForId(id);
+                                                localInterests.removeWhere(
+                                                  (i) => i.id == id,
+                                                );
+                                              });
+
+                                              Navigator.pop(context, 'Delete');
+                                            },
+                                            child: const Text('Yes'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(
+                                              context,
+                                              'Never mind',
+                                            ),
+                                            child: const Text('No'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Centred on the card (and so on the description above it),
+                  // pinned to the top of the row. Positioned rather than a
+                  // row child so the wider right-hand group can't push it
+                  // off-centre; it only paints when there is something to
+                  // collapse and the row's middle is otherwise free.
+                  if (!isEditingAny && !_searchKeyboardActive)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child:
+                            _buildDescriptionExpandToggle(
+                              id,
+                              richTextController,
+                            ) ??
+                            const SizedBox.shrink(),
                       ),
                     ),
-                  Text(
-                    getStatusText(interest.privacy),
-                    style: TextStyle(fontSize: 8),
-                  ),
                 ],
               ),
               if (widget.showInputForm && toggle)
