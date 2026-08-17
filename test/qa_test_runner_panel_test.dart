@@ -95,6 +95,25 @@ void main() {
     expect(find.text('logic check — nothing to watch'), findsWidgets);
   });
 
+  testWidgets('tapping a scenario tile opens its doc preview', (tester) async {
+    tester.view.physicalSize = const Size(1600, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: QaTestRunnerPanel())),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap the first scenario's title to open its doc sheet.
+    final first = QaRegistry.all().first;
+    await tester.tap(find.text(first.name).first);
+    await tester.pumpAndSettle();
+
+    // The sheet renders a heading parsed from the scenario's markdown doc.
+    expect(find.text('What it checks'), findsOneWidget);
+  });
+
   testWidgets('shows each scenario\'s last-run time and status', (tester) async {
     tester.view.physicalSize = const Size(1600, 2400);
     tester.view.devicePixelRatio = 1.0;

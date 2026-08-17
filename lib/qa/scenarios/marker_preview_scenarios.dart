@@ -105,6 +105,29 @@ List<QaScenario> markerPreviewScenarios() {
       summary:
           "Tapping another person's marker on the map opens their profile "
           "Preview, showing that user's name and details.",
+      doc: '''
+## What it checks
+Tapping a marker that belongs to **another** user opens the real `Preview`
+dialog for that person, showing their name (Ada Lovelace) and details.
+
+## Why it matters
+The marker -> Preview handoff is the map's primary interaction: it's how you go
+from a dot on the map to someone's profile. This is the happy path of
+`handleMarkerTap`'s "not me" branch.
+
+## How it runs
+- **Headless (`flutter test`):** mounts a real `google_maps` `Marker` and the
+  real `Preview` in a test harness. A `GoogleMap` platform view can't render in a
+  widget test, so a proxy button invokes the marker's own `onTap` — the same
+  callback Google Maps would fire.
+- **Live (dashboard ▶):** seeds one profile under `qa_e2e_*`, then invokes the
+  app's real `handleMarkerTap` (the platform-view marker still isn't tappable) and
+  drives the real Preview on screen.
+
+## Expected
+Before tap: no `Preview`, no `AlertDialog`. After tap: `Preview` + `AlertDialog`
+on screen, showing **Ada Lovelace**.
+''',
       build: () async =>
           _harness(markerUid: _otherUid, firestore: await _seedUsers()),
       body: (d) async {
@@ -140,6 +163,25 @@ List<QaScenario> markerPreviewScenarios() {
       summary:
           "Tapping your own marker on the map opens your account drawer "
           "instead of a profile Preview — you don't preview yourself.",
+      doc: '''
+## What it checks
+Tapping **your own** marker opens the end (account) drawer instead of a profile
+Preview — no `Preview` dialog appears.
+
+## Why it matters
+This is the other branch of `handleMarkerTap`: previewing yourself makes no
+sense, so your own marker is a shortcut to your account drawer. The test guards
+that the "is me" check routes correctly and never shows a self-Preview.
+
+## How it runs
+- **Headless:** the proxy button fires the marker's `onTap` with the viewer's own
+  uid; the harness asserts the drawer path, not a Preview.
+- **Live:** calls the real handler with the signed-in user's uid and asserts no
+  Preview opens (works in either auth state, so it needs no seeded data).
+
+## Expected
+After tapping your own marker: no `Preview` on screen.
+''',
       build: () async =>
           _harness(markerUid: _viewerUid, firestore: await _seedUsers()),
       body: (d) async {

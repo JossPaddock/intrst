@@ -23,6 +23,7 @@ import 'package:intrst/widgets/Interests/Interests.dart';
 import 'package:intrst/widgets/Messaging.dart';
 import 'package:intrst/widgets/FollowingFeed.dart';
 import 'package:intrst/widgets/Preview.dart' as custom_preview;
+import 'package:intrst/main/marker_visibility.dart';
 import 'package:intrst/qa/e2e/qa_app_controller.dart';
 import 'package:intrst/qa/e2e/qa_app_harness.dart';
 import 'package:provider/provider.dart';

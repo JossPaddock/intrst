@@ -32,17 +32,35 @@ class QaRunHistory {
   CollectionReference<Map<String, dynamic>> get _runs =>
       _db.collection(collection);
 
+  /// A stable, Firestore-safe document id from a `suite :: name` id.
+  static String docIdFrom(String id) =>
+      id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+
   /// A stable, Firestore-safe document id for [scenario].
-  static String docIdFor(QaScenario scenario) =>
-      scenario.id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+  static String docIdFor(QaScenario scenario) => docIdFrom(scenario.id);
 
   /// Records the outcome of a run of [scenario]. Best-effort — callers ignore
   /// failures so a logging hiccup never breaks a run.
-  Future<void> record(QaScenario scenario, {required bool passed}) async {
-    await _runs.doc(docIdFor(scenario)).set(<String, dynamic>{
-      'scenario_id': scenario.id,
-      'suite': scenario.suite,
-      'name': scenario.name,
+  Future<void> record(QaScenario scenario, {required bool passed}) =>
+      recordById(
+        id: scenario.id,
+        suite: scenario.suite,
+        name: scenario.name,
+        passed: passed,
+      );
+
+  /// Records a run keyed by a raw `suite :: name` id, so non-scenario runs (the
+  /// unit-test tab) can share the same "last run" store and [loadAll].
+  Future<void> recordById({
+    required String id,
+    required String suite,
+    required String name,
+    required bool passed,
+  }) async {
+    await _runs.doc(docIdFrom(id)).set(<String, dynamic>{
+      'scenario_id': id,
+      'suite': suite,
+      'name': name,
       'last_run_at': FieldValue.serverTimestamp(),
       'last_status': passed ? 'passed' : 'failed',
     });

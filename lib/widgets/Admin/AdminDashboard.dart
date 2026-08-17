@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intrst/utility/AdminUtility.dart';
 import 'package:intrst/widgets/Admin/AdminUserCard.dart';
 import 'package:intrst/widgets/Admin/QaTestRunnerPanel.dart';
+import 'package:intrst/widgets/Admin/UnitTestRunnerPanel.dart';
 
 /// Web + debug-only admin dashboard.
 ///
@@ -17,18 +18,24 @@ import 'package:intrst/widgets/Admin/QaTestRunnerPanel.dart';
 /// **Patrol tests** lists every scenario in the project's test registry and
 /// replays any of them live on screen — see [QaTestRunnerPanel].
 ///
+/// **Unit tests** lists every unit test in [UnitTestRunnerPanel]'s registry and
+/// runs the pure-logic ones in-app, showing their console output inline.
+///
 /// This screen is gated to `kIsWeb && kDebugMode`; the entry point that opens
 /// it (a Drawer item in the home page) applies the same gate, and the delete
 /// Cloud Function independently verifies the caller is an admin.
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key, this.initialTabIndex = 0});
 
-  /// Which tab to open on: 0 = Users, 1 = Patrol tests. The PiP's "Back to
-  /// dashboard" returns straight to the Patrol tests tab.
+  /// Which tab to open on: 0 = Users, 1 = Patrol tests, 2 = Unit tests. The
+  /// PiP's "Back to dashboard" returns straight to the Patrol tests tab.
   final int initialTabIndex;
 
   /// Tab index of the Patrol tests tab.
   static const int patrolTestsTabIndex = 1;
+
+  /// Tab index of the Unit tests tab.
+  static const int unitTestsTabIndex = 2;
 
   static const Color _brand = Color(0xFF082D38);
 
@@ -402,7 +409,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       initialIndex: widget.initialTabIndex,
       child: Scaffold(
         backgroundColor: const Color(0xFFF2F4F5),
@@ -417,6 +424,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             tabs: [
               Tab(icon: Icon(Icons.people_outline), text: 'Users'),
               Tab(icon: Icon(Icons.science_outlined), text: 'Patrol tests'),
+              Tab(icon: Icon(Icons.rule), text: 'Unit tests'),
             ],
           ),
         ),
@@ -424,6 +432,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             _buildUsersTab(),
             const QaTestRunnerPanel(),
+            const UnitTestRunnerPanel(),
           ],
         ),
       ),

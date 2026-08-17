@@ -1,22 +1,6 @@
 part of 'package:intrst/main.dart';
 
 extension _HomeMapLogic on _MyHomePageState {
-  double _calculateDistance(LatLng point1, LatLng point2) {
-    const double earthRadius = 6371000;
-
-    double lat1Rad = point1.latitude * pi / 180;
-    double lat2Rad = point2.latitude * pi / 180;
-    double deltaLat = (point2.latitude - point1.latitude) * pi / 180;
-    double deltaLng = (point2.longitude - point1.longitude) * pi / 180;
-
-    double a = sin(deltaLat / 2) * sin(deltaLat / 2) +
-        cos(lat1Rad) * cos(lat2Rad) *
-            sin(deltaLng / 2) * sin(deltaLng / 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    return earthRadius * c;
-  }
-
   /*double _getVisualProximityThreshold(double zoom) {
     // examples of how the formula works according to ai:
     // zoom level 3, markers ~1000km apart considered "close"
@@ -37,100 +21,9 @@ extension _HomeMapLogic on _MyHomePageState {
     return threshold;
   }*/
 
-  double _getVisualProximityThreshold(double zoom) {
-    switch (zoom.floor()) {
-      case 3: return 900000;
-      case 4: return 350000;
-      case 5: return 90000;
-      case 6: return 87664.062;
-      case 7: return 43832.031;
-      case 8: return 21916.016;
-      case 9: return 10958;
-      case 10: return 5479;
-      case 11: return 2739;
-      case 12: return 1369;
-      case 13: return 684;
-      case 14: return 342;
-      case 15: return 171;
-      case 16: return 85;
-      case 17: return 42;
-      case 18: return 21;
-      case 19: return 10;
-      case 20: return 10;
-      case 21: return 10;
-      default:
-        if (zoom < 3) return 701312.5;
-        return 10;
-    }
-  }
-
-  Set<String> _getMarkersToShowAsLabels(double currentZoom, {List<String>? filteredUids}) {
-    const double minLabelZoom = 2.0;
-    const double alwaysLabelDistance = 1000000; // 1000km for always label markers distances
-
-    Set<String> showAsLabels = {};
-
-    double proximityThreshold = _getVisualProximityThreshold(currentZoom);
-
-    List<MapEntry<String, LatLng>> markerPositions = [];
-    for (var marker in poiMarkers) {
-      if (filteredUids == null || filteredUids.isEmpty || filteredUids.contains(marker.markerId.value)) {
-        markerPositions.add(MapEntry(marker.markerId.value, marker.position));
-      }
-    }
-
-    int n = markerPositions.length;
-    
-    for (int i = 0; i < n; i++) {
-      double minDistanceToAnyMarker = double.infinity;
-      LatLng p1 = markerPositions[i].value;
-
-      for (int j = 0; j < n; j++) {
-        if (i == j) continue;
-        
-        LatLng p2 = markerPositions[j].value;
-        
-      
-        double latDelta = (p1.latitude - p2.latitude).abs();
-        double lngDelta = (p1.longitude - p2.longitude).abs();
-        
-        if (latDelta > 10 || lngDelta > 10) {
-           continue; 
-        }
-
-        double distance = _calculateDistance(p1, p2);
-
-        if (distance < minDistanceToAnyMarker) {
-          minDistanceToAnyMarker = distance;
-          if (currentZoom >= minLabelZoom && distance < proximityThreshold) {
-            break; 
-          }
-        }
-      }
-
-      if (minDistanceToAnyMarker > alwaysLabelDistance) {
-        showAsLabels.add(markerPositions[i].key);
-      } else if (currentZoom >= minLabelZoom && minDistanceToAnyMarker >= proximityThreshold) {
-        showAsLabels.add(markerPositions[i].key);
-      }
-    }
-
-    print('At zoom $currentZoom: ${showAsLabels.length} markers shown as labels, ${markerPositions.length - showAsLabels.length} as POI');
-    return showAsLabels;
-  }
-
-  // Label markers carry this suffix on their MarkerId so they can be shown on
-  // top of the always-visible POI marker (which uses the bare uid) instead of
-  // replacing it.
-  static const String _labelIdSuffix = '_label';
-
-  String _labelMarkerId(String uid) => '$uid$_labelIdSuffix';
-
-  String _uidFromLabelMarkerId(String labelMarkerId) =>
-      labelMarkerId.endsWith(_labelIdSuffix)
-          ? labelMarkerId.substring(
-              0, labelMarkerId.length - _labelIdSuffix.length)
-          : labelMarkerId;
+  // Marker id helpers live in MarkerVisibility; kept as thin aliases so the
+  // call sites below read the same as before.
+  String _labelMarkerId(String uid) => MarkerVisibility.labelMarkerId(uid);
 
   //   0.0  -> text centered on the dot.
   //   > 0  -> text moves UP.
@@ -214,71 +107,21 @@ extension _HomeMapLogic on _MyHomePageState {
     return allowed;
   }
 
-  // Whether a marker (by uid) should be visible given the active search term
-  // and relationship filter. [relUids] is the result of
-  // _relationshipFilterUids() hoisted out so it is computed once per pass.
-  bool _markerVisible(String uid, Set<String>? relUids) {
-    if (searchTerm.isNotEmpty && !searchFilteredResults.contains(uid)) {
-      return false;
-    }
-    if (relUids != null && !relUids.contains(uid)) return false;
-    return true;
-  }
-
+  // Thin caller: all of the marker selection lives in MarkerVisibility (pure,
+  // testable); this only feeds it state and setStates the result.
   void _onCameraMove(double zoom) {
-    const double minLabelZoom = 2.0;
-
-    // While searching, ignore the relationship filters so search results behave
-    // as if no filters are applied.
-    final Set<String>? relUids =
-        searchTerm.isEmpty ? _relationshipFilterUids() : null;
-
-    // Effective visible-uid filter (search ∩ relationship) used by the label
-    // proximity computation. Null means no filtering is active.
-    List<String>? visibleFilter;
-    if (searchTerm.isNotEmpty || relUids != null) {
-      visibleFilter = poiMarkers
-          .map((marker) => marker.markerId.value)
-          .where((uid) => _markerVisible(uid, relUids))
-          .toList();
-    }
-
-    Set<String> showAsLabels =
-        _getMarkersToShowAsLabels(zoom, filteredUids: visibleFilter);
+    final Set<Marker> next = MarkerVisibility.buildVisibleMarkers(
+      poiMarkers: poiMarkers,
+      labelMarkers: labelMarkers,
+      zoom: zoom,
+      searchTerm: searchTerm,
+      searchFilteredResults: searchFilteredResults,
+      relationshipUids: _relationshipFilterUids(),
+      useOriginalMarkerBehavior: _useOriginalMarkerBehavior,
+    );
 
     setState(() {
-      markers = {};
-
-      if (_useOriginalMarkerBehavior) {
-        // Original behavior: POI and label are mutually exclusive — a marker
-        // shows as a label when in `showAsLabels`, otherwise as a POI dot.
-        if (zoom < minLabelZoom) {
-          markers.addAll(poiMarkers.where(
-              (marker) => _markerVisible(marker.markerId.value, relUids)));
-        } else {
-          markers.addAll(labelMarkers.where((marker) {
-            final String uid = _uidFromLabelMarkerId(marker.markerId.value);
-            return _markerVisible(uid, relUids) && showAsLabels.contains(uid);
-          }));
-          markers.addAll(poiMarkers.where((marker) =>
-              _markerVisible(marker.markerId.value, relUids) &&
-              !showAsLabels.contains(marker.markerId.value)));
-        }
-      } else {
-        // New behavior: POI markers are always shown (within the active
-        // filter)...
-        markers.addAll(poiMarkers
-            .where((marker) => _markerVisible(marker.markerId.value, relUids)));
-
-        // ...and label markers are layered on top, shown/hidden by the same
-        // zoom + proximity logic as before.
-        if (zoom >= minLabelZoom) {
-          markers.addAll(labelMarkers.where((marker) {
-            final String uid = _uidFromLabelMarkerId(marker.markerId.value);
-            return _markerVisible(uid, relUids) && showAsLabels.contains(uid);
-          }));
-        }
-      }
+      markers = next;
     });
 
     _currentZoom = zoom;

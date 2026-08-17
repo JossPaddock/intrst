@@ -96,6 +96,19 @@ fixed doc per scenario), and each tile shows its **last run** — so you can see
 a glance when a scenario last ran and whether it passed. Use the header's refresh
 button to re-read without leaving the tab.
 
+### Reading a scenario's docs
+
+Every scenario carries its own documentation. Tap a tile (or its **document**
+icon) to open a scrollable preview of that scenario's doc — what it checks, why it
+matters, and how it runs headless vs. live. It's rendered from the scenario's
+[`QaScenario.doc`](../../lib/qa/qa_scenario.dart) markdown by the same in-house
+renderer the Unit tests tab uses
+([`simple_markdown.dart`](../../lib/widgets/Admin/simple_markdown.dart)) via the
+shared [`test_doc_sheet.dart`](../../lib/widgets/Admin/test_doc_sheet.dart), so the
+two tabs present docs identically. A scenario with no dedicated doc falls back to
+its one-line summary. The docs live inline beside each scenario in
+`lib/qa/scenarios/`, so they can't drift from the code.
+
 Before every scenario the runner **resets the app to a baseline** (dismisses any
 open dialog/drawer, returns to the map) via `QaAppHarness.resetToBaseline`, so a
 scenario never inherits UI state a previous one left behind (e.g. an open
@@ -124,6 +137,7 @@ explanatory step rather than hanging.
 |-----------|------|-----------|---------------|
 | 2 widget + 6 logic | Messaging / blocking | [`blocking_scenarios.dart`](../../lib/qa/scenarios/blocking_scenarios.dart) | [`test/blocking_messages_patrol_test.dart`](../../test/blocking_messages_patrol_test.dart) |
 | 2 widget | Map / preview | [`marker_preview_scenarios.dart`](../../lib/qa/scenarios/marker_preview_scenarios.dart) | [`test/marker_opens_preview_patrol_test.dart`](../../test/marker_opens_preview_patrol_test.dart) |
+| 8 logic | Map / marker labels by zoom | [`marker_visibility_scenarios.dart`](../../lib/qa/scenarios/marker_visibility_scenarios.dart) | [`test/marker_visibility_scenarios_patrol_test.dart`](../../test/marker_visibility_scenarios_patrol_test.dart) |
 | 1 widget | Logged-out preview → login | [`preview_login_scenarios.dart`](../../lib/qa/scenarios/preview_login_scenarios.dart) | [`test/widgets/preview_logged_out_login_test.dart`](../../test/widgets/preview_logged_out_login_test.dart) |
 
 ---
@@ -170,6 +184,64 @@ invokes the marker's own `onTap`.
 |----------|------------------|
 | `tapping another user's marker opens the Preview for that user` | The Preview dialog opens showing the tapped person. |
 | `tapping your own marker does not open a Preview` | The end drawer opens instead; no Preview appears. |
+
+## `marker_visibility_scenarios.dart`
+
+Logic-only coverage of how zoom drives name labels, asserting on
+[`MarkerVisibility`](../../lib/main/marker_visibility.dart) — the pure marker
+selection extracted out of `_onCameraMove`. There is nothing on screen to watch;
+the scenarios still run and report in the dashboard like any other.
+
+### Suite — `Marker label zoom boundary`
+
+`MarkerVisibility.minLabelZoom` (2.0) is a hard gate: below it the builder emits
+no label markers at all, whatever the proximity maths says.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `below the boundary (zoom 1.9) shows only POI dots — layered` | A hair under the gate, the default layered mode renders POI dots and no labels. |
+| `below the boundary (zoom 1.9) shows only POI dots — original` | Same rule in the mutually-exclusive mode. |
+| `at the boundary (zoom 2.0) labels become eligible — layered` | The gate is inclusive: isolated markers gain their labels at exactly 2.0. |
+| `at the boundary (zoom 2.0) labels become eligible — original` | Inclusive in the mutually-exclusive mode too, where the dot flips to a label. |
+
+### Suite — `Marker label zoom round-trips`
+
+The **"swap to labels and back" regression guard**. The map rebuilds its entire
+marker set on every camera move (`_onCameraMove` → `buildVisibleMarkers` →
+`setState`), so zooming in to swap crowded POI dots for name labels and zooming
+back out must land on *exactly* the marker set it started with.
+
+Each scenario walks the builder through a zoom sweep and compares the final
+`MarkerId`s against the initial ones. The fixture is a crowded pair 110 m apart
+plus one isolated marker, chosen so every waypoint really differs:
+
+| | zoom 1 | zoom 10 | zoom 18 |
+|---|---|---|---|
+| layered | `a`, `b`, `c` | `a`, `b`, `c`, `c_label` | `a`, `b`, `c` + all three labels |
+| original | `a`, `b`, `c` | `a`, `b`, `c_label` | all three as labels |
+
+Each scenario also asserts the **midpoint differs** from the start, so it can
+never pass vacuously — a builder that returned the same thing at every zoom
+fails here instead of sailing through.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `zoom 10 -> 18 -> 10 restores the original marker ids — layered` | Zooming past the proximity threshold (5479 m at zoom 10 → 21 m at zoom 18) so the crowded pair gains labels, then back out, restores the zoom-10 set. |
+| `zoom 10 -> 18 -> 10 restores the original marker ids — original` | The same sweep where markers change identity between `uid` and `uid_label` rather than layering. |
+| `zoom 10 -> 1 -> 10 restores the original marker ids — layered` | Crossing `minLabelZoom` **downwards and back up** returns every dropped label, with no orphaned or duplicated markers. |
+| `zoom 10 -> 1 -> 10 restores the original marker ids — original` | The boundary crossing where every label becomes a POI dot below 2.0 and must turn back on the way up. |
+
+The two sweeps guard different branches: `10 → 18 → 10` exercises the proximity
+threshold, `10 → 1 → 10` exercises the zoom gate. A bug that dropped labels
+permanently after zooming out past the gate would leave the map label-less for
+the rest of the session and would be invisible to the proximity-only sweep.
+
+`MarkerVisibility` is pure today, so these round trips hold by construction —
+which is the point. The moment anyone adds caching, memoisation or accumulated
+state to the marker pipeline, a stale label or an orphaned dot would survive the
+trip back and these fail. The same sweeps run at unit granularity in
+[`marker_visibility_unit_tests.dart`](../../lib/qa/unit/marker_visibility_unit_tests.dart);
+see [`unit-tests.md`](./unit-tests.md).
 
 ## `preview_login_scenarios.dart`
 
@@ -266,9 +338,12 @@ Both work by swapping [`QaPacer`](../../lib/qa/live_qa_driver.dart) — the one 
 of the driver that genuinely needs a running app (waiting on real frames and a
 real clock) — for a tester-backed implementation.
 
-## Related, non-Patrol tests
+## Related: unit tests and the Unit tests tab
 
-- [`test/DateTimeUtility_test.dart`](../../test/DateTimeUtility_test.dart) —
-  exhaustive formatting cases for `DateTimeUtility.getFormattedTime`
-  (today / yesterday / tomorrow / within 7 days / beyond 7 days / cross-year /
-  time-formatting edge cases). Plain unit tests, not registered in `QaRegistry`.
+The pure-logic unit tests (date/time formatting, map marker visibility) have
+their own catalogue and their own dashboard tab, built on the same
+"one definition, two runners" design as the Patrol scenarios — see
+[`unit-tests.md`](./unit-tests.md). The **Unit tests** tab sits beside this one
+in the admin dashboard; it runs the runnable tests **in-app** and shows their
+console output inline (no PiP, since there is nothing on screen to drive), and
+lists the `testWidgets`-based QA tooling tests read-only for completeness.

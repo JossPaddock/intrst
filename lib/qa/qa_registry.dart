@@ -1,6 +1,7 @@
 import 'qa_scenario.dart';
 import 'scenarios/blocking_scenarios.dart';
 import 'scenarios/marker_preview_scenarios.dart';
+import 'scenarios/marker_visibility_scenarios.dart';
 import 'scenarios/preview_login_scenarios.dart';
 
 /// The catalogue of every Patrol scenario in the project.
@@ -19,6 +20,7 @@ class QaRegistry {
   static List<QaScenario> all() => <QaScenario>[
         ...blockingScenarios(),
         ...markerPreviewScenarios(),
+        ...markerVisibilityScenarios(),
         ...previewLoginScenarios(),
       ];
 

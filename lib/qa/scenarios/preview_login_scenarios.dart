@@ -154,6 +154,35 @@ List<QaScenario> previewLoginScenarios() {
           'The sign-up funnel: a logged-out visitor viewing someone\'s profile '
           'Preview from the map who taps one of their interests is routed to the '
           'log-in / sign-up page, and the Preview closes.',
+      doc: '''
+## What it checks
+A **logged-out** visitor viewing someone's profile Preview from the map, who taps
+one of that person's selectable (link-free) interests, is routed to the
+log-in / sign-up page — and the Preview dialog closes.
+
+## Why it matters
+This is the top of the sign-up funnel. A public profile is visible to anyone, but
+*acting* on it (selecting an interest) has to convert the visitor into an account.
+If this route broke, logged-out visitors would hit a dead end instead of the
+sign-up prompt.
+
+## Link-free vs. linked interests
+Only **link-free** interests exercise this path. An interest with a `link` opens
+that URL; a link-free interest is one of the up-to-5 selectable ones that should
+route an unauthenticated visitor to login/sign-up. The fixture seeds two public,
+link-free interests (Rock Climbing, Jazz Piano).
+
+## How it runs
+- **Headless:** hosts the real `Preview` over a two-slot shell (slot 0 = map,
+  slot 1 = login prompt) and asserts the Preview requested navigation to slot 1.
+- **Live:** signs the session out (no credentials needed to sign out), seeds a
+  public profile, opens its real Preview, taps an interest, and asserts the real
+  `LoginScreen` shows and the Preview is gone.
+
+## Expected
+Tap "Rock Climbing" -> routed to the login/sign-up destination (index 1) and the
+`Preview` is dismissed.
+''',
       build: scenario.build,
       body: scenario.run,
       liveSetUp: scenario.liveSetUp,

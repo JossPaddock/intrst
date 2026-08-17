@@ -127,6 +127,7 @@ class QaScenario {
     required this.name,
     required this.summary,
     required this.body,
+    this.doc,
     this.build,
     this.liveSetUp,
     this.liveBody,
@@ -140,9 +141,17 @@ class QaScenario {
   /// What this scenario proves, phrased as the test name.
   final String name;
 
-  /// One line explaining why the scenario exists, shown in the dashboard so
-  /// the full scope of coverage is readable without opening the code.
+  /// One line explaining why the scenario exists, shown on the dashboard tile.
   final String summary;
+
+  /// Long-form documentation for this scenario, shown in a scrollable preview
+  /// when its tile is tapped in the dashboard. Lightweight markdown (`##`
+  /// headings, `-` bullets, `**bold**`, `` `code` ``). Falls back to [summary]
+  /// when null — see [docText].
+  final String? doc;
+
+  /// The doc to show, falling back to the one-line [summary].
+  String get docText => (doc == null || doc!.trim().isEmpty) ? summary : doc!;
 
   /// Builds the widget tree to drive. It is called fresh on every run, so a
   /// scenario that captures per-run state must reset that state here.

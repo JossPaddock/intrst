@@ -6,6 +6,7 @@ import '../../qa/live_qa_driver.dart';
 import '../../qa/qa_registry.dart';
 import '../../qa/qa_scenario.dart';
 import 'AdminDashboard.dart';
+import 'test_doc_sheet.dart';
 
 /// The admin dashboard's Patrol test panel.
 ///
@@ -251,6 +252,7 @@ class _QaTestRunnerPanelState extends State<QaTestRunnerPanel> {
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       child: ListTile(
         dense: true,
+        onTap: () => _showDoc(scenario),
         leading: running
             ? const SizedBox(
                 width: 20,
@@ -286,34 +288,63 @@ class _QaTestRunnerPanelState extends State<QaTestRunnerPanel> {
             _buildLastRun(scenario),
           ],
         ),
-        trailing: canDrive
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip:
-                        'Debug — pause at each step, advance with Continue',
-                    icon: const Icon(Icons.bug_report_outlined),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () =>
-                        _launch(context, <QaScenario>[scenario], debug: true),
-                  ),
-                  IconButton(
-                    tooltip: 'Run this scenario against the live app',
-                    icon: const Icon(Icons.play_arrow),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => _launch(context, <QaScenario>[scenario]),
-                  ),
-                ],
-              )
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Read this scenario\'s docs',
+              icon: const Icon(Icons.description_outlined),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _showDoc(scenario),
+            ),
+            if (canDrive) ...[
+              IconButton(
+                tooltip: 'Debug — pause at each step, advance with Continue',
+                icon: const Icon(Icons.bug_report_outlined),
+                visualDensity: VisualDensity.compact,
+                onPressed: () =>
+                    _launch(context, <QaScenario>[scenario], debug: true),
+              ),
+              IconButton(
+                tooltip: 'Run this scenario against the live app',
+                icon: const Icon(Icons.play_arrow),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _launch(context, <QaScenario>[scenario]),
+              ),
+            ]
             // Logic-only: runs in place here, no PiP.
-            : IconButton(
+            else
+              IconButton(
                 tooltip: 'Run this check here in the dashboard',
                 icon: const Icon(Icons.play_arrow),
                 visualDensity: VisualDensity.compact,
                 onPressed: running ? null : () => _runInline(scenario),
               ),
+          ],
+        ),
       ),
+    );
+  }
+
+  /// Opens a scrollable preview of [scenario]'s documentation (its
+  /// [QaScenario.doc], or its summary when no doc is written).
+  void _showDoc(QaScenario scenario) {
+    final String note;
+    final IconData noteIcon;
+    if (scenario.hasLive) {
+      note = 'Runs live: ▶ drives the real app in a PiP, 🐞 steps through it';
+      noteIcon = Icons.play_circle_outline;
+    } else {
+      note = 'Logic check — runs in place in the dashboard, nothing to watch';
+      noteIcon = Icons.rule;
+    }
+    showTestDocSheet(
+      context,
+      suite: scenario.suite,
+      name: scenario.name,
+      doc: scenario.docText,
+      note: note,
+      noteIcon: noteIcon,
     );
   }
 
