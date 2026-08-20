@@ -6,165 +6,6 @@ extension _HomeLocationLogic on _MyHomePageState {
         (_pendingMapFocusUserUid?.isNotEmpty ?? false);
   }
 
-  Future<void> _showLocationDisclaimer(BuildContext context) async {
-    CollectionReference users =
-    FirebaseFirestore.instance.collection('users');
-    bool trigger = await fu.getFirstRunExperience( users, FirebaseAuth.instance.currentUser!.uid);
-    if(!trigger) {
-      await showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text("Location Disclaimer"),
-            content: const Text(
-              "Please use marker settings in bottom right to move your marker wherever "
-                  "you want it. We initially place it in a random spot in your general vicinity.",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  CollectionReference users =
-                  FirebaseFirestore.instance.collection('users');
-                  fu.setFirstRunExperienceComplete(
-                      users, FirebaseAuth.instance.currentUser!.uid);
-                  Navigator.of(context).pop();
-                },
-                child: const Text("OK"),
-              ),
-            ],
-          );
-        },
-      );
-    }
-  }
-
-  Future<void> _getLocationServiceAndPermission(
-    Completer<GoogleMapController> controllerCompleter, {
-    bool suppressWhenPendingFocus = false,
-  }) async {
-    print('getLocationServiceAndPermission is running');
-
-    if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
-      return;
-    }
-
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
-    final GoogleMapController controller = await controllerCompleter.future;
-
-    // Ensure location services are enabled
-    _serviceEnabled = await location.serviceEnabled();
-    if (!_serviceEnabled) {
-      _serviceEnabled = await location.requestService();
-      if (!_serviceEnabled) {
-        print('location service is not enabled');
-        return;
-      }
-    }
-
-    // Check current permission status
-    _permissionGranted = await location.hasPermission();
-    if (_permissionGranted == PermissionStatus.denied) {
-      // Request permission
-      setState(() {
-        _markersLoadingSignedInBannerText =
-            'share location to place your marker...';
-      });
-      _permissionGranted = await location.requestPermission();
-      if (_permissionGranted == PermissionStatus.granted) {
-        setState(() {
-          _markersLoadingSignedInBannerText = 'placing your marker...';
-        });
-      }
-      print('1st check permission granted: $_permissionGranted');
-      // Poll for permission status to give iOS (mobile) time to update
-      int tries = 0;
-      while (_permissionGranted != PermissionStatus.granted && tries < 5) {
-        print('polling for permission try#:$tries');
-        await Future.delayed(const Duration(milliseconds: 500));
-        _permissionGranted = await location.hasPermission();
-        tries++;
-      }
-      print('after polling permission granted: $_permissionGranted');
-
-      if (_permissionGranted != PermissionStatus.granted) {
-        print('Permission not granted after request');
-        /*Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (BuildContext context) => ChangeNotifierProvider(
-              create: (context) => UserModel(),
-              child: const MyApp(),
-            ),
-          ),
-        ); */
-        setState(() {
-          _markersLoadingSignedIn = false;
-          _markersLoadingSignedOut = false;
-        });
-      }
-    }
-
-    // Retrieve user location from Firestore
-    final userLocation = await fu.retrieveUserLocation(
-        users, FirebaseAuth.instance.currentUser!.uid);
-
-    if (userLocation == GeoPoint(0, 0)) {
-      print('user location was 0,0');
-      // Update user location in Firestore and move map camera
-      bool movedUser = await _gotoCurrentUserLocation(
-        true,
-        _signedIn,
-        suppressWhenPendingFocus: suppressWhenPendingFocus,
-      );
-      if (!movedUser) {
-        if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
-          return;
-        }
-        // Move map camera to stored location with a small random offset
-        Random random = Random();
-        double lat = generateRandomNumber(-50, 50, random);
-        double long = generateRandomNumber(-180, 180, random);
-        _newPosition = CameraPosition(
-          target: LatLng(
-            lat,
-            long,
-          ),
-          zoom: 3,
-        );
-        CollectionReference users =
-            FirebaseFirestore.instance.collection('users');
-        String localUid = FirebaseAuth.instance.currentUser!.uid;
-        print(
-            'updating user with user_uid: $localUid location to lat: ${lat}; long: ${long} in Firebase');
-        fu.updateUserLocation(users, localUid, GeoPoint(lat, long));
-        await loadMarkers(true);
-        await controller
-            .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
-        setState(() {
-          _markersLoadingSignedIn = true;
-          _markersLoadingSignedInBannerText =
-              'click on the marker button (bottom right) then toggle to move your marker';
-        });
-      }
-    } else {
-      if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
-        return;
-      }
-      // Move map camera to stored location with a small random offset
-      Random random = Random();
-      double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
-      double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
-      _newPosition = CameraPosition(
-        target: LatLng(
-          userLocation.latitude + randomNumber1,
-          userLocation.longitude + randomNumber2,
-        ),
-        zoom: 12,
-      );
-      await controller
-          .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
-    }
-  }
-
   Future<bool> _gotoCurrentUserLocationFast(
       bool updateUserLocation, bool loadUserMarker) async {
     final GoogleMapController controller = await _controller.future;
@@ -185,7 +26,7 @@ extension _HomeLocationLogic on _MyHomePageState {
 
       _newPosition = CameraPosition(
         target: LatLng(locationData.latitude!, locationData.longitude!),
-        zoom: 12,
+        zoom: _MyHomePageState._userLocationZoom,
       );
 
       await controller.animateCamera(
@@ -205,84 +46,12 @@ extension _HomeLocationLogic on _MyHomePageState {
     }
   }
 
-  Future<bool> _gotoCurrentUserLocation(
-    bool updateUserLocation,
-    bool loadUserMarker, {
-    bool suppressWhenPendingFocus = false,
-  }) async {
-    print('running _gotoCurrentUserLocation method');
-    Random random = Random();
-    double randomNumber1 = generateRandomNumber(-0.015, 0.015, random);
-    double randomNumber2 = generateRandomNumber(-0.015, 0.015, random);
-    final GoogleMapController controller = await _controller.future;
-    print('about to call location.getLocation');
-    LocationData? locationData;
-    try {
-      locationData = await location.getLocation().timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          print("Timeout getting location. Took more than 5 seconds.");
-          throw TimeoutException("location.getLocation() timed out");
-        },
-      );
-
-      if (locationData.latitude == null || locationData.longitude == null) {
-        print("Received null coordinates, retrying...");
-        await Future.delayed(const Duration(seconds: 1));
-        locationData = await location.getLocation();
-      }
-
-      print(
-          "Got location: ${locationData.latitude}, ${locationData.longitude}");
-    } catch (e) {
-      print("Error getting location: $e");
-      // Optionally show error to user or fallback
-      return false;
-    }
-    print('locationData: ${locationData.latitude}');
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
-    String localUid = FirebaseAuth.instance.currentUser!.uid;
-    if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
-      return false;
-    }
-    if (updateUserLocation) {
-      print(
-          'updating user with user_uid: $localUid location to lat: ${locationData.latitude}; long: ${locationData.longitude} in Firebase');
-      fu.updateUserLocation(
-          users,
-          localUid,
-          GeoPoint(locationData.latitude! + randomNumber1,
-              locationData.longitude! + randomNumber2));
-    }
-    _newPosition = CameraPosition(
-        target: LatLng(locationData.latitude! + randomNumber1,
-            locationData.longitude! + randomNumber2),
-        zoom: 12);
-    await loadMarkers(loadUserMarker);
-    if (_shouldSuppressAutoCenter(suppressWhenPendingFocus)) {
-      return false;
-    }
-    await controller
-        .animateCamera(CameraUpdate.newCameraPosition(_newPosition));
-    setState(() {
-      _markersLoadingSignedIn = false;
-    });
-    return true;
-  }
-
   double generateRandomNumber(double min, double max, Random random) {
     return min + random.nextDouble() * (max - min);
   }
 
-  Future<void> _goToInitialPosition(
-      Completer<GoogleMapController> completerController) async {
-    final GoogleMapController controller = await completerController.future;
-    await controller
-        .animateCamera(CameraUpdate.newCameraPosition(_MyHomePageState._kLake));
-  }
-
   Future<void> moveCameraToUserLocation({
-    double zoom = 12,
+    double zoom = _MyHomePageState._userLocationZoom,
     bool animate = true,
   }) async {
     if (_uid.isEmpty) return;
@@ -311,7 +80,7 @@ extension _HomeLocationLogic on _MyHomePageState {
 
   Future<void> moveCameraToSpecificUser(
     String targetUid, {
-    double zoom = 12,
+    double zoom = _MyHomePageState._userLocationZoom,
     bool animate = true,
   }) async {
     if (targetUid.isEmpty) return;
@@ -352,7 +121,9 @@ extension _HomeLocationLogic on _MyHomePageState {
 
       final users = FirebaseFirestore.instance.collection('users');
 
-      fu.updateUserLocation(
+      // Awaited so the marker reload below reads the new location rather than
+      // racing the write.
+      await fu.updateUserLocation(
         users,
         _uid,
         GeoPoint(newLatLng.latitude, newLatLng.longitude),
@@ -365,7 +136,7 @@ extension _HomeLocationLogic on _MyHomePageState {
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: newLatLng,
-            zoom: 12,
+            zoom: _MyHomePageState._userLocationZoom,
           ),
         ),
       );

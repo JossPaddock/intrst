@@ -357,7 +357,7 @@ extension _HomeMapLogic on _MyHomePageState {
             setState(() {});
           },
           onDragEnd: (LatLng newPosition) async {
-            fu.updateUserLocation(
+            await fu.updateUserLocation(
                 FirebaseFirestore.instance.collection('users'),
                 FirebaseAuth.instance.currentUser!.uid,
                 GeoPoint(newPosition.latitude, newPosition.longitude));
@@ -460,7 +460,7 @@ extension _HomeMapLogic on _MyHomePageState {
         }
 
         Future<void> handleDragEnd(LatLng newPosition) async {
-          fu.updateUserLocation(
+          await fu.updateUserLocation(
               FirebaseFirestore.instance.collection('users'),
               FirebaseAuth.instance.currentUser!.uid,
               GeoPoint(newPosition.latitude, newPosition.longitude));

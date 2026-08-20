@@ -250,18 +250,26 @@ class FirebaseUsersUtility {
     return uids;
   }
 
-  void updateUserLocation(
-      CollectionReference users, String userUid, GeoPoint newGeoPoint) {
-    users.where('user_uid', isEqualTo: userUid).get().then((querySnapshot) {
-      if (querySnapshot.docs.isNotEmpty) {
-        querySnapshot.docs.first.reference
-            .update({'location': newGeoPoint})
-            .then((_) => print("Updated Location for user with uid: $userUid"))
-            .catchError((error) => print("Couldn't update location: $error"));
-      } else {
-        print("No results for User");
-      }
-    });
+  /// Writes [newGeoPoint] as the user's marker location.
+  ///
+  /// Returns the pending write so callers that read the location straight
+  /// afterwards (e.g. reloading markers) can await it and avoid racing against
+  /// their own update. Fire-and-forget callers are unaffected.
+  Future<void> updateUserLocation(
+      CollectionReference users, String userUid, GeoPoint newGeoPoint) async {
+    final querySnapshot =
+        await users.where('user_uid', isEqualTo: userUid).get();
+    if (querySnapshot.docs.isEmpty) {
+      print("No results for User");
+      return;
+    }
+    try {
+      await querySnapshot.docs.first.reference
+          .update({'location': newGeoPoint});
+      print("Updated Location for user with uid: $userUid");
+    } catch (error) {
+      print("Couldn't update location: $error");
+    }
   }
 
   FirebaseMappers fm = FirebaseMappers();

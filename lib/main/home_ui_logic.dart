@@ -141,7 +141,9 @@ extension _HomeUiLogic on _MyHomePageState {
       endDrawerEnableOpenDragGesture: false,
       resizeToAvoidBottomInset: false,
       key: _scaffoldKey,
-      appBar: _awaitingEmailVerification
+      // The verify-email and location-onboarding screens are full-screen
+      // takeovers; a search bar over either makes no sense.
+      appBar: _awaitingEmailVerification || _showLocationOnboarding
           ? null
           : AppBar(
         toolbarHeight: toolbarHeight,
@@ -384,6 +386,18 @@ extension _HomeUiLogic on _MyHomePageState {
               )
             : _awaitingEmailVerification
                 ? _buildVerifyEmailScreen()
+                // A brand-new sign-up places their marker here, before the map
+                // is built, so it can open centred on them.
+                : _showLocationOnboarding
+                    ? _buildLocationOnboardingScreen()
+                // Hold everything behind one loading indicator until we know
+                // who the user is and where their map should open. Building
+                // the map earlier is what produced the old jumpy sequence,
+                // because GoogleMap reads initialCameraPosition only once.
+                // (Only the map tab waits on _mapReady, so the login screen and
+                // the other tabs stay reachable regardless.)
+                : (!_authResolved || (!_mapReady && _selectedIndex == 0))
+                    ? _buildMapLoadingIndicator()
                 : _signedIn // _signedInGoogleMap
                 ? IndexedStack( index: _selectedIndex, children: <Widget>[
                     Scaffold(
@@ -406,9 +420,12 @@ extension _HomeUiLogic on _MyHomePageState {
                                     },*/
                                     onCameraMove:
                                         (CameraPosition cameraPosition) {
-                                      _onCameraMove(cameraPosition.zoom);
+                                      _handleCameraMove(cameraPosition);
                                       _trackSignedInUsageAction();
                                     },
+                                    // Remember where they ended up, so the next
+                                    // launch opens right back here.
+                                    onCameraIdle: _persistCameraPosition,
                                     cloudMapId:
                                         mapId, // Set the map style ID here
                                     mapToolbarEnabled: false,
@@ -429,55 +446,51 @@ extension _HomeUiLogic on _MyHomePageState {
                                         : <Factory<
                                                 OneSequenceGestureRecognizer>>{}
                                             .toSet(),
+                                    // Resolved before this widget is built —
+                                    // see _HomeMapBootstrap.
                                     initialCameraPosition:
-                                        _MyHomePageState._kLake,
+                                        _initialCameraPosition,
                                     zoomControlsEnabled: false,
                                     myLocationButtonEnabled: false,
                                     compassEnabled: true,
                                     minMaxZoomPreference:
                                         MinMaxZoomPreference(3.0, 900.0),
                                     markers: markers,
+                                    // The camera and markers were resolved in
+                                    // _bootstrapMap before this widget was
+                                    // built, so there is nothing to animate
+                                    // here — the map opens already in place.
                                     onMapCreated:
                                         (GoogleMapController controller) async {
-                                      final pendingFeedMapFocusUid =
-                                          _pendingMapFocusUserUid;
-                                      final hasPendingFeedMapFocus =
-                                          (pendingFeedMapFocusUid?.isNotEmpty ??
-                                              false);
-                                      loadFCMToken();
-                                      double zoom =
-                                          await controller.getZoomLevel();
-                                      _currentZoom = zoom;
                                       print('onMapCreated signedIn is running');
                                       if (_controller.isCompleted) {
                                         _controller = Completer();
                                       }
                                       _controller.complete(controller);
-                                      if (!hasPendingFeedMapFocus &&
+                                      loadFCMToken();
+                                      _currentZoom =
+                                          _initialCameraPosition.zoom;
+                                      _onCameraMove(_currentZoom);
+
+                                      // Fallback for an account that has no
+                                      // marker but already completed sign-up
+                                      // onboarding (which otherwise handles
+                                      // this before the map is ever built).
+                                      if (_needsMarkerPlacement &&
                                           !_hasPerformedInitialSignedInMapSetup) {
                                         _hasPerformedInitialSignedInMapSetup =
                                             true;
-                                        await _showLocationDisclaimer(context);
-                                        _getLocationServiceAndPermission(
-                                          _controller,
-                                          suppressWhenPendingFocus: true,
-                                        );
-                                        _gotoCurrentUserLocation(
-                                          false,
-                                          _signedIn,
-                                          suppressWhenPendingFocus: true,
-                                        );
+                                        await _placeUserMarkerAndCenter();
+                                        if (mounted) {
+                                          _needsMarkerPlacement = false;
+                                        }
                                       }
-                                      print('callback is working');
-                                      setState(() {});
-                                      if (markers.isEmpty) {
-                                        print(
-                                            'markers is empty attempting to load markers now');
-                                        await loadMarkers(true);
-                                      }
-                                      _onCameraMove(_currentZoom);
-                                      if (hasPendingFeedMapFocus &&
-                                          pendingFeedMapFocusUid != null &&
+
+                                      // A feed "show this user" request that
+                                      // arrived before the map existed.
+                                      final pendingFeedMapFocusUid =
+                                          _pendingMapFocusUserUid;
+                                      if (pendingFeedMapFocusUid != null &&
                                           pendingFeedMapFocusUid.isNotEmpty) {
                                         await moveCameraToSpecificUser(
                                           pendingFeedMapFocusUid,
@@ -723,37 +736,25 @@ extension _HomeUiLogic on _MyHomePageState {
                     Stack(children: [
                       GoogleMap(
                         onCameraMove: (CameraPosition cameraPosition) {
-                          _onCameraMove(cameraPosition.zoom);
+                          _handleCameraMove(cameraPosition);
                         },
+                        onCameraIdle: _persistCameraPosition,
                         cloudMapId: mapId, // Set the map style ID here
                         zoomGesturesEnabled: _zoomEnabled,
-                        initialCameraPosition: _MyHomePageState._kLake,
+                        // Same contract as the signed-in map: resolved by
+                        // _bootstrapMap before this widget is built.
+                        initialCameraPosition: _initialCameraPosition,
                         zoomControlsEnabled: false,
                         minMaxZoomPreference: MinMaxZoomPreference(3.0, 900.0),
                         markers: markers,
                         onMapCreated: (GoogleMapController controller) async {
-                          setState(() {
-                            _markersLoadingSignedOut = true;
-                          });
-                          double zoom = await controller.getZoomLevel();
-                          _currentZoom = zoom;
                           print('onMapCreated signedOut is running');
                           if (_controllerSignedOut.isCompleted) {
                             _controllerSignedOut = Completer();
                           }
-                          print('mapStyle should be set');
-                          print('callback is working');
-                          setState(() {});
-                          print(markers.length);
-                          await loadMarkers(false);
-                          //await Future.delayed(Duration(milliseconds: 1000));
-                          print(markers.length);
                           _controllerSignedOut.complete(controller);
+                          _currentZoom = _initialCameraPosition.zoom;
                           _onCameraMove(_currentZoom);
-                          await Future.delayed(Duration(milliseconds: 250));
-                          setState(() {
-                            _markersLoadingSignedOut = false;
-                          });
                         },
                       ),
                       if (_markersLoadingSignedOut)

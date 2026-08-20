@@ -65,6 +65,63 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
   String? _openMessagesWithUserUid;
   String? _pendingMapFocusUserUid;
   bool _hasPerformedInitialSignedInMapSetup = false;
+
+  // ---------------------------------------------------------------------------
+  // Map start-up. The map is never built until we know (a) whether the user is
+  // signed in, and (b) where the camera should start and which markers belong
+  // on it. Until then the body shows a single loading indicator, which is what
+  // removes the old "world view -> fly to you -> markers pop in" sequence.
+  // ---------------------------------------------------------------------------
+
+  /// False until the first `authStateChanges` event lands, so we never flash
+  /// the signed-out map at a user who turns out to be signed in.
+  bool _authResolved = false;
+
+  /// Safety net: if Firebase never reports an auth state we stop waiting and
+  /// treat the session as signed out rather than showing a loader forever.
+  Timer? _authResolutionTimeout;
+  static const Duration _authResolutionGrace = Duration(seconds: 8);
+
+  /// True once [_initialCameraPosition] is resolved and the markers for it are
+  /// loaded; gates the GoogleMap widget.
+  bool _mapReady = false;
+
+  /// Identifies the session the current bootstrap ran for ("out", "in:<uid>"),
+  /// so a sign-in/sign-out re-resolves the map exactly once.
+  String? _mapBootstrapKey;
+
+  /// Where the map starts. Read once by GoogleMap at construction time, which
+  /// is why the widget must not be built before this is settled.
+  CameraPosition _initialCameraPosition = _kLake;
+
+  /// Set during bootstrap when the signed-in user has no stored location yet.
+  /// Normally handled by the sign-up onboarding screen below; the in-map
+  /// fallback (_placeUserMarkerAndCenter) only runs when that screen was not
+  /// shown, e.g. an account that completed onboarding but lost its marker.
+  bool _needsMarkerPlacement = false;
+
+  /// True while the just-signed-up user is on the location onboarding screen.
+  /// The map is not built until this clears, so it can open already centred on
+  /// them with their markers loaded — no camera animation, no pop-in.
+  bool _showLocationOnboarding = false;
+
+  /// True while the onboarding screen is requesting permission / a fix.
+  bool _locationOnboardingBusy = false;
+
+  /// Set when the location request did not produce a position, so the screen
+  /// can explain and offer to continue anyway rather than trapping the user.
+  String? _locationOnboardingError;
+
+  /// The zoom used whenever the app opens the map on *the user* rather than on
+  /// a remembered view — their stored marker, or a fresh device fix. One
+  /// constant so every "go to where you are" path lands at the same scale.
+  static const double _userLocationZoom = 12.0;
+
+  final MapCameraMemory _cameraMemory = const MapCameraMemory();
+
+  /// Latest camera reported by the map, and the last one written to storage.
+  MapCameraSnapshot? _lastCameraSnapshot;
+  MapCameraSnapshot? _persistedCameraSnapshot;
   String _lastTrackedUsageDayKey = '';
   RemoteMessage? _pendingInitialMessage;
   bool _shouldCreateInterest = false;
@@ -95,8 +152,14 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
   void initState() {
     print('Build mode: ${kReleaseMode ? "Release" : "NOT Release"}');
     initializeFirebase();
-    _goToInitialPosition(_controller);
-    _goToInitialPosition(_controllerSignedOut);
+    // Do NOT move the camera here: the map is not built until
+    // _ensureMapBootstrapped resolves where it should start (see _mapReady).
+    _authResolutionTimeout = Timer(_authResolutionGrace, () {
+      if (!mounted || _authResolved) return;
+      print('Auth state never resolved; continuing as signed out.');
+      _markAuthResolved();
+      _ensureMapBootstrapped();
+    });
     setState(() {
       lastKnownDraggabilityState = _retrieveDraggabilityUserModel();
       markers = poiMarkers;
@@ -121,6 +184,7 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
     }
     _notificationLoading?.cancel();
     _emailVerificationPoll?.cancel();
+    _authResolutionTimeout?.cancel();
     super.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();

@@ -93,6 +93,8 @@ extension _HomeUserLogic on _MyHomePageState {
       _selectedIndex = 0;
     });
     _handleUserModel('');
+    _markAuthResolved();
+    _ensureMapBootstrapped();
   }
 
   /// Holds an authenticated-but-unverified user on the verification screen and
@@ -114,6 +116,10 @@ extension _HomeUserLogic on _MyHomePageState {
       });
     }
     _handleUserModel('');
+    // The verify-email screen replaces the map entirely, so resolve auth (to
+    // clear the loading indicator) but leave the map un-bootstrapped until
+    // they verify and a real session begins.
+    _markAuthResolved();
     _startEmailVerificationPolling(user);
   }
 
@@ -176,6 +182,9 @@ extension _HomeUserLogic on _MyHomePageState {
       _selectedIndex = 0;
     });
     _handleUserModel(localUid);
+    _markAuthResolved();
+    // Resolve the camera + markers for this session before the map is built.
+    await _ensureMapBootstrapped();
     loadUserContext();
     await flushInitialMessage();
   }
@@ -298,6 +307,18 @@ extension _HomeUserLogic on _MyHomePageState {
       _pendingMapFocusUserUid = targetUid;
     });
     _onItemTapped(0);
+
+    // The map lives in an IndexedStack, so switching tabs does not re-create it
+    // (onMapCreated will not fire again). Drive the camera directly whenever the
+    // map is already up; onMapCreated handles the not-yet-created case.
+    if (!_mapReady || !_controller.isCompleted) return;
+    await moveCameraToSpecificUser(targetUid, zoom: 13.5);
+    if (!mounted) return;
+    setState(() {
+      if (_pendingMapFocusUserUid == targetUid) {
+        _pendingMapFocusUserUid = null;
+      }
+    });
   }
 
   void _onItemTapped(int index) {
