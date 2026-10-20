@@ -18,7 +18,10 @@ void main() {
     Finder control,
   ) async {
     List<QaScenario>? launched;
-    tester.view.physicalSize = const Size(1600, 2400);
+    // Tall enough that the lazily-built list renders every suite header at once;
+    // grow it when the registry grows rather than scrolling, so the assertion
+    // stays "all of them are on screen".
+    tester.view.physicalSize = const Size(1600, 8000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -54,7 +57,11 @@ void main() {
       find.text('${scenarios.length} scenarios across ${suites.length} suites'),
       findsOneWidget,
     );
+    // The panel is a lazy ListView, so suites below the fold are not built yet.
+    // Walk down it in registry order, scrolling each heading into view.
+    final list = find.byType(Scrollable).first;
     for (final suite in suites) {
+      await tester.scrollUntilVisible(find.text(suite), 300, scrollable: list);
       expect(find.text(suite), findsWidgets, reason: 'missing suite $suite');
     }
   });

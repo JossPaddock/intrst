@@ -118,6 +118,8 @@ extension _HomeMapLogic on _MyHomePageState {
       searchFilteredResults: searchFilteredResults,
       relationshipUids: _relationshipFilterUids(),
       useOriginalMarkerBehavior: _useOriginalMarkerBehavior,
+      // Move mode: the user's own dot is the only thing on the map.
+      soloUid: _markerMoveMode ? _uid : null,
     );
 
     setState(() {
@@ -304,37 +306,36 @@ extension _HomeMapLogic on _MyHomePageState {
   }
 
   Future<void>? handleMarkerTap(String title, String uid, bool isPoi) {
+    // While move mode is on the map is a drag surface, not a browse surface.
+    if (_markerMoveMode) return null;
     if (_zoomEnabled) {
       _handleAlternateUserModel(uid, title);
       print(uid);
-      if (uid == _uid) {
-        //this is the case where you tapped on the signed in users marker
-        _scaffoldKey.currentState?.openEndDrawer();
-        //markers = isPoi ? poiMarkers : labelMarkers;
-        return null;
-      } else {
-        return showDialog<bool>(
-            context: context,
-            builder: (BuildContext context) {
-              _zoomEnabled = false;
-              return custom_preview.Preview(
-                uid: _uid,
-                alternateUid: uid,
-                scaffoldKey: _scaffoldKey,
-                onItemTapped: _onItemTapped,
-                signedIn: _signedIn,
-                onDrawerOpened: () {
-                  Navigator.of(context).pop(true);
-                },
-                onOpenMessages: _openMessagesForUserFromFeed,
-              );
-            }).then((drawerOpened) {
-          if (drawerOpened != true) {
-            _zoomEnabled = true;
-          }
-          _onCameraMove(_currentZoom);
-        });
-      }
+      // Tapping your own marker opens the same preview as anyone else's — it
+      // just swaps the social actions for "Move marker" (see Preview).
+      final bool isOwnMarker = _signedIn && uid == _uid;
+      return showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            _zoomEnabled = false;
+            return custom_preview.Preview(
+              uid: _uid,
+              alternateUid: uid,
+              scaffoldKey: _scaffoldKey,
+              onItemTapped: _onItemTapped,
+              signedIn: _signedIn,
+              onDrawerOpened: () {
+                Navigator.of(context).pop(true);
+              },
+              onOpenMessages: _openMessagesForUserFromFeed,
+              onMoveMarker: isOwnMarker ? _enterMarkerMoveMode : null,
+            );
+          }).then((drawerOpened) {
+        if (drawerOpened != true) {
+          _zoomEnabled = true;
+        }
+        _onCameraMove(_currentZoom);
+      });
     }
   }
 
@@ -466,8 +467,12 @@ extension _HomeMapLogic on _MyHomePageState {
               GeoPoint(newPosition.latitude, newPosition.longitude));
           await loadMarkers(true);
           setState(() {
-            _markersLoadingSignedIn = false;
-            _markersLoadingSignedInBannerText = 'loading markers...';
+            // The "drag your marker" banner belongs to move mode, so it stays
+            // up until Done rather than being cleared by this reload.
+            _markersLoadingSignedIn = _markerMoveMode;
+            if (!_markerMoveMode) {
+              _markersLoadingSignedInBannerText = 'loading markers...';
+            }
           });
         }
 

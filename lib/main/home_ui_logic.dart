@@ -1,14 +1,6 @@
 part of 'package:intrst/main.dart';
 
 extension _HomeUiLogic on _MyHomePageState {
-  Widget rollingIconBuilder(int? value, bool foreground) {
-    return Icon(iconDataByValue(value));
-  }
-
-  Widget iconBuilder(int value) {
-    return rollingIconBuilder(value, false);
-  }
-
   // A single relationship-filter chip for the Marker Settings menu.
   Widget _buildMarkerFilterChip(
       String label, bool selected, ValueChanged<bool> onSelected) {
@@ -41,14 +33,47 @@ extension _HomeUiLogic on _MyHomePageState {
     _onCameraMove(_currentZoom);
   }
 
-  IconData iconDataByValue(int? value) => switch (value) {
-        0 => Icons.disabled_by_default,
-        _ => Icons.swipe,
-      };
+  /// Enters marker move mode from the signed-in user's own preview: their
+  /// marker becomes draggable, every other marker (and the map settings panel)
+  /// is hidden, and a Done button appears bottom-right.
+  Future<void> _enterMarkerMoveMode() async {
+    await _setDraggabilityUserModel(true);
+    setState(() {
+      _markerMoveMode = true;
+      mapOptionsVisibility = false;
+      // Dragging needs the gestures back; the preview had switched them off.
+      _zoomEnabled = true;
+      _markersLoadingSignedIn = true;
+      _markersLoadingSignedInBannerText = kIsWeb
+          ? 'drag your marker to a new location...'
+          : 'long press to drag your marker to a new location...';
+    });
+    // Rebuild the markers so the user's POI is created draggable.
+    await loadMarkers(true);
+    if (!mounted) return;
+    lastKnownDraggabilityState = true;
+    _onCameraMove(_currentZoom);
+    await moveCameraToUserLocation();
+    if (!mounted) return;
+    setState(() {
+      // loadMarkers clears the banner; move mode owns it until Done.
+      _markersLoadingSignedIn = true;
+    });
+  }
 
-  Widget sizeIconBuilder(BuildContext context,
-      AnimatedToggleProperties<int> local, GlobalToggleProperties<int> global) {
-    return iconBuilder(local.value);
+  /// Leaves marker move mode (the Done button): the marker is pinned again and
+  /// every other marker comes back.
+  Future<void> _exitMarkerMoveMode() async {
+    await _setDraggabilityUserModel(false);
+    setState(() {
+      _markerMoveMode = false;
+      _markersLoadingSignedIn = false;
+      _markersLoadingSignedInBannerText = 'loading markers...';
+    });
+    await loadMarkers(true);
+    if (!mounted) return;
+    lastKnownDraggabilityState = false;
+    _onCameraMove(_currentZoom);
   }
 
   /// Full-screen state shown while an account exists but its email is not yet
@@ -132,9 +157,10 @@ extension _HomeUiLogic on _MyHomePageState {
     double mapHeight =
         MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top;
     double toolbarHeight = 56;
-    // Updated bottom bar height - doubled from 80 to 160
-    // Raised to fit the relationship filter chips below the draggability toggle.
-    double bottomBarHeight = 252;
+    // Sized for the title plus the relationship filter chips. (The marker
+    // draggability toggle used to live here; it moved into the user's own
+    // marker preview as "Move marker".)
+    double bottomBarHeight = 170;
 
     return Scaffold(
       drawerEnableOpenDragGesture: false,
@@ -180,6 +206,7 @@ extension _HomeUiLogic on _MyHomePageState {
                     searchTerm = '';
                     searchFilteredResults = [];
                     searchFilteredMarkers = {};
+                    _searchFocusedUid = null;
                     _onCameraMove(_currentZoom); // reapply full marker set
                   });
 
@@ -216,6 +243,7 @@ extension _HomeUiLogic on _MyHomePageState {
                   searchFilteredResults = uid_results;
                   _onCameraMove(_currentZoom);
                 });
+                _focusSoleSearchResult(uid_results);
                 var input = value;
                 var options = interests;
 
@@ -306,6 +334,7 @@ extension _HomeUiLogic on _MyHomePageState {
                   searchFilteredResults = uid_results;
                   _onCameraMove(_currentZoom);
                 });
+                _focusSoleSearchResult(uid_results);
                 print('Selected: $selection');
               },
             ),
@@ -507,58 +536,75 @@ extension _HomeUiLogic on _MyHomePageState {
                                       }
                                     },
                                   ),
-                                  Positioned(
-                                    bottom: kIsWeb ? 185 : 125,
-                                    right: 10,
-                                    child: FloatingActionButton(
-                                      mini: true,
-                                      backgroundColor: Colors.white,
-                                      onPressed: () {
-                                        _showTemporaryBottomMessage(
-                                          "Taking you to your Marker's location",
-                                        );
-                                        moveCameraToUserLocation();
-                                      },
-                                      child:
-                                          Icon(Icons.place, color: Colors.blue),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: kIsWeb ? 130 : 70,
-                                    right: 10,
-                                    child: FloatingActionButton(
-                                      mini: true,
-                                      backgroundColor: Colors.white,
-                                      onPressed: () {
-                                        _showTemporaryBottomMessage(
-                                          'Taking you to your current location',
-                                        );
-                                        _gotoCurrentUserLocationFast(
-                                            true, _signedIn);
-                                      },
-                                      child: Icon(Icons.my_location,
-                                          color: Colors.blue),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: kIsWeb ? 75 : 15,
-                                    right: 10,
-                                    child: FloatingActionButton(
-                                      mini: true,
-                                      onPressed: () async {
-                                        setState(() {
-                                          //_zoomEnabled = false;
-                                          mapOptionsVisibility =
-                                              !mapOptionsVisibility;
-                                        });
-                                        if (mapOptionsVisibility) {
+                                  // Move mode owns the map: the only
+                                  // control is Done.
+                                  if (!_markerMoveMode) ...[
+                                    Positioned(
+                                      bottom: kIsWeb ? 185 : 125,
+                                      right: 10,
+                                      child: FloatingActionButton(
+                                        mini: true,
+                                        backgroundColor: Colors.white,
+                                        onPressed: () {
+                                          _showTemporaryBottomMessage(
+                                            "Taking you to your Marker's location",
+                                          );
                                           moveCameraToUserLocation();
-                                        }
-                                      },
-                                      child: Icon(Icons.location_on),
-                                      backgroundColor: Colors.blue,
+                                        },
+                                        child:
+                                            Icon(Icons.place, color: Colors.blue),
+                                      ),
                                     ),
-                                  ),
+                                    Positioned(
+                                      bottom: kIsWeb ? 130 : 70,
+                                      right: 10,
+                                      child: FloatingActionButton(
+                                        mini: true,
+                                        backgroundColor: Colors.white,
+                                        onPressed: () {
+                                          _showTemporaryBottomMessage(
+                                            'Taking you to your current location',
+                                          );
+                                          _gotoCurrentUserLocationFast(
+                                              true, _signedIn);
+                                        },
+                                        child: Icon(Icons.my_location,
+                                            color: Colors.blue),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: kIsWeb ? 75 : 15,
+                                      right: 10,
+                                      child: FloatingActionButton(
+                                        mini: true,
+                                        onPressed: () async {
+                                          setState(() {
+                                            //_zoomEnabled = false;
+                                            mapOptionsVisibility =
+                                                !mapOptionsVisibility;
+                                          });
+                                          if (mapOptionsVisibility) {
+                                            moveCameraToUserLocation();
+                                          }
+                                        },
+                                        child: Icon(Icons.location_on),
+                                        backgroundColor: Colors.blue,
+                                      ),
+                                    ),
+                                  ],
+                                  if (_markerMoveMode)
+                                    Positioned(
+                                      bottom: kIsWeb ? 75 : 15,
+                                      right: 10,
+                                      child: FloatingActionButton.extended(
+                                        backgroundColor:
+                                            const Color(0xFFff673a),
+                                        foregroundColor: Colors.white,
+                                        onPressed: _exitMarkerMoveMode,
+                                        icon: const Icon(Icons.check),
+                                        label: const Text('Done'),
+                                      ),
+                                    ),
                                   if (_markersLoadingSignedIn)
                                     Positioned(
                                       left: 0,
@@ -600,70 +646,6 @@ extension _HomeUiLogic on _MyHomePageState {
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                       ),
-                                    ),
-                                    SizedBox(height: 16),
-                                    // Toggle switch and status text
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        // Toggle switch
-                                        SizedBox(
-                                          height: 40,
-                                          width: 100,
-                                          child:
-                                              AnimatedToggleSwitch<int>.rolling(
-                                            current: toggleIndex,
-                                            values: [0, 1],
-                                            onChanged: (i) async {
-                                              print(toggleIndex);
-                                              setState(() => toggleIndex = i);
-                                              bool choice = (i == 1);
-                                              _setDraggabilityUserModel(choice);
-                                              await loadMarkers(true);
-                                              _onCameraMove(_currentZoom);
-                                              setState(() => toggleIndex = i);
-                                              print(toggleIndex);
-                                              setState(() {
-                                                _zoomEnabled = true;
-                                                if (!choice) {
-                                                  mapOptionsVisibility = false;
-                                                  _markerDraggabilityText =
-                                                      'not movable';
-                                                } else {
-                                                  _markerDraggabilityText =
-                                                      'movable';
-                                                  setState(() {
-                                                    _markersLoadingSignedIn =
-                                                        true;
-                                                    if (kIsWeb) {
-                                                      _markersLoadingSignedInBannerText =
-                                                          'drag your marker to a new location...';
-                                                    } else {
-                                                      _markersLoadingSignedInBannerText =
-                                                          'long press to drag your marker to a new location...';
-                                                    }
-                                                  });
-                                                }
-                                              });
-                                            },
-                                            iconBuilder: rollingIconBuilder,
-                                            style: ToggleStyle(),
-                                            height: 50,
-                                          ),
-                                        ),
-                                        SizedBox(width: 16),
-                                        // Text label
-                                        Text(
-                                          _markerDraggabilityText,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
                                     ),
                                     SizedBox(height: 16),
                                     // Relationship filters
@@ -835,9 +817,14 @@ extension _HomeUiLogic on _MyHomePageState {
                       Navigator.pop(context);
                     },
                   ),
-                  // Admin dashboard: web + debug builds only. The dashboard and
-                  // its delete Cloud Function both re-check authorization.
-                  if (kIsWeb && kDebugMode)
+                  // Admin dashboard: web + debug builds, and only for an
+                  // admin (see [AdminAccess]). The build gate alone never asked
+                  // *who* was signed in, so every user on a debug web build
+                  // could open it. _isAdmin is recomputed by the auth listener
+                  // on every sign-in and cleared on sign-out; the dashboard
+                  // re-checks for itself, and the Cloud Functions behind its
+                  // privileged actions check server-side.
+                  if (kIsWeb && kDebugMode && _isAdmin)
                     ListTile(
                       title: const Text('Admin Dashboard'),
                       onTap: () {

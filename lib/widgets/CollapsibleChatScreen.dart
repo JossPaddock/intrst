@@ -598,6 +598,22 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
     fuu.updateUnreadNotificationCounts('users');
   }
 
+  /// Persists an edit made from a chat bubble. The conversation stream picks
+  /// the new content up, so there is nothing to set locally on success.
+  Future<bool> _handleEditMessage(String messageId, String newContent) async {
+    // Same hard stop as sending: a blocked conversation is read-only.
+    if (_isBlockedConversation) {
+      return false;
+    }
+
+    return fmu.editMessage(
+      dr: widget.documentReference,
+      messageId: messageId,
+      newContent: newContent,
+      userUid: widget.uid,
+    );
+  }
+
   Widget _buildHeader(BuildContext context) {
     final fullNames = _participantNames.join(', ');
     final latestTimestamp = _latestMessageTimestamp();
@@ -763,6 +779,8 @@ class _CollapsibleChatContainerState extends State<CollapsibleChatScreen> {
       chatContent = ChatScreen(
         uid: widget.uid,
         documentData: _latestConversationData!,
+        conversationBlocked: _isBlockedConversation,
+        onEditMessage: _handleEditMessage,
       );
     }
 

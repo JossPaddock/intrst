@@ -72,6 +72,38 @@ class UserModel extends ChangeNotifier {
     });
   }
 
+  // One-shot request for the interests drawer to open [interestId] already
+  // expanded (e.g. the user tapped a notification about it). CardList
+  // consumes it via [takeInterestFocusRequest] once that interest is loaded.
+  String _focusRequestInterestId = '';
+  String _focusRequestOwnerUid = '';
+
+  void requestInterestFocus({
+    required String ownerUid,
+    required String interestId,
+  }) {
+    _focusRequestOwnerUid = ownerUid.trim();
+    _focusRequestInterestId = interestId.trim();
+  }
+
+  // Returns the pending focus request for [ownerUid]'s interests if it names
+  // one of [availableIds], clearing it so it only applies once. Doesn't
+  // notify: it's called from build.
+  String? takeInterestFocusRequest(
+    String ownerUid,
+    Iterable<String> availableIds,
+  ) {
+    if (_focusRequestInterestId.isEmpty ||
+        _focusRequestOwnerUid != ownerUid ||
+        !availableIds.contains(_focusRequestInterestId)) {
+      return null;
+    }
+    final id = _focusRequestInterestId;
+    _focusRequestInterestId = '';
+    _focusRequestOwnerUid = '';
+    return id;
+  }
+
   void clearFeedInterestHighlight() {
     _feedHighlightTimer?.cancel();
     _feedHighlightedInterestId = '';

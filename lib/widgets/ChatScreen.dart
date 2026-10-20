@@ -1,15 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intrst/utility/DateTimeUtility.dart';
+import 'package:intrst/utility/MessageEditPolicy.dart';
 import 'package:intrst/widgets/ChatBubble.dart';
+import 'package:intrst/widgets/EditMessageDialog.dart';
 
 import '../utility/FirebaseUsersUtility.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.uid, required this.documentData});
+  const ChatScreen({
+    super.key,
+    required this.uid,
+    required this.documentData,
+    this.onEditMessage,
+    this.conversationBlocked = false,
+  });
 
   final String uid;
   final Map<String, dynamic> documentData;
+
+  /// Persists an edit. Given the message's id and the new content, returns
+  /// whether the write succeeded. Null means editing is unavailable (e.g. a
+  /// read-only preview of a conversation).
+  final Future<bool> Function(String messageId, String newContent)?
+      onEditMessage;
+
+  /// When true no message is editable — messaging is blocked in this
+  /// conversation (see `MessageBlockPolicy`).
+  final bool conversationBlocked;
 
   @override
   ChatScreenState createState() => ChatScreenState();
@@ -97,13 +115,22 @@ class ChatScreenState extends State<ChatScreen> {
     }
 
     final parsed = <Map<String, dynamic>>[];
-    for (final value in raw.values) {
+    for (final entry in raw.entries) {
+      final value = entry.value;
       if (value is! Map) continue;
+      final timestampRaw = value['timestamp'];
       parsed.add({
+        // The conversation map is keyed by the message's uuid; carrying it
+        // through is what lets a bubble address its own message on edit.
+        'id': entry.key.toString(),
         'message_content': value['message_content'],
-        'timestamp': value['timestamp'] != null
-            ? (value['timestamp'] as Timestamp).toDate()
-            : DateTime.now(),
+        'timestamp':
+            timestampRaw is Timestamp ? timestampRaw.toDate() : DateTime.now(),
+        // Null until the message has been edited at least once.
+        'sent_at': timestampRaw is Timestamp ? timestampRaw.toDate() : null,
+        'edited_at': value['edited_at'] is Timestamp
+            ? (value['edited_at'] as Timestamp).toDate()
+            : null,
         'user_uid': value['user_uid'] ?? '',
       });
     }
@@ -139,6 +166,59 @@ class ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Whether the pencil should be offered on [message]. Recomputed on every
+  /// build so the affordance disappears on its own once the edit window
+  /// closes and the list rebuilds.
+  bool _canEdit(Map<String, dynamic> message) {
+    if (widget.onEditMessage == null) return false;
+    return MessageEditPolicy.canEdit(
+      senderUid: (message['user_uid'] ?? '').toString(),
+      viewerUid: widget.uid,
+      conversationBlocked: widget.conversationBlocked,
+      sentAt: message['sent_at'] as DateTime?,
+      now: DateTime.now(),
+    );
+  }
+
+  /// The hover text on a bubble: when it was sent, plus when it was edited.
+  String _tooltipFor(Map<String, dynamic> message) {
+    final sent = _dtu.getFormattedTime(message['timestamp']);
+    final editedAt = message['edited_at'] as DateTime?;
+    if (editedAt == null) return sent;
+    return '$sent\nEdited ${_dtu.getFormattedTime(editedAt)}';
+  }
+
+  Future<void> _promptEdit(Map<String, dynamic> message) async {
+    final onEditMessage = widget.onEditMessage;
+    if (onEditMessage == null) return;
+
+    final messageId = (message['id'] ?? '').toString();
+    final original = (message['message_content'] ?? '').toString();
+    if (messageId.isEmpty) return;
+
+    final updated = await EditMessageDialog.show(
+      context,
+      originalContent: original,
+    );
+    if (updated == null || !mounted) return;
+
+    // Re-check the window: the dialog may have been open long enough for the
+    // message to become uneditable while the user was typing.
+    if (!_canEdit(message)) {
+      _showEditFailure('That message can no longer be edited.');
+      return;
+    }
+
+    final saved = await onEditMessage(messageId, updated);
+    if (!mounted || saved) return;
+    _showEditFailure('Could not edit that message. Please try again.');
+  }
+
+  void _showEditFailure(String reason) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(SnackBar(content: Text(reason)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -171,10 +251,14 @@ class ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 subtitle: Tooltip(
-                  message: _dtu.getFormattedTime(message['timestamp']),
+                  message: _tooltipFor(message),
                   child: ChatBubble(
                     message: message['message_content'],
                     isSender: isUserMessage,
+                    isEdited: message['edited_at'] != null,
+                    onEdit: _canEdit(message)
+                        ? () => _promptEdit(message)
+                        : null,
                   ),
                 ),
               );

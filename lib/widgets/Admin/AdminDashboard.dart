@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intrst/utility/AdminAccess.dart';
 import 'package:intrst/utility/AdminUtility.dart';
 import 'package:intrst/widgets/Admin/AdminUserCard.dart';
 import 'package:intrst/widgets/Admin/QaTestRunnerPanel.dart';
@@ -21,9 +22,17 @@ import 'package:intrst/widgets/Admin/UnitTestRunnerPanel.dart';
 /// **Unit tests** lists every unit test in [UnitTestRunnerPanel]'s registry and
 /// runs the pure-logic ones in-app, showing their console output inline.
 ///
-/// This screen is gated to `kIsWeb && kDebugMode`; the entry point that opens
-/// it (a Drawer item in the home page) applies the same gate, and the delete
-/// Cloud Function independently verifies the caller is an admin.
+/// Access is gated on **two** independent conditions: the build must be
+/// `kIsWeb && kDebugMode`, and the signed-in user must be an admin
+/// ([AdminAccess]). The drawer item that opens it applies the same pair, but
+/// this screen re-checks rather than trusting its caller — a pushed route or a
+/// restored navigation stack must not be a way in. The check is driven by
+/// [AdminAccess.changes], so signing out (or signing in as someone else) while
+/// the dashboard is open revokes it immediately instead of leaving the previous
+/// admin's screen on display.
+///
+/// None of this is the security boundary: the privileged operations are Cloud
+/// Functions that verify the caller server-side.
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key, this.initialTabIndex = 0});
 
@@ -72,15 +81,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   bool get _searchMode => _searchQuery.trim().isNotEmpty;
 
+  // Null while the first check is in flight, so the screen can show a spinner
+  // rather than flashing either the dashboard or a denial before it knows.
+  bool? _isAdmin;
+  StreamSubscription<bool>? _adminWatch;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _loadNextPage();
+    // Deliberately no _loadNextPage() here: nothing is read until the identity
+    // check has passed, so a non-admin who reaches this route never triggers a
+    // single user query.
+    _watchAdminAccess();
+  }
+
+  void _watchAdminAccess() {
+    if (!(kIsWeb && kDebugMode)) return;
+    _adminWatch = AdminAccess.changes().listen((isAdmin) {
+      if (!mounted) return;
+      final bool wasAdmin = _isAdmin ?? false;
+      setState(() => _isAdmin = isAdmin);
+      if (isAdmin && !wasAdmin) {
+        _loadNextPage();
+      } else if (!isAdmin) {
+        // Whoever is signed in now is not an admin: drop everything the
+        // previous session loaded so no user list survives the change.
+        _discardLoadedData();
+      }
+    });
+  }
+
+  /// Clears every record read while an admin was signed in.
+  void _discardLoadedData() {
+    setState(() {
+      _users.clear();
+      _searchResults.clear();
+      _emailsByUid.clear();
+      _emailsInFlight.clear();
+      _lastDoc = null;
+      _hasMore = true;
+      _didInitialLoad = false;
+      _loadError = null;
+    });
   }
 
   @override
   void dispose() {
+    _adminWatch?.cancel();
     _searchDebounce?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
@@ -401,10 +449,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget build(BuildContext context) {
     // Defense in depth: this screen must never render outside web debug builds.
     if (!(kIsWeb && kDebugMode)) {
+      return const _AdminDashboardNotice(
+        icon: Icons.build_circle_outlined,
+        message: 'The admin dashboard is only available in web debug builds.',
+      );
+    }
+
+    // Identity gate. Re-checked here rather than trusted from the caller, and
+    // re-evaluated whenever the signed-in user or their token changes.
+    final bool? isAdmin = _isAdmin;
+    if (isAdmin == null) {
       return const Scaffold(
-        body: Center(
-          child: Text('The admin dashboard is only available in web debug builds.'),
-        ),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (!isAdmin) {
+      return const _AdminDashboardNotice(
+        icon: Icons.lock_outline,
+        message: 'The admin dashboard is only available to administrators.',
       );
     }
 
@@ -447,6 +509,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
           child: _searchMode ? _buildSearchResults() : _buildBrowseList(),
         ),
       ],
+    );
+  }
+}
+
+/// Full-screen explanation shown in place of the dashboard when it may not be
+/// opened — wrong build, or the signed-in user is not an admin. Deliberately
+/// says nothing about what the dashboard contains.
+class _AdminDashboardNotice extends StatelessWidget {
+  const _AdminDashboardNotice({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F4F5),
+      appBar: AppBar(
+        backgroundColor: AdminDashboard._brand,
+        foregroundColor: Colors.white,
+        title: const Text('Admin Dashboard'),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 48, color: Colors.black38),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16, color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

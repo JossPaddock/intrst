@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_login/flutter_login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intrst/login/signup/signup_submission.dart';
+import 'package:intrst/login/signup/signup_wizard.dart';
+import 'package:intrst/login/signup/signup_wizard_data.dart';
 import 'package:intrst/utility/FirebaseUsersUtility.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -30,6 +33,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final FirebaseUsersUtility fu = FirebaseUsersUtility();
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
+  late final SignupSubmission _signupSubmission =
+      SignupSubmission(usersUtility: fu);
   Duration get loginTime => const Duration(milliseconds: 2250);
 
   void askNotificationSetting(String uid) async {
@@ -122,148 +127,118 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Parses a birthday entered as `MM/DD/YYYY`. Returns null if the string
-  /// isn't a valid calendar date in that format.
-  DateTime? _parseBirthday(String input) {
-    final match =
-    RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(input.trim());
-    if (match == null) return null;
-
-    final month = int.parse(match.group(1)!);
-    final day = int.parse(match.group(2)!);
-    final year = int.parse(match.group(3)!);
-
-    final date = DateTime(year, month, day);
-    // DateTime normalizes out-of-range values (e.g. month 13) instead of
-    // throwing, so confirm the parts round-trip to catch invalid dates.
-    if (date.year != year || date.month != month || date.day != day) {
-      return null;
+  /// Entry point for the "Sign up" button.
+  ///
+  /// The email and password are collected by `FlutterLogin`; everything else —
+  /// name, age, first interest and marker location — is collected by the
+  /// wizard, which runs *before* any account is created. Nothing is written
+  /// anywhere until the user finishes all three parts, so an abandoned or
+  /// underage sign-up leaves no account and no half-built profile behind.
+  Future<String?> _signupUser(SignupData data) async {
+    final String email = data.name?.trim() ?? '';
+    final String password = data.password ?? '';
+    if (email.isEmpty || password.isEmpty) {
+      return 'Please enter an email address and password.';
     }
-    return date;
-  }
 
-  int _calculateAge(DateTime birthday) {
-    final now = DateTime.now();
-    int age = now.year - birthday.year;
-    if (now.month < birthday.month ||
-        (now.month == birthday.month && now.day < birthday.day)) {
-      age--;
-    }
-    return age;
-  }
-
-  Future<void> _showUnderageDialog() {
-    return showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Age Restriction'),
-          content: const Text(
-              'You must be at least 13 years of age to use the intrst app.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+    // Resolves to null once the account exists, or to a message to show on
+    // this screen if the user backed out or hit an error only fixable here.
+    return SignupWizard.show(
+      context,
+      email: email,
+      onSubmit: (result) => _createAccountFromWizard(email, password, result),
     );
   }
 
-  Future<String?> _signupUser(SignupData data) async {
-    debugPrint('Signup Name: ${data.name}, Password: ${data.password}');
+  /// Creates the Auth account and writes every answer the wizard collected.
+  ///
+  /// Safe to retry: if a previous attempt created the account but failed to
+  /// write the profile, the existing session is reused rather than triggering
+  /// an "email already in use" error the user cannot act on.
+  Future<SignupSubmitError?> _createAccountFromWizard(
+      String email, String password, SignupWizardResult result) async {
+    User? user = FirebaseAuth.instance.currentUser;
+    final bool reusingSession =
+        user != null && (user.email?.toLowerCase() == email.toLowerCase());
 
-    if (data.name is String && data.password is String) {
-      String email = data.name ?? '';
-      String password = data.password ?? '';
-
-      // Safely access additional signup data to avoid crashes.
-      var firstname = data.additionalSignupData?['firstname'] ?? 'Bob';
-      var lastname = data.additionalSignupData?['lastname'] ?? 'Watkins';
-      final birthdayInput = data.additionalSignupData?['birthday'];
-      final birthday =
-      birthdayInput is String ? _parseBirthday(birthdayInput) : null;
-
-      if (birthday == null) {
-        return 'Please enter a valid birthday as MM/DD/YYYY.';
-      }
-
-      // Enforce the age gate before creating the Firebase Auth account so
-      // no account is ever created for an underage signup attempt.
-      if (_calculateAge(birthday) < 13) {
-        if (mounted) {
-          await _showUnderageDialog();
-        }
-        return 'You must be at least 13 years of age to use the intrst app.';
-      }
-
-      final credential = await _createNewUser(email, password);
-      if (credential == null) {
-        return 'Sign-up failed. The email may already be in use.';
-      }
-
-      final user = credential.user!;
-
-      // Send verification email in production; skip in debug for convenience.
-      // The account already exists at this point, so a send failure is
-      // non-fatal: we log it and continue. The user is kept signed in and the
-      // authStateChanges listener routes them to the "verify your email"
-      // screen, which also offers a resend.
-      if (!kDebugMode) {
-        try {
-          await user.sendEmailVerification();
-          print('Verification email sent to ${user.email}');
-        } catch (e) {
-          print('Failed to send verification email: $e');
-        }
-      } else {
-        print('Debug mode: skipping email verification for ${user.email}');
-      }
-
-      CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
-
+    if (!reusingSession) {
       try {
-        // MUST await this call before potential sign-out to ensure document creation.
-        await fu.addUserToFirestore(
-            users, user.uid, firstname, lastname, GeoPoint(0, 0), birthday);
+        final credential = await FirebaseAuth.instance
+            .createUserWithEmailAndPassword(email: email, password: password);
+        user = credential.user;
+      } on FirebaseAuthException catch (e) {
+        print('Sign-up error: ${e.code} ${e.message}');
+        return _signupErrorFor(e);
       } catch (e) {
-        print('Failed to create user doc: $e');
-        return 'Failed to create user profile. Please try again.';
+        print('Sign-up error: $e');
+        return const SignupSubmitError(
+            'Sign-up failed. Please check your connection and try again.');
       }
-
-      askNotificationSetting(user.uid);
-
-      // We deliberately keep the user signed in (no signOut) even though they
-      // are unverified. The authStateChanges listener sees the unverified
-      // session and shows the "verify your email" screen, then polls and logs
-      // them in automatically the moment they verify — no second sign-in.
     }
 
-    return Future.delayed(loginTime).then((_) => null);
+    if (user == null) {
+      return const SignupSubmitError(
+          'Sign-up failed. Please try again.', fatal: true);
+    }
+
+    // The account exists at this point, so a failed verification email is
+    // non-fatal: the "verify your email" screen offers a resend. Skipped in
+    // debug, where the auth listener bypasses the verification gate anyway.
+    if (!kDebugMode && !user.emailVerified) {
+      try {
+        await user.sendEmailVerification();
+        print('Verification email sent to ${user.email}');
+      } catch (e) {
+        print('Failed to send verification email: $e');
+      }
+    }
+
+    try {
+      await _signupSubmission.submit(
+        users: FirebaseFirestore.instance.collection('users'),
+        userUid: user.uid,
+        result: result,
+      );
+    } catch (e) {
+      print('Failed to create user profile: $e');
+      return const SignupSubmitError(
+          "We couldn't save your profile. Check your connection and try "
+          'again.');
+    }
+
+    askNotificationSetting(user.uid);
+
+    // The user stays signed in even though they are unverified: the
+    // authStateChanges listener shows the "verify your email" screen and logs
+    // them straight in the moment they verify — no second sign-in.
+    return null;
   }
 
-  Future<UserCredential?> _createNewUser(
-      String email, String password) async {
-    try {
-      return await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-    } on FirebaseAuthException catch (e) {
-      switch (e.code) {
-        case 'weak-password':
-          print('The password provided is too weak.');
-        case 'email-already-in-use':
-          print('The account already exists for that email.');
-        default:
-          print('Sign-up error: ${e.code}');
-      }
-    } catch (e) {
-      print(e);
+  /// Maps a sign-up auth failure onto a wizard error. Failures the user can
+  /// only fix back on the login form (the email or password itself) are fatal
+  /// and close the wizard; transient ones keep their answers and let them
+  /// retry in place.
+  SignupSubmitError _signupErrorFor(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return const SignupSubmitError(
+            'An account already exists for that email address.',
+            fatal: true);
+      case 'invalid-email':
+        return const SignupSubmitError(
+            "That email address doesn't look right.",
+            fatal: true);
+      case 'weak-password':
+        return const SignupSubmitError(
+            'Please choose a stronger password.',
+            fatal: true);
+      case 'network-request-failed':
+        return const SignupSubmitError(
+            'No connection. Check your network and try again.');
+      default:
+        return const SignupSubmitError(
+            'Sign-up failed. Please try again.');
     }
-    return null;
   }
 
   Future<String?> _recoverPassword(String email) async {
@@ -329,48 +304,6 @@ class _LoginScreenState extends State<LoginScreen> {
         widget.onSelectedIndexChanged(0);
       },
       onRecoverPassword: _recoverPassword,
-      additionalSignupFields: [
-        UserFormField(
-          keyName: 'firstname',
-          displayName: 'First Name',
-          userType: LoginUserType.firstName,
-          fieldValidator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter a First Name';
-            }
-            return null;
-          },
-        ),
-        UserFormField(
-          keyName: 'lastname',
-          displayName: 'Last Name',
-          userType: LoginUserType.lastName,
-          fieldValidator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter a Last Name';
-            }
-            return null;
-          },
-        ),
-        UserFormField(
-          keyName: 'birthday',
-          displayName: 'Birthday (MM/DD/YYYY)',
-          userType: LoginUserType.text,
-          fieldValidator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your birthday';
-            }
-            final birthday = _parseBirthday(value);
-            if (birthday == null) {
-              return 'Please enter a valid date as MM/DD/YYYY';
-            }
-            if (birthday.isAfter(DateTime.now())) {
-              return 'Birthday cannot be in the future';
-            }
-            return null;
-          },
-        ),
-      ],
     );
   }
 }

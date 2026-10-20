@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intrst/utility/FirebaseMappers.dart';
+import 'package:intrst/utility/MessageEditPolicy.dart';
 import '../models/Interest.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
@@ -128,6 +129,72 @@ try {
     } catch (e) {
       print("Error sending message: $e");
       return 'Error';
+    }
+  }
+
+  /// Rewrites the content of an already-sent message.
+  ///
+  /// Re-reads the message from the server first so the author check and the
+  /// edit window are enforced against stored data, not against whatever the
+  /// client happened to have in memory. The original send [timestamp] is left
+  /// untouched (so the message keeps its place in the conversation) and
+  /// `edited_at` is stamped, which is what the UI reads to show "(edited)".
+  ///
+  /// Returns true when the message was rewritten.
+  Future<bool> editMessage({
+    required DocumentReference dr,
+    required String messageId,
+    required String newContent,
+    required String userUid,
+  }) async {
+    try {
+      final snapshot = await dr.get();
+      final data = snapshot.data() as Map<String, dynamic>?;
+      final conversation = data?['conversation'];
+      if (conversation is! Map || !conversation.containsKey(messageId)) {
+        print('Error editing message: message $messageId no longer exists');
+        return false;
+      }
+
+      final existing = Map<String, dynamic>.from(conversation[messageId] as Map);
+      final timestampRaw = existing['timestamp'];
+      final sentAt = timestampRaw is Timestamp ? timestampRaw.toDate() : null;
+
+      final allowed = MessageEditPolicy.canEdit(
+        senderUid: (existing['user_uid'] ?? '').toString(),
+        viewerUid: userUid,
+        conversationBlocked: false,
+        sentAt: sentAt,
+        now: DateTime.now(),
+      );
+      if (!allowed) {
+        print('Error editing message: $messageId is not editable by $userUid');
+        return false;
+      }
+
+      final original = (existing['message_content'] ?? '').toString();
+      if (!MessageEditPolicy.isValidEdit(
+        original: original,
+        edited: newContent,
+      )) {
+        print('Error editing message: rejected edit of $messageId');
+        return false;
+      }
+
+      await dr.set({
+        'conversation': {
+          messageId: {
+            'message_content': MessageEditPolicy.normalize(newContent),
+            'edited_at': FieldValue.serverTimestamp(),
+          },
+        }
+      }, SetOptions(merge: true));
+
+      print('User has edited message successfully.');
+      return true;
+    } catch (e) {
+      print('Error editing message: $e');
+      return false;
     }
   }
 }

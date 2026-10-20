@@ -334,6 +334,10 @@ class _QaTestRunnerPanelState extends State<QaTestRunnerPanel> {
     if (scenario.hasLive) {
       note = 'Runs live: ▶ drives the real app in a PiP, 🐞 steps through it';
       noteIcon = Icons.play_circle_outline;
+    } else if (scenario.build != null) {
+      // A widget scenario with no live definition has no tree to mount here.
+      note = 'Widget test — runs under `flutter test` only, not in the app';
+      noteIcon = Icons.science_outlined;
     } else {
       note = 'Logic check — runs in place in the dashboard, nothing to watch';
       noteIcon = Icons.rule;

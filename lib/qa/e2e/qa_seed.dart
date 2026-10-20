@@ -48,12 +48,19 @@ class QaSeeder {
   /// Creates a `users` doc under the reserved namespace. [uid] must start with
   /// [prefix]; it becomes both the document id and the `user_uid` field the app
   /// looks users up by.
+  ///
+  /// [location] is where the seeded user's marker lands on the real map.
+  /// Scenarios that assert on marker *selection* (which markers are drawn, and
+  /// which of them are labelled) pass a deliberately remote point, so the
+  /// seeded marker is isolated from every real user and its label is decided by
+  /// zoom alone rather than by whoever happens to live nearby.
   Future<void> seedUser({
     required String uid,
     required String firstName,
     required String lastName,
     List<Map<String, dynamic>> interests = const <Map<String, dynamic>>[],
     List<String> blockedUids = const <String>[],
+    GeoPoint location = const GeoPoint(0, 0),
   }) async {
     assert(uid.startsWith(prefix), 'seeded uid must be namespaced: $uid');
     final ref = _users.doc(uid);
@@ -63,7 +70,7 @@ class QaSeeder {
       'last_name': lastName,
       'interests': interests,
       'blocked_uids': blockedUids,
-      'location': const GeoPoint(0, 0),
+      'location': location,
     });
     _created.add(ref);
   }
@@ -82,6 +89,35 @@ class QaSeeder {
     });
     _created.add(ref);
     return ref;
+  }
+
+  /// Writes one message into a seeded conversation and returns its id.
+  ///
+  /// [sentAt] defaults to now, which puts the message inside
+  /// `MessageEditPolicy.editWindow` — what the editing scenarios need in order
+  /// to find a pencil on it. Pass an older time to drive the expired case.
+  ///
+  /// No separate cleanup is registered: the message lives inside the
+  /// conversation document, which [seedConversation] already tracks for
+  /// deletion.
+  Future<String> seedMessage({
+    required DocumentReference<Map<String, dynamic>> conversation,
+    required String senderUid,
+    required String content,
+    DateTime? sentAt,
+  }) async {
+    final id = '${prefix}msg_${_created.length}_'
+        '${DateTime.now().microsecondsSinceEpoch}';
+    await conversation.set(<String, dynamic>{
+      'conversation': <String, dynamic>{
+        id: <String, dynamic>{
+          'message_content': content,
+          'user_uid': senderUid,
+          'timestamp': Timestamp.fromDate(sentAt ?? DateTime.now()),
+        },
+      },
+    }, SetOptions(merge: true));
+    return id;
   }
 
   /// Adds [targetUid] to the `blocked_uids` of the **real** user [ownerUid]

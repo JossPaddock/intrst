@@ -21,3 +21,27 @@ Future<void> phase(String name, FutureOr<void> Function() body) async {
   print('$kPhaseMarker $name');
   await body();
 }
+
+/// Stable prefixes the CI reporter looks for to detect a *step* line — one
+/// scenario action or assertion — inside a test's captured output.
+///
+/// Steps are the headless counterpart of the step log the live runner paints in
+/// its PiP overlay: under `flutter test` there is nothing to watch, so the same
+/// trail is printed instead. Like phases, the reporter only surfaces these for
+/// failing tests, so a green run stays quiet.
+const String kStepMarker = 'STEP ›';
+const String kStepFailMarker = 'STEP ✗';
+
+/// Logs [label] as a step, runs [body], and logs again if it throws.
+///
+/// The step is printed *before* [body] runs, so a step that hangs or crashes
+/// the runner still leaves its name in the output.
+Future<T> logStep<T>(String label, FutureOr<T> Function() body) async {
+  print('$kStepMarker $label');
+  try {
+    return await body();
+  } catch (_) {
+    print('$kStepFailMarker $label');
+    rethrow;
+  }
+}

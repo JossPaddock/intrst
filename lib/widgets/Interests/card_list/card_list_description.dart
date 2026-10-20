@@ -1,7 +1,9 @@
 part of '../CardList.dart';
 
-const double _collapsedDescriptionHeight = 50.0;
-const int _descriptionCollapseThreshold = 150;
+// How many lines of description a card shows in the list before it's
+// tapped open.
+const int _collapsedDescriptionLines = 2;
+const double _collapsedImageMaxHeight = 50.0;
 
 const double _defaultImageMaxHeight = 160.0;
 
@@ -26,8 +28,8 @@ const List<(String char, IconData icon)> _imageAlignOptions = [
 ];
 
 // Renders an interest's rich-text description inline, including embedded
-// images with resize/align controls and the collapse/expand behaviour for
-// long descriptions.
+// images with resize/align controls, or as a short truncated preview while
+// the card is collapsed in the list.
 mixin _CardListDescriptionMixin on _CardListStateBase {
   String _updateImageInDescription(
     String descJson,
@@ -274,14 +276,13 @@ mixin _CardListDescriptionMixin on _CardListStateBase {
     RichTextEditorController richTextController, {
     bool canResize = false,
     Interest? interest,
+    bool collapsed = false,
   }) {
-    final plainText = _getRichTextPlainText(richTextController);
-    final bool isLong = plainText.length > _descriptionCollapseThreshold;
-    final bool isExpanded = _expandedDescriptions[id] ?? false;
-
     final parts = _splitDocumentAtImages(richTextController.document);
 
-    final inlineContent = Column(
+    if (collapsed) return _buildCollapsedDescription(context, parts);
+
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final part in parts)
@@ -296,50 +297,96 @@ mixin _CardListDescriptionMixin on _CardListStateBase {
             ),
       ],
     );
+  }
 
-    if (isLong && !isExpanded) {
-      return SizedBox(
-        height: _collapsedDescriptionHeight,
-        child: ClipRect(
-          // OverflowBox lets the content column lay out at its natural
-          // height (it can contain images far taller than the collapsed
-          // preview); the ClipRect shows just the top slice. Without it
-          // the column is forced into the 60px box and reports a
-          // RenderFlex overflow.
-          child: OverflowBox(
-            alignment: Alignment.topCenter,
-            minHeight: 0,
-            maxHeight: double.infinity,
-            child: inlineContent,
-          ),
+  // The list preview: the description's text flattened onto at most
+  // [_collapsedDescriptionLines] lines, ending in an ellipsis whenever
+  // anything is cut off — overflowing text or images the preview leaves
+  // out — so the reader knows tapping the card shows more. Links keep their
+  // styling but aren't tappable here, so a tap anywhere opens the card.
+  Widget _buildCollapsedDescription(BuildContext context, List<Object> parts) {
+    final baseStyle = DefaultTextStyle.of(context).style;
+    final linkStyle = baseStyle.copyWith(
+      color: const Color(0xFF1A73E8),
+      decoration: TextDecoration.underline,
+      decorationColor: const Color(0xFF1A73E8),
+    );
+
+    final spans = <TextSpan>[];
+    final images = <({String url, double maxHeight, String alignChar})>[];
+    for (final part in parts) {
+      if (part is List<RichTextOp>) {
+        for (final op in part) {
+          // Line breaks become spaces so the preview fills both lines and
+          // the ellipsis lands where the text is actually cut.
+          final text = op.text.replaceAll(RegExp(r'\s+'), ' ');
+          if (text.isEmpty) continue;
+          spans.add(
+            TextSpan(text: text, style: op.isLink ? linkStyle : baseStyle),
+          );
+        }
+      } else if (part is ({String url, double maxHeight, String alignChar})) {
+        images.add(part);
+      }
+    }
+    final bool hasText = spans.any((s) => s.text!.trim().isNotEmpty);
+
+    // Image-only description: show a thumbnail of the first image instead.
+    if (!hasText) {
+      if (images.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: _collapsedImageMaxHeight,
+                ),
+                child: Image.network(
+                  images.first.url,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            if (images.length > 1) Text(' …', style: baseStyle),
+          ],
         ),
       );
     }
 
-    return inlineContent;
-  }
-
-  // The show-more/less chevron lives in the card's action row rather than
-  // under the description itself, so it shares the row with the
-  // favorite/edit/delete buttons. Returns null when the description is short
-  // enough that there is nothing to collapse.
-  @override
-  Widget? _buildDescriptionExpandToggle(
-    String id,
-    RichTextEditorController richTextController,
-  ) {
-    final plainText = _getRichTextPlainText(richTextController);
-    if (plainText.length <= _descriptionCollapseThreshold) return null;
-
-    final bool isExpanded = _expandedDescriptions[id] ?? false;
-
-    return GestureDetector(
-      onTap: () =>
-          setState(() => _expandedDescriptions[id] = !isExpanded),
-      child: Icon(
-        isExpanded ? Icons.expand_less : Icons.expand_more,
-        color: Colors.black,
-        size: 20,
+    final textSpan = TextSpan(children: spans, style: baseStyle);
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          var span = textSpan;
+          // TextOverflow.ellipsis covers text that runs past the last line;
+          // when the text fits but images were dropped, add one by hand.
+          if (images.isNotEmpty) {
+            final painter = TextPainter(
+              text: textSpan,
+              maxLines: _collapsedDescriptionLines,
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+            )..layout(maxWidth: constraints.maxWidth);
+            final bool textOverflows = painter.didExceedMaxLines;
+            painter.dispose();
+            if (!textOverflows) {
+              span = TextSpan(
+                children: [...spans, const TextSpan(text: ' …')],
+                style: baseStyle,
+              );
+            }
+          }
+          return Text.rich(
+            span,
+            maxLines: _collapsedDescriptionLines,
+            overflow: TextOverflow.ellipsis,
+          );
+        },
       ),
     );
   }

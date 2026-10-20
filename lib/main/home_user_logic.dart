@@ -90,6 +90,9 @@ extension _HomeUserLogic on _MyHomePageState {
       _awaitingEmailVerification = false;
       _uid = '';
       _name = '';
+      // Cleared here, not on the next sign-in: a signed-out app must never
+      // still be offering the admin dashboard from the previous session.
+      _isAdmin = false;
       _selectedIndex = 0;
     });
     _handleUserModel('');
@@ -112,6 +115,7 @@ extension _HomeUserLogic on _MyHomePageState {
         _awaitingEmailVerification = true;
         _uid = '';
         _name = '';
+        _isAdmin = false;
         _selectedIndex = 0;
       });
     }
@@ -167,6 +171,10 @@ extension _HomeUserLogic on _MyHomePageState {
       name = '';
     }
 
+    // Resolved per sign-in from this user's own token/email, so it can never
+    // carry over from whoever was signed in before.
+    final bool isAdmin = await AdminAccess.isAdmin(user: user);
+
     if (!mounted || generation != _authStateGeneration) {
       print('Stale auth event ($generation); skipping signed-in commit.');
       return;
@@ -179,6 +187,7 @@ extension _HomeUserLogic on _MyHomePageState {
       _awaitingEmailVerification = false;
       _name = name;
       _uid = localUid;
+      _isAdmin = isAdmin;
       _selectedIndex = 0;
     });
     _handleUserModel(localUid);
@@ -274,7 +283,8 @@ extension _HomeUserLogic on _MyHomePageState {
   }
 
   Future<void> _openInterestsForUserFromFeed(
-      String targetUid, String targetName, String targetInterestId) async {
+      String targetUid, String targetName, String targetInterestId,
+      {bool expandInterest = false}) async {
     _handleAlternateUserModel(targetUid, targetName);
     final sanitizedInterestId = targetInterestId.trim();
     if (sanitizedInterestId.isNotEmpty) {
@@ -282,6 +292,12 @@ extension _HomeUserLogic on _MyHomePageState {
         ownerUid: targetUid,
         interestId: sanitizedInterestId,
       );
+      if (expandInterest) {
+        UserModel().requestInterestFocus(
+          ownerUid: targetUid,
+          interestId: sanitizedInterestId,
+        );
+      }
     } else {
       UserModel().clearFeedInterestHighlight();
     }

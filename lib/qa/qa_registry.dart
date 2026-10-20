@@ -1,8 +1,11 @@
 import 'qa_scenario.dart';
 import 'scenarios/blocking_scenarios.dart';
+import 'scenarios/live_map_scenarios.dart';
 import 'scenarios/marker_preview_scenarios.dart';
+import 'scenarios/message_edit_scenarios.dart';
 import 'scenarios/marker_visibility_scenarios.dart';
 import 'scenarios/preview_login_scenarios.dart';
+import 'scenarios/signup_wizard_scenarios.dart';
 
 /// The catalogue of every Patrol scenario in the project.
 ///
@@ -19,9 +22,12 @@ class QaRegistry {
   /// Built fresh on each call so scenarios that hold per-run state start clean.
   static List<QaScenario> all() => <QaScenario>[
         ...blockingScenarios(),
+        ...liveMapScenarios(),
         ...markerPreviewScenarios(),
         ...markerVisibilityScenarios(),
+        ...messageEditScenarios(),
         ...previewLoginScenarios(),
+        ...signupWizardScenarios(),
       ];
 
   /// [all], grouped by suite, preserving declaration order.

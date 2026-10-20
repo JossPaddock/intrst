@@ -87,7 +87,10 @@ abstract class _CardListStateBase extends State<CardList> {
   // True while the search field has focus (keyboard is up). Used to hide the
   // title, link, and description fields so the search results have full room.
   bool _searchKeyboardActive = false;
-  final Map<String, bool> _expandedDescriptions = {};
+  // The interest the user tapped to read in full. While set, every other
+  // interest is hidden and this one shows its whole description; tapping it
+  // again clears it and restores the list with truncated descriptions.
+  String? _focusedInterestId;
   // Whether the pinned "Favorites" section is expanded. The database already
   // enforces the 5-favorite cap, so this is purely a display constant.
   bool _favoritesExpanded = true;
@@ -163,11 +166,8 @@ abstract class _CardListStateBase extends State<CardList> {
     RichTextEditorController richTextController, {
     bool canResize = false,
     Interest? interest,
+    bool collapsed = false,
   });
-  Widget? _buildDescriptionExpandToggle(
-    String id,
-    RichTextEditorController richTextController,
-  );
 
   // Implemented in card_list_sharing.dart:
   Widget _buildNewChatTab(Interest interest);
