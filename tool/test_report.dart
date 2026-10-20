@@ -2,8 +2,8 @@
 //
 // It wraps `flutter test --machine`, parses the JSON event stream, and prints:
 //   * one line per test:  `Test <name> passed ✅`  /  `Test <name> failed ❌`
-//   * for FAILING tests only, the phase breakdown + failure details, so it is
-//     clear which step broke and why (passing tests stay quiet);
+//   * for FAILING tests only, the phase/step breakdown + failure details, so it
+//     is clear which step broke and why (passing tests stay quiet);
 //   * a final `Passed X/Y tests` tally.
 //
 // Exit code is non-zero if any test failed or the runner itself failed, so it
@@ -23,6 +23,8 @@ const String _pass = '✅';
 const String _fail = '❌';
 const String _skip = '⊘';
 const String _phaseMarker = 'PHASE ›';
+const String _stepMarker = 'STEP ›';
+const String _stepFailMarker = 'STEP ✗';
 const String _rule =
     '────────────────────────────────────────────────────────────';
 
@@ -196,7 +198,16 @@ void _printRecord(_TestRecord record, List<String> orderedFailures) {
     for (final rawLine in const LineSplitter().convert(message)) {
       final line = rawLine.trimRight();
       if (line.isEmpty) continue;
-      final label = line.startsWith(_phaseMarker) ? '▸' : '·';
+      final String label;
+      if (line.startsWith(_phaseMarker)) {
+        label = '▸';
+      } else if (line.startsWith(_stepFailMarker)) {
+        label = _fail;
+      } else if (line.startsWith(_stepMarker)) {
+        label = '·';
+      } else {
+        label = ' ';
+      }
       stdout.writeln('    $label $line');
     }
   }

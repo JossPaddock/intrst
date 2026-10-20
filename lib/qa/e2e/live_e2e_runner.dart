@@ -150,6 +150,19 @@ class LiveE2eRunner {
           if (setUp != null) await setUp(harness);
         });
         await scenario.liveBody!(driver, harness!);
+      } else if (scenario.build != null) {
+        // A widget scenario mounts its own tree under `flutter test`; here there
+        // is nothing to mount it into, and running its body against the real app
+        // would assert on the wrong tree — silently passing any check that only
+        // looks for absence. Fail loudly instead, so the gap is visible rather
+        // than mistaken for coverage.
+        await driver.phase('cannot run in the app', () async {
+          throw QaHarnessUnavailable(
+            'This scenario builds its own widget tree and has no live '
+            'definition (liveBody), so it can only run under `flutter test`. '
+            'Add live hooks to drive it against the real app.',
+          );
+        });
       } else {
         // Logic-only scenario: no app to drive, just evaluate its checks.
         await scenario.body(driver);

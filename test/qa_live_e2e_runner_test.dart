@@ -151,6 +151,55 @@ void main() {
 
     expect(runner.view.status, QaRunStatus.passed);
   });
+
+  // A widget scenario has its own tree mounted for it under `flutter test`. In
+  // the app there is nothing to mount it into, so running its body here would
+  // assert against the real app instead — quietly passing any check that only
+  // looks for absence. It has to fail loudly instead.
+  testWidgets('a widget scenario with no liveBody fails instead of running '
+      'against the real app', (tester) async {
+    final navKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navKey,
+        home: const Scaffold(body: SizedBox.shrink()),
+      ),
+    );
+    final runner = LiveE2eRunner(
+      overlay: navKey.currentState!.overlay!,
+      onRevealApp: () {},
+      onBackToDashboard: () {},
+      pacer: TesterPacer(tester),
+      stepDelay: Duration.zero,
+      harnessProvider: () => null,
+      rootProvider: () => WidgetsBinding.instance.rootElement,
+    );
+
+    var bodyRan = false;
+    final scenario = QaScenario(
+      suite: 'Widget',
+      name: 'mounts its own tree',
+      summary: 'headless-only',
+      build: () async => const MaterialApp(home: Text('mounted')),
+      body: (d) async {
+        bodyRan = true;
+        // Would pass vacuously against an app that never mounted this widget.
+        await d.expectAbsent(qaText('never rendered'));
+      },
+    );
+
+    await runner.run(<QaScenario>[scenario]);
+    await tester.pump();
+
+    expect(runner.view.status, QaRunStatus.failed);
+    expect(bodyRan, isFalse,
+        reason: 'the body must not run against the real app tree');
+    expect(
+      runner.view.steps.any((s) => s.failure?.contains('flutter test') ?? false),
+      isTrue,
+      reason: 'the failure should explain the scenario is headless-only',
+    );
+  });
 }
 
 class _FakeHarness implements QaAppHarness {
@@ -175,6 +224,10 @@ class _FakeHarness implements QaAppHarness {
   Future<void> goHome() async {}
 
   @override
+  Future<void> openSignupWizard(
+      {String email = 'qa-signup@example.com'}) async {}
+
+  @override
   Future<void> resetToBaseline() async {}
 
   @override
@@ -188,4 +241,46 @@ class _FakeHarness implements QaAppHarness {
 
   @override
   Future<void> openConversationWith(String uid, String displayName) async {}
+
+  // --- Map surface. This fake exists to exercise the runner, not the map, so
+  // these keep just enough state for a scenario to be driven end to end.
+  List<String> _markerIds = <String>['fake-viewer', 'fake-other'];
+  double _zoom = 10;
+
+  @override
+  List<String> visibleMarkerIds() => _markerIds;
+
+  @override
+  double get currentMapZoom => _zoom;
+
+  @override
+  double get initialMapZoom => 10;
+
+  @override
+  Future<double?> rememberedCameraZoom() async => 10;
+
+  @override
+  Future<void> applyMapZoom(double zoom) async => _zoom = zoom;
+
+  @override
+  Future<void> reloadMarkers() async {}
+
+  @override
+  Future<void> enterSearch(String term) async =>
+      _markerIds = <String>['fake-other'];
+
+  @override
+  Future<void> clearSearch() async =>
+      _markerIds = <String>['fake-viewer', 'fake-other'];
+
+  @override
+  Future<void> setRelationshipFilters({
+    bool? friends,
+    bool? followers,
+    bool? following,
+  }) async {}
+
+  @override
+  Future<void> openPreviewForMarkerId(String markerId, String displayName) =>
+      openPreviewFor(markerId, displayName);
 }

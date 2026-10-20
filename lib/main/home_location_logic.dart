@@ -104,6 +104,82 @@ extension _HomeLocationLogic on _MyHomePageState {
     }
   }
 
+  /// Smoothly moves the map camera to [target] at [zoom].
+  ///
+  /// On Android and iOS this is the SDK's own `animateCamera`. The web plugin
+  /// implements `animateCamera` as a plain `moveCamera`, which jumps, so on
+  /// web the camera is stepped once per frame along a [MapFlyPath] instead.
+  /// Starting another flight stops this one where it is.
+  Future<void> flyCameraTo(LatLng target, {required double zoom}) async {
+    final Completer<GoogleMapController> mapController =
+        _signedIn ? _controller : _controllerSignedOut;
+    if (!_mapReady || !mapController.isCompleted) return;
+    final GoogleMapController controller = await mapController.future;
+    final int flight = ++_cameraFlightGeneration;
+    final CameraPosition end = CameraPosition(target: target, zoom: zoom);
+
+    try {
+      if (!kIsWeb) {
+        await controller.animateCamera(CameraUpdate.newCameraPosition(end));
+        return;
+      }
+
+      final CameraPosition start =
+          _lastCameraSnapshot?.toCameraPosition() ?? _initialCameraPosition;
+      final MapFlyPath path = MapFlyPath(
+        from: start.target,
+        fromZoom: start.zoom,
+        to: target,
+        toZoom: zoom,
+        viewportPixels: MediaQuery.sizeOf(context).shortestSide,
+      );
+      final int durationMicros = path.duration.inMicroseconds;
+      final Stopwatch clock = Stopwatch()..start();
+
+      while (true) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted || flight != _cameraFlightGeneration) return;
+        final double t = durationMicros == 0
+            ? 1.0
+            : (clock.elapsedMicroseconds / durationMicros).clamp(0.0, 1.0);
+        final CameraPosition frame =
+            path.at(Curves.easeInOutCubic.transform(t));
+        // The zoom-out on a long hop can dip below what the map allows.
+        final CameraPosition clamped = CameraPosition(
+          target: frame.target,
+          zoom: max(frame.zoom, MapZoom.minZoom),
+        );
+        await controller.moveCamera(CameraUpdate.newCameraPosition(clamped));
+        if (t >= 1.0) return;
+      }
+    } catch (e) {
+      // The map can be torn down mid-flight (sign-out, or leaving the
+      // signed-out map's tab disposes it).
+      print('Camera flight stopped: $e');
+    }
+  }
+
+  /// When a search matches exactly one person, flies the map to their marker.
+  /// Called with every fresh set of search results; anything other than a
+  /// single match just forgets the last flight, so narrowing back down to
+  /// that person later flies there again.
+  void _focusSoleSearchResult(List<String> uids) {
+    if (uids.length != 1) {
+      _searchFocusedUid = null;
+      return;
+    }
+    final String uid = uids.single;
+    if (uid == _searchFocusedUid) return;
+    final Marker? marker =
+        poiMarkers.where((m) => m.markerId.value == uid).firstOrNull;
+    if (marker == null) return;
+    _searchFocusedUid = uid;
+    flyCameraTo(
+      marker.position,
+      zoom: max(_currentZoom, _MyHomePageState._searchFocusZoom),
+    );
+  }
+
   Future<void> moveUserMarkerToCurrentLocation() async {
     if (_uid.isEmpty) return;
 

@@ -130,6 +130,11 @@ class LiveQaDriver implements QaDriver {
 
   int _pointer = 0;
 
+  /// Mirrors the on-screen step log to the debug console, so a live run leaves
+  /// a trail that outlives the PiP overlay (and can be copied out of the
+  /// browser console when a run goes wrong).
+  void _log(String message) => debugPrint('[QA] $message');
+
   /// How long an assertion keeps re-checking before giving up. A live app has
   /// no `pumpAndSettle`, so instead of guessing a fixed wait, assertions poll —
   /// which absorbs the async loads (e.g. a fake Firestore read) that a widget
@@ -146,6 +151,7 @@ class LiveQaDriver implements QaDriver {
   ) async {
     final step = QaStep(label: label, kind: kind);
     steps.add(step);
+    _log(label);
     onUpdate();
 
     // In a step-through run, block here (with the step already shown as pending)
@@ -162,11 +168,13 @@ class LiveQaDriver implements QaDriver {
     } on QaScenarioFailure catch (e) {
       step.status = QaStepStatus.failed;
       step.failure = e.message;
+      _log('FAILED: $label — ${e.message}');
       onUpdate();
       rethrow;
     } catch (e) {
       step.status = QaStepStatus.failed;
       step.failure = e.toString();
+      _log('FAILED: $label — $e');
       onUpdate();
       rethrow;
     } finally {
@@ -271,6 +279,7 @@ class LiveQaDriver implements QaDriver {
   Future<void> phase(String name, Future<void> Function() body) async {
     final step = QaStep(label: name, kind: QaStepKind.phase);
     steps.add(step);
+    _log('phase: $name');
     onUpdate();
     try {
       await body();
@@ -280,6 +289,7 @@ class LiveQaDriver implements QaDriver {
       // Surface why the phase failed (e.g. missing credentials, no running
       // app) so the PiP shows the reason, not just a red bar.
       step.failure = e is QaScenarioFailure ? e.message : e.toString();
+      _log('FAILED phase: $name — ${step.failure}');
       rethrow;
     } finally {
       onUpdate();

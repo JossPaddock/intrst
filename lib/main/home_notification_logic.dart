@@ -121,7 +121,9 @@ extension _HomeNotificationLogic on _MyHomePageState {
       //   • sets alternateUid / alternateName on UserModel
       //   • calls setFeedInterestHighlight so the card glows
       //   • navigates to map tab (index 0) then opens the end drawer
-      await _openInterestsForUserFromFeed(actorUid, actorName, interestId);
+      // plus opens that interest already expanded so it's readable at once.
+      await _openInterestsForUserFromFeed(actorUid, actorName, interestId,
+          expandInterest: true);
     }
   }
 

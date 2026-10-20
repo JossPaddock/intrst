@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderEditable;
 import 'package:intrst/rich_text_editor/rich_text_document.dart';
 import 'package:intrst/rich_text_editor/rich_text_editor_controller.dart';
 import 'package:intrst/rich_text_editor/url_detector.dart';
@@ -110,6 +113,14 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
   // Overlay / popover
   OverlayEntry? _popoverEntry;
   ({String url, int start, int end})? _activeLink;
+  // Caret offset of the tap that opened the popover; picks which line of a
+  // wrapped link the popover anchors to.
+  int _activeCaretOffset = 0;
+  // The link rect the popover was last built against, and the scroll
+  // positions that can move the link while the popover is open.
+  Rect? _popoverAnchor;
+  Listenable? _linkMovement;
+  bool _repositionScheduled = false;
 
   // Key for measuring the TextField's render box.
   final GlobalKey _fieldKey = GlobalKey();
@@ -259,38 +270,20 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
   void _showPopoverAtLinkRange(({String url, int start, int end}) link) {
     _hidePopover();
 
-    final renderBox =
-    _fieldKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-
-    final globalFieldOrigin = renderBox.localToGlobal(Offset.zero);
-    final padding = _resolvedContentPadding();
-    final painter =
-    _buildPainter(renderBox.size.width - padding.horizontal);
-
-    final boxes = painter.getBoxesForSelection(
-      TextSelection(baseOffset: link.start, extentOffset: link.end),
-    );
-    painter.dispose();
-
-    final Offset popoverGlobal;
-    if (boxes.isNotEmpty) {
-      final box = boxes.first;
-      popoverGlobal = Offset(
-        globalFieldOrigin.dx + padding.left + box.left,
-        globalFieldOrigin.dy + padding.top + box.bottom + 4,
-      );
-    } else {
-      popoverGlobal = Offset(
-        globalFieldOrigin.dx + padding.left,
-        globalFieldOrigin.dy + renderBox.size.height + 4,
-      );
-    }
-
     _activeLink = link;
+    _activeCaretOffset = _controller.selection.baseOffset;
     _popoverEntry = OverlayEntry(builder: (ctx) {
+      final anchor = _popoverAnchor = _linkAnchorRect();
+      // This frame's layout (keyboard resize, scrolling) may still move the
+      // link; re-check once it has settled.
+      _scheduleReposition();
+      if (anchor == null) return const SizedBox.shrink();
       return _PopoverPositioner(
-        position: popoverGlobal,
+        anchor: anchor,
+        // Stay clear of the notch, home indicator and keyboard.
+        insets: MediaQuery.paddingOf(ctx) +
+            MediaQuery.viewInsetsOf(ctx) +
+            const EdgeInsets.all(8),
         onDismiss: _hidePopover,
         child: LinkPopover(
           url: link.url,
@@ -317,6 +310,85 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
     });
 
     Overlay.of(context).insert(_popoverEntry!);
+    _listenForLinkMovement();
+  }
+
+  /// The tapped link's rect in the overlay's coordinates — the line of the
+  /// link the caret is on, since a wrapped link has one box per line — or the
+  /// whole field if the link can't be measured.
+  Rect? _linkAnchorRect() {
+    final link = _activeLink;
+    final overlayBox =
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+    final fieldBox = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+    if (link == null ||
+        overlayBox == null ||
+        fieldBox == null ||
+        !fieldBox.attached ||
+        !fieldBox.hasSize) {
+      return null;
+    }
+
+    // Measure on the field's own RenderEditable so decoration, padding and
+    // the field's internal scroll offset are all accounted for.
+    final editable = _renderEditable;
+    if (editable != null) {
+      final length = _controller.text.length;
+      final boxes = editable.getBoxesForSelection(TextSelection(
+        baseOffset: link.start.clamp(0, length),
+        extentOffset: link.end.clamp(0, length),
+      ));
+      if (boxes.isNotEmpty) {
+        final caretY = editable
+            .getLocalRectForCaret(
+                TextPosition(offset: _activeCaretOffset.clamp(0, length)))
+            .center
+            .dy;
+        final box = boxes.firstWhere(
+          (b) => b.top <= caretY && caretY <= b.bottom,
+          orElse: () => boxes.first,
+        );
+        return MatrixUtils.transformRect(
+            editable.getTransformTo(overlayBox), box.toRect());
+      }
+    }
+    return MatrixUtils.transformRect(
+        fieldBox.getTransformTo(overlayBox), Offset.zero & fieldBox.size);
+  }
+
+  RenderEditable? get _renderEditable {
+    // TextField's state exposes its EditableText key through this interface.
+    final Object? state = _fieldKey.currentState;
+    return state is TextSelectionGestureDetectorBuilderDelegate
+        ? state.editableTextKey.currentState?.renderEditable
+        : null;
+  }
+
+  /// Keeps the popover on the link while it scrolls — inside the field (long
+  /// text) or along with any scrollable the field sits in.
+  void _listenForLinkMovement() {
+    final sources = <Listenable>[];
+    final editable = _renderEditable;
+    if (editable != null) sources.add(editable.offset);
+    for (var scrollable = Scrollable.maybeOf(context);
+        scrollable != null;
+        scrollable = Scrollable.maybeOf(scrollable.context)) {
+      sources.add(scrollable.position);
+    }
+    _linkMovement = Listenable.merge(sources)
+      ..addListener(_scheduleReposition);
+  }
+
+  /// After the current frame is laid out, rebuilds the popover if the link
+  /// has moved since the popover was last positioned.
+  void _scheduleReposition() {
+    if (_repositionScheduled) return;
+    _repositionScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _repositionScheduled = false;
+      if (!mounted || _popoverEntry == null) return;
+      if (_linkAnchorRect() != _popoverAnchor) _popoverEntry!.markNeedsBuild();
+    });
   }
 
   // ── View mode ──────────────────────────────────────────────────────────────
@@ -357,114 +429,11 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
     );
   }
 
-  // ── Link tap handling (edit mode) ──────────────────────────────────────────
-
-  void _onEditTapUp(TapUpDetails details) {
-    final offset = _hitTestTextOffset(details.localPosition);
-    if (offset == null) {
-      _hidePopover();
-      return;
-    }
-    final link = _controller.getLinkAtOffset(offset);
-    if (link != null) {
-      _activeLink = link;
-      _showPopover(link, details.localPosition);
-    } else {
-      _hidePopover();
-      _activeLink = null;
-    }
-  }
-
-  /// Converts a tap's local position (relative to the TextField) into a
-  /// character offset using [TextPainter].
-  int? _hitTestTextOffset(Offset localPosition) {
-    final renderBox =
-    _fieldKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return null;
-
-    // Subtract content padding so we measure from the text origin.
-    final padding = _resolvedContentPadding();
-    final adjusted = Offset(
-      (localPosition.dx - padding.left).clamp(0.0, double.infinity),
-      (localPosition.dy - padding.top).clamp(0.0, double.infinity),
-    );
-
-    final painter = _buildPainter(renderBox.size.width - padding.horizontal);
-    final position = painter.getPositionForOffset(adjusted);
-    painter.dispose();
-    return position.offset;
-  }
-
   // ── Popover ────────────────────────────────────────────────────────────────
 
-  void _showPopover(
-      ({String url, int start, int end}) link,
-      Offset localTapPosition,
-      ) {
-    _hidePopover();
-
-    final renderBox =
-    _fieldKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-
-    final globalFieldOrigin = renderBox.localToGlobal(Offset.zero);
-    final padding = _resolvedContentPadding();
-    final painter =
-    _buildPainter(renderBox.size.width - padding.horizontal);
-
-    // Get the bounding boxes for the link's character range.
-    final boxes = painter.getBoxesForSelection(
-      TextSelection(baseOffset: link.start, extentOffset: link.end),
-    );
-    painter.dispose();
-
-    Offset popoverGlobal;
-    if (boxes.isNotEmpty) {
-      final box = boxes.first;
-      popoverGlobal = Offset(
-        globalFieldOrigin.dx + padding.left + box.left,
-        globalFieldOrigin.dy + padding.top + box.bottom + 4,
-      );
-    } else {
-      // Fallback: just below the field.
-      popoverGlobal = Offset(
-        globalFieldOrigin.dx + padding.left,
-        globalFieldOrigin.dy + renderBox.size.height + 4,
-      );
-    }
-
-    _popoverEntry = OverlayEntry(builder: (ctx) {
-      return _PopoverPositioner(
-        position: popoverGlobal,
-        onDismiss: _hidePopover,
-        child: LinkPopover(
-          url: link.url,
-          mode: LinkPopoverMode.edit,
-          onOpen: () {
-            _hidePopover();
-            _openLink(link.url);
-          },
-          onEdit: () {
-            _hidePopover();
-            _showLinkEditDialog(
-              initialText:
-              _controller.text.substring(link.start, link.end),
-              initialUrl: link.url,
-              offset: link.start,
-            );
-          },
-          onRemove: () {
-            _hidePopover();
-            _controller.removeLink(link.start);
-          },
-        ),
-      );
-    });
-
-    Overlay.of(context).insert(_popoverEntry!);
-  }
-
   void _hidePopover() {
+    _linkMovement?.removeListener(_scheduleReposition);
+    _linkMovement = null;
     _popoverEntry?.remove();
     _popoverEntry = null;
   }
@@ -510,43 +479,23 @@ class _RichTextEditorWidgetState extends State<RichTextEditorWidget> {
     }
   }
 
-  // ── TextPainter helpers ────────────────────────────────────────────────────
-
-  TextPainter _buildPainter(double maxWidth) {
-    final painter = TextPainter(
-      text: _controller.buildTextSpan(
-        context: context,
-        style: widget.style,
-        withComposing: false,
-      ),
-      textDirection: TextDirection.ltr,
-      maxLines: widget.maxLines,
-    )..layout(maxWidth: maxWidth.clamp(0.0, double.infinity));
-    return painter;
-  }
-
-  EdgeInsets _resolvedContentPadding() {
-    final cp = widget.decoration?.contentPadding;
-    if (cp == null) {
-      // Match Flutter's default TextField padding.
-      return const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
-    }
-    return cp.resolve(Directionality.of(context));
-  }
 }
 
 // ── Popover positioner ────────────────────────────────────────────────────────
 
-/// Positions the [child] popover at [position] in global coordinates.
+/// Lays the [child] popover out next to [anchor] (the link, in overlay
+/// coordinates) while keeping it fully inside the overlay minus [insets].
 /// Tapping outside the popover calls [onDismiss].
 class _PopoverPositioner extends StatelessWidget {
   const _PopoverPositioner({
-    required this.position,
+    required this.anchor,
+    required this.insets,
     required this.child,
     required this.onDismiss,
   });
 
-  final Offset position;
+  final Rect anchor;
+  final EdgeInsets insets;
   final Widget child;
   final VoidCallback onDismiss;
 
@@ -562,16 +511,62 @@ class _PopoverPositioner extends StatelessWidget {
             onTap: onDismiss,
           ),
         ),
-        // The actual popover card.
-        Positioned(
-          left: position.dx,
-          top: position.dy,
-          child: child,
+        // The actual popover card. Taps that miss it fall through to the
+        // barrier.
+        Positioned.fill(
+          child: CustomSingleChildLayout(
+            delegate: _PopoverLayoutDelegate(anchor: anchor, insets: insets),
+            child: child,
+          ),
         ),
       ],
     );
   }
 }
+
+/// Places the popover just below the link with their left edges aligned,
+/// flips it above the link when there's more room there, then shifts it as
+/// little as needed to keep every button on screen.
+class _PopoverLayoutDelegate extends SingleChildLayoutDelegate {
+  _PopoverLayoutDelegate({required this.anchor, required this.insets});
+
+  final Rect anchor;
+  final EdgeInsets insets;
+
+  static const double _gap = 4;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    // Never wider than the visible area; the URL chip shrinks to fit.
+    return constraints.loosen().copyWith(
+      maxWidth: math.max(0.0, constraints.maxWidth - insets.horizontal),
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final bounds = insets.deflateRect(Offset.zero & size);
+    final roomBelow = bounds.bottom - anchor.bottom - _gap;
+    final roomAbove = anchor.top - _gap - bounds.top;
+    final top = roomBelow >= childSize.height || roomBelow >= roomAbove
+        ? anchor.bottom + _gap
+        : anchor.top - _gap - childSize.height;
+    return Offset(
+      _clampInto(anchor.left, bounds.left, bounds.right - childSize.width),
+      _clampInto(top, bounds.top, bounds.bottom - childSize.height),
+    );
+  }
+
+  // Like num.clamp, but pins to [min] rather than throwing when the popover
+  // is bigger than the space (max < min).
+  static double _clampInto(double value, double min, double max) =>
+      math.max(min, math.min(value, max));
+
+  @override
+  bool shouldRelayout(_PopoverLayoutDelegate old) =>
+      anchor != old.anchor || insets != old.insets;
+}
+
 class _LinkEditDialog extends StatefulWidget {
   final String initialText;
   final String initialUrl;

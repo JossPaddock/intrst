@@ -1,0 +1,8 @@
+create patrol tests for the following scenarios
+
+D. Full zoom sweep — logic scenario
+
+13. monotonic label growth across zoom 3→21 — for a fixed marker set, the labelled set never shrinks as zoom increases. One check catches any bad row in the hand-tuned visualProximityThreshold table, which is otherwise only spot-checked at the unit level.
+14. zoom sweep is stateless — running the sweep twice yields identical results, and running it backwards yields the mirrored sequence. Extends the existing round-trip guard to the whole range.
+
+Make sure to update the docs and ensure tests appear in admin dashboard

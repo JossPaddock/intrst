@@ -273,9 +273,16 @@ class FirebaseUsersUtility {
   }
 
   FirebaseMappers fm = FirebaseMappers();
+  /// Creates the Firestore profile document for a freshly created account.
+  ///
+  /// [firstRunExperienceComplete] is true when the caller has already placed
+  /// the user's marker — the sign-up wizard collects a location as its third
+  /// part, so those accounts must not be sent back through the in-app
+  /// location onboarding screen afterwards.
   Future<void> addUserToFirestore(CollectionReference users, String userUid,
       String firstName, String lastName, GeoPoint geoPoint,
-      DateTime birthday) async {
+      DateTime birthday,
+      {bool firstRunExperienceComplete = false}) async {
     Map<String, dynamic> userData = {
       'user_uid': userUid,
       'first_name': firstName,
@@ -287,7 +294,7 @@ class FirebaseUsersUtility {
       'friends_uids': [],
       'unread_notifications': [],
       'unread_notifications_count': <String, int>{},
-      'first_run_experience': false,
+      'first_run_experience': firstRunExperienceComplete,
       feedSettingsField: _defaultFeedSettings(),
       'profile_statistics': {
         'longest_app_usage_streak': 0,

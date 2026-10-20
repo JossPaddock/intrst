@@ -44,8 +44,19 @@ elements from the app root (pruning its own PiP chrome) and taps them by
 dispatching genuine pointer events through `GestureBinding`, exactly as a finger
 would. It reaches the running app through a small [`QaAppHarness`](../../lib/qa/e2e/qa_app_harness.dart)
 that `_MyHomePageState` implements and registers (web + debug only), so it can
-sign in, open a `Preview`, or open a conversation via the app's own code paths.
-No test framework is pulled into the app.
+sign in, open a `Preview`, open a conversation, open the sign-up wizard, or
+drive the map via the app's own code paths. No test framework is pulled into the
+app.
+
+The map is the one surface the element walk cannot see at all: a `GoogleMap` is a
+**platform view**, so its markers are neither in the element tree nor tappable.
+The harness therefore also exposes the map's own state and controls —
+`visibleMarkerIds()`, `currentMapZoom` / `initialMapZoom` / `rememberedCameraZoom()`,
+`applyMapZoom`, `reloadMarkers`, `enterSearch` / `clearSearch`,
+`setRelationshipFilters` and `openPreviewForMarkerId` — each delegating to the
+production path (`_onCameraMove`, `loadMarkers`, the real search controller, the
+real filter-chip handler, `handleMarkerTap`). A live map scenario asserts on the
+marker ids the app actually handed Google Maps.
 
 The consequence worth knowing: **the dashboard is for watching and debugging a
 scenario; `flutter test` is the source of truth for whether it passes.** Both
@@ -119,15 +130,21 @@ Because it drives the real app, the live run seeds the **live** backend
 (`intrst-1525412155568`). Everything it writes lives under the reserved
 `qa_e2e_*` id namespace, and cleanup deletes only the exact documents it created
 (see [`qa_seed.dart`](../../lib/qa/e2e/qa_seed.dart)) — never a query-and-delete —
-so it cannot touch real data. Two of the scenarios open the `Preview` by invoking
-the app's real `handleMarkerTap` in code, since a Google Maps marker (a platform
-view) can't be tapped; everything the Preview then does is real.
+so it cannot touch real data. The scenarios that open a `Preview` do so by
+invoking the app's real `handleMarkerTap` in code, since a Google Maps marker (a
+platform view) can't be tapped; everything the Preview then does is real. The
+live map scenarios seed their fixture user at a deliberately remote point in the
+South Atlantic, so its marker is isolated from every real user and its label is
+decided by the zoom rather than by whoever happens to live nearby.
 
 Scenarios that assert on logic rather than UI (the `MessageBlockPolicy` checks)
 are marked *"logic check — nothing to watch"*. There is nothing to drive, so
 their ▶ **runs them in place in the dashboard** — no PiP, no leaving the tab —
 and reports the result on the tile (and a brief snackbar). Only scenarios that
-actually drive the app (▶ / 🐞) open the PiP. A scenario that needs a session it
+actually drive the app (▶ / 🐞) open the PiP. A widget scenario that has no live
+definition is marked *"widget test — runs under `flutter test` only"* and fails
+with an explanatory step if run here, rather than being evaluated against the
+wrong widget tree. A scenario that needs a session it
 can't get (no one signed in and no test credentials) fails gracefully with an
 explanatory step rather than hanging.
 
@@ -137,8 +154,11 @@ explanatory step rather than hanging.
 |-----------|------|-----------|---------------|
 | 2 widget + 6 logic | Messaging / blocking | [`blocking_scenarios.dart`](../../lib/qa/scenarios/blocking_scenarios.dart) | [`test/blocking_messages_patrol_test.dart`](../../test/blocking_messages_patrol_test.dart) |
 | 2 widget | Map / preview | [`marker_preview_scenarios.dart`](../../lib/qa/scenarios/marker_preview_scenarios.dart) | [`test/marker_opens_preview_patrol_test.dart`](../../test/marker_opens_preview_patrol_test.dart) |
-| 8 logic | Map / marker labels by zoom | [`marker_visibility_scenarios.dart`](../../lib/qa/scenarios/marker_visibility_scenarios.dart) | [`test/marker_visibility_scenarios_patrol_test.dart`](../../test/marker_visibility_scenarios_patrol_test.dart) |
+| 6 live (logic headless) | Map / live search, relationship filters, label tap, camera zoom, IP placement | [`live_map_scenarios.dart`](../../lib/qa/scenarios/live_map_scenarios.dart) | [`test/live_map_patrol_test.dart`](../../test/live_map_patrol_test.dart) |
+| 21 logic | Map / marker labels, search + relationship filtering, POI/label invariants | [`marker_visibility_scenarios.dart`](../../lib/qa/scenarios/marker_visibility_scenarios.dart) | [`test/marker_visibility_scenarios_patrol_test.dart`](../../test/marker_visibility_scenarios_patrol_test.dart) |
 | 1 widget | Logged-out preview → login | [`preview_login_scenarios.dart`](../../lib/qa/scenarios/preview_login_scenarios.dart) | [`test/widgets/preview_logged_out_login_test.dart`](../../test/widgets/preview_logged_out_login_test.dart) |
+| 7 widget + live | Messaging / message editing | [`message_edit_scenarios.dart`](../../lib/qa/scenarios/message_edit_scenarios.dart) | [`test/message_edit_patrol_test.dart`](../../test/message_edit_patrol_test.dart) |
+| 7 widget + live + 3 logic | Sign-up wizard / profile, interest, progress, submission | [`signup_wizard_scenarios.dart`](../../lib/qa/scenarios/signup_wizard_scenarios.dart) | [`test/signup_wizard_patrol_test.dart`](../../test/signup_wizard_patrol_test.dart) |
 
 ---
 
@@ -180,14 +200,117 @@ driving a real `google_maps` `Marker` and the real `Preview` widget. A
 `GoogleMap` platform view cannot render in a widget test, so a proxy button
 invokes the marker's own `onTap`.
 
+Both branches now open the **same** Preview dialog; what differs is the action
+row, because `onMoveMarker` is passed only for your own marker (and `Preview`
+drops the social actions when `uid == alternateUid`). "All interests" is the
+Preview's wording for the list-every-interest action and appears in both.
+
 | Scenario | What it verifies |
 |----------|------------------|
-| `tapping another user's marker opens the Preview for that user` | The Preview dialog opens showing the tapped person. |
-| `tapping your own marker does not open a Preview` | The end drawer opens instead; no Preview appears. |
+| `tapping another user's marker opens their Preview with Chat` | Their Preview opens showing their name, **Chat** and **All interests** — no **Move marker**. |
+| `tapping your own marker opens your Preview with Move marker` | Your own Preview opens showing **Move marker** and **All interests** — no **Chat**. |
+
+## `live_map_scenarios.dart`
+
+The map's marker pipeline **driven through the real running app**. Every other
+marker test asserts at the [`MarkerVisibility`](../../lib/main/marker_visibility.dart)
+layer, where the inputs are hand-built sets; these close the loop — they seed a
+real user, let the real app load it, then drive the real search field, the real
+relationship filters and the real `_onCameraMove`, and assert on the marker ids
+the app actually handed the map (`QaAppHarness.visibleMarkerIds()`).
+
+Each scenario also carries a **headless `body`** that pins the same rule at the
+pure-logic layer, so `flutter test` — the source of truth — still gates on it
+with no app, no Firebase and no network. In the dashboard they run as live
+scenarios (▶ drives the app, PiP and all).
+
+Marker sets are compared **as people, not as raw ids**, wherever the comparison
+spans a filter change: narrowing the map also re-decides which survivors are
+isolated enough to be labelled, so `uid` legitimately becomes `uid_label` on the
+way. Comparisons within one filter state (search → clear, filter on → off) are
+exact id comparisons.
+
+### Suite — `Chat bubble (editing)`
+
+Mounts the production [`ChatBubble`](../../lib/widgets/ChatBubble.dart) the way
+[`ChatScreen`](../../lib/widgets/ChatScreen.dart) renders one message. Whether a
+bubble is *given* an `onEdit` callback is decided by
+[`MessageEditPolicy`](../../lib/utility/MessageEditPolicy.dart) — covered in
+[`unit-tests.md`](./unit-tests.md); these scenarios pin what the user sees.
+
+Each also carries a **live** definition: it seeds a `qa_e2e_*` 1:1 conversation
+holding one message stamped with the current time (so it is inside the edit
+window), opens the real chat via `openConversationWith`, and deletes exactly what
+it seeded afterwards.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `your own editable message offers the pencil` | A sender-side bubble inside the edit window renders the edit button — the only entry point to editing. Live: the pencil appears on a real message the signed-in user just sent. |
+| `a received message never offers the pencil` | A bubble with `isSender: false` renders **no** edit button even when an `onEdit` callback is passed, so a wiring mistake in `ChatScreen` still cannot surface an edit affordance on someone else's message. Live: seeds the message as the *other* user. |
+| `an edited message is marked "(edited)" for everyone` | An edited message carries the `(edited)` marker on the **receiving** side too, so text cannot be changed silently after it has been read. Live: performs a real edit end to end, then asserts the new text is shown, the old text is gone, and the marker appeared — the proof `edited_at` is written and read back. |
+| `an unedited message shows no marker` | The negative half of the marker contract. Asserts the message **is** on screen before asserting the marker is not, so an empty screen cannot satisfy it by default. |
+
+### Suite — `Edit message dialog`
+
+Drives the production [`EditMessageDialog`](../../lib/widgets/EditMessageDialog.dart).
+Headless, a host records what the dialog resolves to (the value
+`FirebaseMessagesUtility.editMessage` writes verbatim); live, the dialog is
+opened from the pencil on a real seeded message and the assertion is made
+against the conversation itself.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `saves a real change and returns the trimmed text` | Replacing the text with a padded new message and pressing **Save** yields the **trimmed** text, so the stored message matches what the dialog previewed. Live, the assertion is an exact-text match on the conversation, which an untrimmed write would not satisfy. |
+| `cancelling leaves the message alone` | Changing the text then pressing **Cancel** writes nothing — Cancel is a true escape hatch. Live: the original message still stands, without the typed text and without an `(edited)` marker. |
+| `Save does nothing until the message actually changes` | Save is inert for an untouched message, for one that differs only in spacing, and for an emptied field (deleting is not what this feature offers); the dialog stays open in each case, and a genuine change saves and closes. |
+
+### Suite — `Live map — search`
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `searching narrows the visible marker set on the real map` | Typing the fixture's name into the **real** search field leaves strictly fewer people on the map, all of whom were already on it, including the person searched for. This is the only coverage that the real autocomplete → Firestore search → `_onCameraMove` chain actually reaches `buildVisibleMarkers`. |
+| `clearing the search restores the full marker set` | Emptying the field restores **exactly** the previous marker ids — the state users hit constantly. Guards the separate "search cleared" branch of the production `optionsBuilder`, where a stale result list surviving the clear would leave the map permanently narrowed behind an empty search box. |
+
+### Suite — `Live map — relationship filters`
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `toggling the Friends filter updates the markers live and flips back` | Flipping **Friends** on narrows the map to the allow-set (the seeded non-friend disappears); flipping it off restores exactly the previous set. The logic suites pin the tri-state `null` / populated / empty contract; this pins that the real chip handler (`_onMarkerFilterChanged`) moves between those states and back. Signs in first — the filter is meaningless signed out. |
+
+### Suite — `Live map — marker tap`
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `a label-rendered marker opens the Preview for the user behind it` | At a zoom where the fixture is drawn as its name label, handing the app the **`<uid>_label` id** — the id it actually put on the map — opens that user's real `Preview` with their name on it. |
+
+Above `minLabelZoom` the label is the marker on top, so at any useful zoom the
+label is what a user taps. Pass the raw `<uid>_label` through as a uid and the
+Preview queries a user that does not exist: a blank dialog for the marker people
+tap the most. The existing `marker_preview_scenarios.dart` pair only covers the
+bare-uid path, so nothing else pinned `uidFromLabelMarkerId` being applied at the
+tap.
+
+### Suite — `Live map — camera and zoom`
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `the restored camera zoom produces the same markers as zooming to it by hand` | The zoom [`MapCameraMemory`](../../lib/main/map_camera_memory.dart) restores builds the same marker set as pinching to it: apply it, detour to the world view, come back, compare. Also that the restored zoom survives a `MapCameraSnapshot.create` round-trip unchanged — i.e. it is already inside the clamp range it is about to be re-persisted into. |
+| `an IP-estimated placement lands at a zoom where its own marker is labelled` | The zoom [`MapZoom.forRadius`](../../lib/main/map_zoom.dart) picks for an IP estimate leaves the estimated marker **named**: both `<uid>` and `<uid>_label` reach the map, and the zoom is at or above `minLabelZoom`. |
+
+These two are the crossovers nothing else covers. `map_camera_memory.dart`
+decides *where* the map opens and `marker_visibility.dart` decides *what is on
+it*; the only thing tying them together is the zoom handed across, so a
+restoration that produced a zoom the marker pipeline treats differently would
+reopen the app to a map that looks nothing like the one the user left.
+`MapZoom.forRadius` likewise knows nothing about `MarkerVisibility`: it is
+derived from the uncertainty radius alone and could legitimately return a zoom
+below the label gate — leaving someone who declined location sharing looking at
+an anonymous dot they are supposed to recognise as themselves and drag.
 
 ## `marker_visibility_scenarios.dart`
 
-Logic-only coverage of how zoom drives name labels, asserting on
+Logic-only coverage of which markers reach the map and which of them are
+labelled, asserting on
 [`MarkerVisibility`](../../lib/main/marker_visibility.dart) — the pure marker
 selection extracted out of `_onCameraMove`. There is nothing on screen to watch;
 the scenarios still run and report in the dashboard like any other.
@@ -243,6 +366,130 @@ trip back and these fail. The same sweeps run at unit granularity in
 [`marker_visibility_unit_tests.dart`](../../lib/qa/unit/marker_visibility_unit_tests.dart);
 see [`unit-tests.md`](./unit-tests.md).
 
+### Suite — `Marker search filtering`
+
+The search branch of `buildVisibleMarkers`, which the zoom suites never reach. An
+active search term narrows the map to `searchFilteredResults`, **suppresses the
+relationship filter**, and narrows the input to the label proximity computation
+so labels are recomputed against what is actually on screen. Every scenario runs
+in both marker behaviours.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `search hides every non-matching marker` | With `searchFilteredResults: ['a']`, only **a** is on the map; `b` and `c` and their labels are gone. |
+| `search suppresses the relationship filter` | A relationship filter of `{'b'}` does not intersect with the search — **a** still shows and **b** does not. Search wins outright, deliberately. |
+| `an empty search term ignores a stale result list` | Clearing the search box restores every marker even while the previous result list is still in state. |
+| `a search that matches nobody yields an empty marker set` | A non-empty term with zero results empties the map instead of falling back to showing everyone. |
+| `labels are recomputed against the filtered set` | Filtering away a crowded neighbour lets the survivor gain its name label, because label spacing is computed over the visible markers only. |
+
+The last two guard the same trap from opposite sides: `markersToShowAsLabels`
+treats an empty `filteredUids` as "no filter, use every marker", and that reading
+must never leak into the visibility check — a search matching nobody would then
+show *everybody*.
+
+### Suite — `Marker relationship filtering`
+
+The relationship branch, reached whenever the search box is empty. The filter is
+**tri-state**, not a boolean — `_relationshipFilterUids()`
+([`home_map_logic.dart:101`](../../lib/main/home_map_logic.dart)) returns `null`
+when no friends/followers/following toggle is on, and otherwise a set that may
+well be empty. Each scenario runs in both marker behaviours.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `the relationship filter shows only the allowed uids` | `relationshipUids: {'a', 'c'}` leaves **a** and **c** on the map and drops **b**, dot and label alike. |
+| `a null relationship filter shows everyone` | `null` — no toggle on — means no filtering at all: a, b and c all show. This is the map's default state. |
+| `an empty relationship set hides every marker` | A toggle that resolves to zero uids empties the map. Distinct from `null`: it must **not** collapse back onto "show everyone". |
+
+The `null` and empty cases are the pair worth holding apart. Merging them — as a
+"simplify the nullable away" refactor naturally would — either blanks the default
+map or inverts a filter that matches nobody into one that shows everybody, and
+both failures look plausible on screen.
+
+### Suite — `Marker POI/label invariants`
+
+The structural rules the marker set has to satisfy at **every** zoom, rather than
+which markers appear at a chosen one. Each scenario walks a full **1.0 → 21.0
+sweep in half-zoom steps** (41 builds), so a rule cannot hold at the zooms the
+other suites sample and break in between. These are the properties the two marker
+behaviours are *defined* by, and none of them was asserted anywhere before.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `layered mode always keeps a POI dot under every label` | For every `x_label` in the result, `x` is in it too — at all 41 zooms. This is what "layered" means, and it is the defining difference from the original mode. |
+| `original mode never emits both forms of the same uid` | `x` and `x_label` are mutually exclusive at all 41 zooms — the label branch and the POI branch are guarded by complementary predicates over `showAsLabels`. |
+| `no label is emitted without a POI marker behind it` | A stale `ghost_label` with no POI marker never reaches the map — across both modes, all 41 zooms, and four filter configurations including **search + relationship combined** (328 marker sets). |
+| `the 1000 km isolation rule labels below the zoom gate` | `markersToShowAsLabels` labels a 1056 km-isolated pair at zoom **1.5**, below `minLabelZoom`; a 890 km pair at the same zoom labels nothing. |
+| `buildVisibleMarkers still withholds those labels below zoom 2.0` | End to end the gate wins: the same 1056 km pair renders as two bare dots at zoom 1.5 in both modes, even though `showAsLabels` picked both. |
+
+The first two are exact mirror images, and running both is the point: layered mode
+must emit `x` *and* `x_label`, original mode must emit exactly one of them. Each is
+also guarded against passing vacuously — the sweep must actually produce a label
+(and, in original mode, a bare dot) somewhere along the way.
+
+The `ghost_label` case is worth its filter matrix because orphan suppression is
+**implicit**: the label branch is filtered by `visible(uid)`, which knows about
+the search and relationship sets and nothing about which uids have POI markers.
+Labels stay tied to dots only because `showAsLabels` is computed from
+`poiMarkers`. An orphan label is a name floating over empty map with no tap
+target — and under a relationship filter, a name the user explicitly filtered
+away.
+
+#### The two halves of the 1000 km rule
+
+`alwaysLabelDistance` (`marker_visibility.dart:120`) is the only selection rule
+with no zoom term at all:
+
+```dart
+if (minDistanceToAnyMarker > alwaysLabelDistance) {
+  showAsLabels.add(markerPositions[i].key);
+} else if (currentZoom >= minLabelZoom && minDistanceToAnyMarker >= proximityThreshold) {
+```
+
+so it reads as "always label, whatever the zoom" — and at the
+`markersToShowAsLabels` layer it is. **End to end it is not.** `buildVisibleMarkers`
+gates both of its branches on `zoom >= minLabelZoom`, so below zoom 2.0 the
+isolation rule's result is computed and then discarded. The two scenarios pin one
+layer each, which is what makes the interaction visible instead of something the
+next person rediscovers.
+
+The fixture is 9.5° of latitude (**1056 km**) rather than something larger on
+purpose: `markersToShowAsLabels` skips any pair more than 10° apart before
+measuring, leaving `minDistanceToAnyMarker` at `infinity`, which satisfies the
+1000 km test trivially. Staying inside the window makes the branch fire on a real
+measured distance. The 890 km control — over the sub-zoom-3 proximity threshold of
+701 km, under the isolation rule — is what stops a build that ignored zoom
+entirely from passing.
+
+If the product intent is that a genuinely isolated marker *should* be named at
+world zoom, the second scenario is the one that will fail when that is fixed, and
+it should be updated rather than deleted.
+
+### Suite — `Marker move mode`
+
+The `soloUid` branch. Tapping your own marker opens **your** preview, whose
+`Move marker` button puts the map into move mode: `_enterMarkerMoveMode`
+([`home_ui_logic.dart`](../../lib/main/home_ui_logic.dart)) makes your POI
+draggable and `_onCameraMove` then passes `soloUid: _uid`, which short-circuits
+`buildVisibleMarkers` to your dot alone. Everything else — other users' dots,
+every name label including your own, the search term, the relationship filters —
+is suppressed, so the only things on screen are the dot you are dragging and the
+`Done` button that leaves the mode. Each scenario runs in both marker
+behaviours.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `move mode shows the moving user's POI dot and nothing else` | `soloUid: 'b'` at a zoom where all three markers would normally be labelled yields exactly `{b}` — no other uid, and not even `b_label`. |
+| `move mode overrides the search term and the relationship filters` | A search term and an allow-set that between them exclude `b` still yield `{b}`: you can always see the marker you are moving. |
+| `leaving move mode restores the full marker set` | `soloUid: null` before and after produce the same ids, while the build in between differs — so the round trip cannot pass vacuously. |
+
+The suppression of your **own label** is deliberate, not an oversight: the label
+marker is not draggable and sits directly over the POI dot, so leaving it up
+would swallow the drag gesture on web. The override scenario guards the opposite
+mistake — a refactor that ran move mode through the normal filter chain instead
+of ahead of it would let a stale search term hide the very marker the user is
+trying to reposition, leaving an empty map with a `Done` button on it.
+
 ## `preview_login_scenarios.dart`
 
 | Scenario | What it verifies |
@@ -250,6 +497,90 @@ see [`unit-tests.md`](./unit-tests.md).
 | `selecting an interest routes an unauthenticated visitor to the login/sign-up page` | A logged-out visitor tapping a link-free interest is routed to slot 1 (login/sign-up) and the preview is dismissed. |
 
 ---
+
+## `signup_wizard_scenarios.dart`
+
+Covers the **multi-part sign-up wizard** ([`lib/login/signup/`](../../lib/login/signup)) —
+the three screens a new user walks through after entering an email and password:
+name and age, a first interest, and where their marker goes.
+
+The ordering is what these scenarios are really protecting. The wizard runs
+**before** the Firebase Auth account is created, so a gate that fails open here
+produces a real account that should never have existed; and the whole point of
+collecting an interest and a location up front is that the user reaches the map
+with a populated list and a placed marker, with nothing deferred to a later
+screen. The rules themselves are asserted in
+[`unit-tests.md`](./unit-tests.md#suite--signup-wizard-validation); these
+scenarios prove the screens honour them.
+
+The location part is not mounted here: its map is a `GoogleMap` platform view,
+which a widget test cannot render or interact with. Its placement logic is
+covered at the unit level instead (`SignupLocationDraft`, and the declined-location
+`IpLocationLookup`/`MapZoom` tests it reuses).
+
+### Live runs
+
+Every screen scenario also carries live hooks, so the dashboard walks the real
+wizard rather than reporting "cannot run in the app". `liveSetUp` calls
+[`QaAppHarness.openSignupWizard`](../../lib/qa/e2e/qa_app_harness.dart), which
+pushes the production `SignupWizard` directly — the wizard normally opens from
+`FlutterLogin`'s sign-up submit, and driving that third-party form live would be
+asserting on someone else's widget internals.
+
+**Account creation is disabled for the live wizard**: the `onSubmit` the harness
+passes always refuses, so a dashboard run against prod can walk all three parts,
+and even press "Create my account", without ever creating an account. That is
+also why the live assertions are phrased as *did the flow advance* — there is no
+captured draft to inspect, so "still on Step 1 of 3" is how a rejected part is
+verified, exactly as the user would see it. The write itself is covered by the
+`Signup submission` scenarios below. `liveTearDown` calls `resetToBaseline`,
+which pops the pushed wizard so the next scenario starts from the map.
+
+### Suite — `Signup wizard (about you)`
+
+Mounts the production [`SignupStepProfile`](../../lib/login/signup/signup_step_profile.dart)
+and records the draft it hands forward.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `refuses an underage sign-up before any account is created` | A birthday 12 years ago raises the **Age Restriction** dialog and the step hands nothing forward — so the flow cannot reach account creation. The date is computed relative to today, so the scenario never expires. |
+| `requires a first and last name` | Continuing with both name fields empty shows both field errors and does not advance. |
+| `carries a valid profile forward and shows the age it read` | A complete, old-enough profile advances with its name intact, and the field's helper text reports the age the app calculated — the user's only way to confirm they typed the date they meant. |
+
+### Suite — `Signup wizard (your interest)`
+
+Mounts the production [`SignupStepInterest`](../../lib/login/signup/signup_step_interest.dart).
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `shows the inspiration prompt` | The exact prompt the part is built around ("What has inspired you lately…") is on screen. |
+| `requires the interest to be named` | A description with no name shows the field error and does not advance — a nameless interest would be an unlabelled card in the user's list. |
+| `carries the name and description forward` | Both fields reach the next part, so the account is created with the interest the user actually typed. |
+
+### Suite — `Signup wizard (progress)`
+
+Mounts the production [`SignupProgressHeader`](../../lib/login/signup/signup_progress_header.dart).
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `names the current part and how many are left` | On part two the header reads **Step 2 of 3** and every part is labelled, so the header can never disagree with the number of screens the flow actually has. |
+
+### Suite — `Signup submission`
+
+Logic-only (no `build`): drives
+[`SignupSubmission`](../../lib/login/signup/signup_submission.dart) directly
+against a `FakeFirebaseFirestore` and a recording `FirebaseUsersUtility`.
+`addInterestForUser` and the activity-feed write behind it resolve
+`FirebaseFirestore.instance` internally and cannot be pointed at a fake, so the
+interest write is verified by recording what the submission *asks* the utility to
+write, while the profile document is written for real into the in-memory
+Firestore.
+
+| Scenario | What it verifies |
+|----------|------------------|
+| `writes a complete profile with the marker already placed` | The profile document carries the name from part one, the marker sits at the coordinates part three chose, and `first_run_experience` is already `true` — so the in-app location onboarding screen does not run again for an account that just placed its marker. |
+| `seeds the interest from part two` | Exactly one interest is written, with the name and description the user typed, and it is the same interest handed back to the caller. |
+| `a retry does not create a second profile document` | Replaying the submission — what the wizard's "try again" does after a non-fatal failure — reuses the existing profile instead of duplicating it. `addUserToFirestore` uses `add()`, so this guard lives in `SignupSubmission`. |
 
 ## Adding a new scenario
 
@@ -289,6 +620,13 @@ Omit `build` for a logic-only scenario. To assert on state captured during a run
 define the scenario in a small class whose `build` resets that state — see
 `preview_login_scenarios.dart`.
 
+> **A scenario with a `build` needs live hooks to appear in the app.** `build` is
+> mounted only by the `flutter test` bridge; the dashboard has no tree to mount
+> it into. Running such a scenario there fails with an explanatory step rather
+> than evaluating its `body` — which would assert against the *real app's* tree
+> and let any absence-only check pass vacuously. Add `liveBody` (below) to give
+> it a live definition, or expect it to be **`flutter test`-only**.
+
 ### Making a scenario runnable against the live app
 
 `build`/`body` are the CI source of truth and always run under `flutter test`.
@@ -314,13 +652,51 @@ Share one [`QaSeeder`](../../lib/qa/e2e/qa_seed.dart) across a scenario's
 `liveSetUp`/`liveTearDown` (hold it in a small class, like the `_…Live` holders
 in the scenario files) so cleanup can delete exactly what setup created. The
 [`QaAppHarness`](../../lib/qa/e2e/qa_app_harness.dart) methods
-(`signInTestUser`, `openPreviewFor`, `openConversationWith`, `goHome`, …) each
-delegate to a real app code path. A scenario with no `liveBody` still appears in
-the dashboard and runs its `body` (used for the logic-only checks).
+(`signInTestUser`, `openPreviewFor`, `openConversationWith`, `goHome`,
+`openSignupWizard`, and the
+map surface: `visibleMarkerIds`, `applyMapZoom`, `reloadMarkers`, `enterSearch`,
+`clearSearch`, `setRelationshipFilters`, `openPreviewForMarkerId`,
+`rememberedCameraZoom`, …) each delegate to a real app code path. `QaSeeder` also
+offers `seedMessage`, which drops one message into a seeded conversation (stamped
+now by default, so it lands inside `MessageEditPolicy.editWindow`).
+
+A **logic-only** scenario — no `build`, no `liveBody` — still appears in the
+dashboard and runs its `body` in place. A scenario that has a `build` but no
+`liveBody` is `flutter test`-only and is reported as such (see the note above).
 
 `phase` maps onto the existing [`phase()`](../../test/support/test_phase.dart)
 helper under `flutter test`, so `tool/test_report.dart` still prints the phase
 breakdown for failures, and onto a bold heading in the dashboard's step log.
+
+### What a run logs
+
+Both runners keep a step trail, so a scenario that breaks says *which step* broke
+without anyone re-reading the scenario source.
+
+**Headless (`flutter test`).** Every `QaDriver` call the bridge makes prints one
+line before it runs — `STEP › tap text "Login"` — and prints `STEP ✗ …` if it
+throws. `tool/test_report.dart` (and therefore `./scripts/run_tests.sh`) replays
+those lines under a failing test, marking phases with `▸`, steps with `·` and the
+step that failed with `❌`, followed by the usual error and stack:
+
+```
+Test blocking a blocked user cannot send a message failed ❌
+    ▸ PHASE › open the conversation
+    · STEP › tap text "Messages"
+    · STEP › expect a TextField widget to be visible
+    ❌ STEP ✗ expect a TextField widget to be visible
+      ══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞═══════════════════
+      Expected: at least one matching candidate
+        Actual: _TextWidgetFinder:<Found 0 widgets ...>
+```
+
+Passing tests print nothing — the reporter only surfaces captured output for
+failures — so a green run stays as quiet as it was before.
+
+**Live (dashboard).** Each step is already painted in the PiP overlay; it is now
+also `debugPrint`ed with the shared `[QA]` prefix (as `QaSeeder` does), so the
+browser console holds a copy of the run — including `[QA] FAILED: <step> — <why>`
+— after the overlay is gone.
 
 ## Tests covering the test tooling
 

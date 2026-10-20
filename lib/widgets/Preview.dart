@@ -16,6 +16,7 @@ class Preview extends StatefulWidget {
     required this.signedIn,
     required this.onDrawerOpened,
     required this.onOpenMessages,
+    this.onMoveMarker,
     this.firestore,
   });
   final String uid;
@@ -25,6 +26,10 @@ class Preview extends StatefulWidget {
   final bool signedIn;
   final VoidCallback onDrawerOpened;
   final void Function(String userUid, String userName) onOpenMessages;
+
+  // Supplied only when this preview is the signed-in user's own marker: enters
+  // marker move mode on the map. Null (or signed out) hides the button.
+  final VoidCallback? onMoveMarker;
 
   // Firestore instance backing this dialog. Defaults to
   // [FirebaseFirestore.instance] in production; tests inject a fake so the
@@ -244,6 +249,22 @@ class _InterestAlertDialogState extends State<Preview> {
   // viewing someone else's preview, so the More toggle is gated the same way.
   bool get _hasMoreActions => widget.signedIn && widget.uid != widget.alternateUid;
 
+  /// True when the signed-in user tapped their own marker. Their preview trades
+  /// the social actions (Chat, Follow, Add friend, Block — all no-ops on
+  /// yourself) for "Move marker".
+  bool get _isOwnPreview =>
+      widget.signedIn &&
+      widget.uid.isNotEmpty &&
+      widget.uid == widget.alternateUid;
+
+  void _moveMarkerFromPreview() {
+    final onMoveMarker = widget.onMoveMarker;
+    if (onMoveMarker == null) return;
+    // Close first: move mode hides the map behind this dialog's barrier.
+    Navigator.pop(context);
+    onMoveMarker();
+  }
+
   List<Interest> get _filteredInterests {
     // If viewing own profile, show everything
     if (widget.uid == widget.alternateUid) return _previewInterests;
@@ -313,11 +334,19 @@ class _InterestAlertDialogState extends State<Preview> {
             spacing: 8.0,
             runSpacing: 8.0,
             children: [
-              ElevatedButton.icon(
-                onPressed: _openMessagesFromPreview,
-                icon: const Icon(Icons.chat),
-                label: const Text('Chat', style: TextStyle(fontSize: 12)),
-              ),
+              if (_isOwnPreview && widget.onMoveMarker != null)
+                ElevatedButton.icon(
+                  onPressed: _moveMarkerFromPreview,
+                  icon: const Icon(Icons.open_with),
+                  label: const Text('Move marker',
+                      style: TextStyle(fontSize: 12)),
+                ),
+              if (!_isOwnPreview)
+                ElevatedButton.icon(
+                  onPressed: _openMessagesFromPreview,
+                  icon: const Icon(Icons.chat),
+                  label: const Text('Chat', style: TextStyle(fontSize: 12)),
+                ),
               ElevatedButton.icon(
                 onPressed: _handlePreviewToInterestsWidgetFlow,
                 icon: const Icon(Icons.add),

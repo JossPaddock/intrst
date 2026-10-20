@@ -13,6 +13,10 @@ import 'test_phase.dart' as test_phase;
 /// `scripts/run_tests.sh` and CI execute those same definitions headlessly.
 
 /// Executes a scenario against a real [PatrolTester].
+///
+/// Every action and assertion is logged (see [test_phase.logStep]) so a failing
+/// headless run prints the same step trail the live runner shows on screen —
+/// tool/test_report.dart replays those lines under the failing test.
 class PatrolQaDriver implements QaDriver {
   PatrolQaDriver(this._$);
 
@@ -32,40 +36,62 @@ class PatrolQaDriver implements QaDriver {
 
   @override
   Future<void> tap(QaLocator locator) async {
-    await _$.tester.tap(_finder(locator));
-    await _$.pumpAndSettle();
+    await test_phase.logStep('tap ${locator.description}', () async {
+      await _$.tester.tap(_finder(locator));
+      await _$.pumpAndSettle();
+    });
   }
 
   @override
   Future<void> enterText(QaLocator locator, String text) async {
-    await _$.tester.enterText(_finder(locator), text);
-    await _$.pumpAndSettle();
-  }
-
-  @override
-  Future<void> settle() => _$.pumpAndSettle();
-
-  @override
-  Future<void> expectVisible(QaLocator locator, {int? count}) async {
-    expect(
-      _finder(locator),
-      count == null ? findsAtLeastNWidgets(1) : findsNWidgets(count),
-      reason: 'expected ${locator.description} to be visible',
+    await test_phase.logStep(
+      'enter "$text" into ${locator.description}',
+      () async {
+        await _$.tester.enterText(_finder(locator), text);
+        await _$.pumpAndSettle();
+      },
     );
   }
 
   @override
+  Future<void> settle() => test_phase.logStep(
+        'wait for the UI to settle',
+        () => _$.pumpAndSettle(),
+      );
+
+  @override
+  Future<void> expectVisible(QaLocator locator, {int? count}) async {
+    final label = count == null
+        ? 'expect ${locator.description} to be visible'
+        : 'expect exactly $count of ${locator.description}';
+    await test_phase.logStep(label, () {
+      expect(
+        _finder(locator),
+        count == null ? findsAtLeastNWidgets(1) : findsNWidgets(count),
+        reason: 'expected ${locator.description} to be visible',
+      );
+    });
+  }
+
+  @override
   Future<void> expectAbsent(QaLocator locator) async {
-    expect(
-      _finder(locator),
-      findsNothing,
-      reason: 'expected ${locator.description} not to be present',
+    await test_phase.logStep(
+      'expect ${locator.description} not to be present',
+      () {
+        expect(
+          _finder(locator),
+          findsNothing,
+          reason: 'expected ${locator.description} not to be present',
+        );
+      },
     );
   }
 
   @override
   Future<void> check(String label, bool Function() condition) async {
-    expect(condition(), isTrue, reason: label);
+    await test_phase.logStep(label, () {
+      expect(condition(), isTrue, reason: label);
+    });
   }
 }
 

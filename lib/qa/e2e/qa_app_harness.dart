@@ -36,6 +36,77 @@ abstract class QaAppHarness {
   /// Returns the app to the map/home surface (nav index 0).
   Future<void> goHome();
 
+  /// Opens the **real** multi-part sign-up wizard, using [email] as the address
+  /// the header shows.
+  ///
+  /// The wizard normally opens from `LoginScreen`'s sign-up submit, after the
+  /// user has typed an email and password. Driving `FlutterLogin`'s own form
+  /// live would be asserting on a third-party widget's internals, so this
+  /// mounts the production wizard directly — every screen the scenario then
+  /// walks is the real one.
+  ///
+  /// Account creation is **disabled** for the pushed wizard: its submit
+  /// callback always refuses, so a live run against prod can walk all three
+  /// parts, and even press "Create my account", without ever creating an
+  /// account. Live scenarios therefore cover the parts and the gates between
+  /// them; the write itself is covered by the `Signup submission` scenarios.
+  Future<void> openSignupWizard({String email = 'qa-signup@example.com'});
+
+  // ---------------------------------------------------------------------------
+  // Map surface. A `GoogleMap` is a platform view: its markers cannot be tapped
+  // by the live driver, and nothing about them is visible to an element walk.
+  // These give a live scenario the same view of the map the app itself has —
+  // which markers are on it, at what zoom — and let it drive the map through
+  // the app's own code paths (`_onCameraMove`, `loadMarkers`, the real search
+  // field, the real relationship-filter handler) rather than reaching into
+  // widget state.
+  // ---------------------------------------------------------------------------
+
+  /// The `MarkerId`s currently handed to the map, exactly as the app built
+  /// them — so a label-rendered marker appears here as `<uid>_label`.
+  List<String> visibleMarkerIds();
+
+  /// The zoom the current marker set was built for.
+  double get currentMapZoom;
+
+  /// The zoom the map opened at this launch: the zoom restored from
+  /// [MapCameraMemory], or the default the app fell back to.
+  double get initialMapZoom;
+
+  /// The zoom stored in the app's camera memory — the one a launch right now
+  /// would restore — or null when nothing has been remembered yet.
+  Future<double?> rememberedCameraZoom();
+
+  /// Rebuilds the marker set at [zoom] through the app's real `_onCameraMove`,
+  /// the same call the map makes as the user pinches.
+  Future<void> applyMapZoom(double zoom);
+
+  /// Re-runs the app's real `loadMarkers`, so markers seeded during
+  /// [QaLiveSetUp] reach the map.
+  Future<void> reloadMarkers();
+
+  /// Puts [term] in the **real** search field, which drives the production
+  /// autocomplete → Firestore search → `_onCameraMove` chain. Resolves once the
+  /// app has applied the term (or throws [QaHarnessUnavailable] on timeout).
+  Future<void> enterSearch(String term);
+
+  /// Empties the real search field, taking the app's own "search cleared" path.
+  Future<void> clearSearch();
+
+  /// Flips the relationship filter toggles (null leaves one unchanged) and runs
+  /// the app's real filter-changed handler, refreshing the uid sets and
+  /// rebuilding the markers.
+  Future<void> setRelationshipFilters({
+    bool? friends,
+    bool? followers,
+    bool? following,
+  });
+
+  /// Opens the real Preview for a marker taken straight out of
+  /// [visibleMarkerIds] — including a `<uid>_label` id, which must be resolved
+  /// back to its uid the way the map's own label `onTap` does.
+  Future<void> openPreviewForMarkerId(String markerId, String displayName);
+
   /// Resets the app to a known baseline so a scenario never inherits UI state a
   /// previous one left behind (an open `Preview` dialog, an open drawer, a
   /// different tab). Dismisses any dialog/pushed page, closes drawers, and

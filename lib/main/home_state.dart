@@ -41,11 +41,23 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
   Set<Marker> searchFilteredMarkers = {};
   List<String> searchFilteredResults = [];
   String searchTerm = '';
+
+  /// The person the map last flew to because a search matched only them, so
+  /// further keystrokes that still match just them don't restart the flight.
+  String? _searchFocusedUid;
+
+  /// Bumped by every camera flight; a running web flight stops as soon as it
+  /// sees a newer one (see [flyCameraTo]).
+  int _cameraFlightGeneration = 0;
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   late bool lastKnownDraggabilityState;
   bool _isLoading = false;
-  int toggleIndex = 0;
   bool mapOptionsVisibility = false;
+
+  /// True while the user is repositioning their own marker from their preview.
+  /// Every other marker is hidden and the map shows only a Done button; see
+  /// _enterMarkerMoveMode / _exitMarkerMoveMode.
+  bool _markerMoveMode = false;
 
   // Map marker relationship filters. When all are false, every marker is shown.
   // When one or more are enabled, only markers matching the enabled
@@ -58,7 +70,6 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
   Set<String> _friendUids = {};
   Set<String> _followerUids = {};
   Set<String> _followingUids = {};
-  String _markerDraggabilityText = 'not moveable';
   bool hasNotification = false;
   int notificationCount = 0;
   Timer? _notificationLoading;
@@ -117,17 +128,30 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
   /// constant so every "go to where you are" path lands at the same scale.
   static const double _userLocationZoom = 12.0;
 
+  /// The zoom a search flies in to when it finds a single person: close
+  /// enough that their name label shows, matching the feed's "show on map".
+  /// A user already zoomed in further keeps their own zoom.
+  static const double _searchFocusZoom = 13.5;
+
   final MapCameraMemory _cameraMemory = const MapCameraMemory();
 
   /// Latest camera reported by the map, and the last one written to storage.
   MapCameraSnapshot? _lastCameraSnapshot;
   MapCameraSnapshot? _persistedCameraSnapshot;
   String _lastTrackedUsageDayKey = '';
+
+  // Whether the signed-in user may open the admin dashboard. Owned by the
+  // authStateChanges listener alongside _signedIn/_uid, so it is recomputed on
+  // every sign-in and cleared on every sign-out rather than lingering from a
+  // previous session. See [AdminAccess]; the dashboard re-checks independently.
+  bool _isAdmin = false;
   RemoteMessage? _pendingInitialMessage;
   bool _shouldCreateInterest = false;
   String _initialInterestName = '';
 
-  final mapId = "bc8e2917cca03ad4";
+  // Defined once in [IntrstMapStyle] so the sign-up wizard's placement maps
+  // render with the same palette as the map the user is signing up to enter.
+  final mapId = IntrstMapStyle.cloudMapId;
 
   Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
 
@@ -258,6 +282,113 @@ class _MyHomePageState extends State<MyHomePage> implements QaAppHarness {
     _onItemTapped(0);
     await _qaSettle();
   }
+
+  @override
+  Future<void> openSignupWizard(
+      {String email = 'qa-signup@example.com'}) async {
+    await goHome();
+    // Not awaited: `show` only completes when the wizard is popped, which is
+    // what the scenario's teardown does.
+    //
+    // The submit callback always refuses, so a live run can walk every part of
+    // the real wizard — and press "Create my account" — without a QA run ever
+    // creating an account in prod. Everything else the scenario touches is the
+    // production widget.
+    unawaited(SignupWizard.show(
+      context,
+      email: email,
+      onSubmit: (_) async => const SignupSubmitError(
+        'QA run: account creation is disabled for the live wizard.',
+        fatal: true,
+      ),
+    ));
+    await _qaSettle();
+  }
+
+  // --- Map surface -----------------------------------------------------------
+  // Everything below goes through the same code the map itself uses, so a live
+  // scenario asserts on what production built, not on a parallel computation.
+
+  @override
+  List<String> visibleMarkerIds() =>
+      markers.map((marker) => marker.markerId.value).toList(growable: false);
+
+  @override
+  double get currentMapZoom => _currentZoom;
+
+  @override
+  double get initialMapZoom => _initialCameraPosition.zoom;
+
+  @override
+  Future<double?> rememberedCameraZoom() async =>
+      (await _cameraMemory.load())?.zoom;
+
+  @override
+  Future<void> applyMapZoom(double zoom) async {
+    _onCameraMove(zoom);
+    await _qaSettle();
+  }
+
+  @override
+  Future<void> reloadMarkers() async {
+    await loadMarkers(_signedIn);
+    await _qaSettle();
+  }
+
+  @override
+  Future<void> enterSearch(String term) async {
+    if (term.isEmpty) return clearSearch();
+    // Writing to the controller is what a keystroke does: RawAutocomplete
+    // listens to it and runs the real `optionsBuilder`, which performs the
+    // Firestore search and calls `_onCameraMove` with the results.
+    _searchController.text = term;
+    await _qaSettle();
+    final ok = await _qaWaitUntil(() => searchTerm == term,
+        timeout: const Duration(seconds: 15));
+    if (!ok) {
+      throw QaHarnessUnavailable(
+        'The app never applied the search term "$term" (the search field may '
+        'not be mounted — the map tab has to be open).',
+      );
+    }
+    await _qaSettle();
+  }
+
+  @override
+  Future<void> clearSearch() async {
+    _searchController.clear();
+    await _qaSettle();
+    final ok = await _qaWaitUntil(() => searchTerm.isEmpty);
+    if (!ok) {
+      throw QaHarnessUnavailable(
+        'The app never cleared its search term.',
+      );
+    }
+    await _qaSettle();
+  }
+
+  @override
+  Future<void> setRelationshipFilters({
+    bool? friends,
+    bool? followers,
+    bool? following,
+  }) async {
+    setState(() {
+      if (friends != null) _filterFriends = friends;
+      if (followers != null) _filterFollowers = followers;
+      if (following != null) _filterFollowing = following;
+    });
+    // The same handler the filter chips call.
+    await _onMarkerFilterChanged();
+    await _qaSettle();
+  }
+
+  @override
+  Future<void> openPreviewForMarkerId(String markerId, String displayName) =>
+      openPreviewFor(
+        MarkerVisibility.uidFromLabelMarkerId(markerId),
+        displayName,
+      );
 
   @override
   Future<void> resetToBaseline() async {
