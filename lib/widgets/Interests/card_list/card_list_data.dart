@@ -69,6 +69,7 @@ mixin _CardListDataMixin on _CardListStateBase {
     _mobileLinkController.dispose();
     _mobileRichTextController.dispose();
     _searchFocusNode.dispose();
+    _listScrollController.dispose();
     super.dispose();
   }
 
@@ -315,6 +316,7 @@ mixin _CardListDataMixin on _CardListStateBase {
     _richTextControllers.remove(id);
     _linkControllers[id]?.dispose();
     _linkControllers.remove(id);
+    _cardKeys.remove(id);
   }
 
   void updateToggles(String interestId, bool toggle) {

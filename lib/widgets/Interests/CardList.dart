@@ -87,10 +87,15 @@ abstract class _CardListStateBase extends State<CardList> {
   // True while the search field has focus (keyboard is up). Used to hide the
   // title, link, and description fields so the search results have full room.
   bool _searchKeyboardActive = false;
-  // The interest the user tapped to read in full. While set, every other
-  // interest is hidden and this one shows its whole description; tapping it
-  // again clears it and restores the list with truncated descriptions.
-  String? _focusedInterestId;
+  // The interests the user tapped to read in full. Each opens in place,
+  // showing its whole description with the rest of the list still around it
+  // in order; tapping it again closes it back to the truncated preview.
+  final Set<String> _openInterestIds = <String>{};
+  // Drives the interests list, so a card that was just opened or closed can
+  // be scrolled into view.
+  final ScrollController _listScrollController = ScrollController();
+  // One key per interest card, so a card can be located to scroll to it.
+  final Map<String, GlobalKey> _cardKeys = {};
   // Whether the pinned "Favorites" section is expanded. The database already
   // enforces the 5-favorite cap, so this is purely a display constant.
   bool _favoritesExpanded = true;

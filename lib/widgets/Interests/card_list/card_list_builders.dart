@@ -40,30 +40,37 @@ mixin _CardListBuildersMixin on _CardListStateBase {
     );
     final editingId = editingEntry.key;
 
-    // Arriving from a notification opens that interest already expanded.
+    final visibleIds = filteredInterests.map((i) => i.id).toSet();
+
+    // Arriving from a notification opens that interest already expanded,
+    // scrolled into view (out of a collapsed Favorites section if need be).
     final requestedFocusId = userModel.takeInterestFocusRequest(
       userModel.alternateUid,
-      filteredInterests.map((i) => i.id),
+      visibleIds,
     );
-    if (requestedFocusId != null) _focusedInterestId = requestedFocusId;
-    // Drop a focus whose interest has gone (deleted, or no longer visible).
-    if (_focusedInterestId != null &&
-        !filteredInterests.any((i) => i.id == _focusedInterestId)) {
-      _focusedInterestId = null;
+    if (requestedFocusId != null) {
+      _openInterestIds.add(requestedFocusId);
+      if (filteredInterests.any(
+        (i) => i.id == requestedFocusId && i.favorite,
+      )) {
+        _favoritesExpanded = true;
+      }
+      _revealCard(requestedFocusId);
     }
+    // Forget open interests that have gone (deleted, or no longer visible).
+    _openInterestIds.retainWhere(visibleIds.contains);
 
-    // Editing and reading in full both narrow the list to the one interest.
-    final soloId = editingId.isNotEmpty ? editingId : _focusedInterestId;
-    final visibleInterests = soloId == null
+    // Editing narrows the list to the one interest being edited.
+    final visibleInterests = editingId.isEmpty
         ? filteredInterests
-        : filteredInterests.where((i) => (i.id) == soloId).toList();
+        : filteredInterests.where((i) => i.id == editingId).toList();
 
-    // Drag-to-reorder is only for the signed-in owner outside edit and focus
-    // mode. That also guarantees visibleInterests is localInterests itself
-    // (no privacy filtering), which the Favorites/rest split and
+    // Drag-to-reorder is only for the signed-in owner outside edit mode. That
+    // also guarantees visibleInterests is localInterests itself (no privacy
+    // filtering), which the Favorites/rest split and
     // _handleReorderWithinGroup rely on.
     final bool canReorder =
-        widget.signedIn && widget.showInputForm && soloId == null;
+        widget.signedIn && widget.showInputForm && editingId.isEmpty;
 
     return Container(
       alignment: Alignment.topCenter,
@@ -174,7 +181,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                     userModel,
                     visibleInterests,
                     canReorder,
-                    groupFavorites: soloId == null,
+                    groupFavorites: editingId.isEmpty,
                   ),
           ),
           if (!widget.signedIn)
@@ -238,8 +245,8 @@ mixin _CardListBuildersMixin on _CardListStateBase {
   // Builds the whole interests list: the pinned "Favorites" section (a
   // collapsible dropdown showing the starred interests, capped at 5 by the
   // database) followed by the rest, in the persisted manual order. When a
-  // single interest is being edited or read in full, [groupFavorites] is
-  // false and only that one card is shown, with no sectioning or dragging.
+  // single interest is being edited, [groupFavorites] is false and only that
+  // one card is shown, with no sectioning or dragging.
   Widget _buildInterestList(
     BuildContext context,
     UserModel userModel,
@@ -268,6 +275,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
     final otherInterests = visibleInterests.where((i) => !i.favorite).toList();
 
     return SingleChildScrollView(
+      controller: _listScrollController,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -297,6 +305,60 @@ mixin _CardListBuildersMixin on _CardListStateBase {
         ],
       ),
     );
+  }
+
+  // Opens or closes the tapped interest in place. Closing one the user has
+  // scrolled down into first brings its top into view, or the shrink would
+  // leave the screen showing whatever comes after it.
+  void _toggleOpen(String id) {
+    final bool opening = !_openInterestIds.contains(id);
+    final cardContext = _cardKeys[id]?.currentContext;
+    if (!opening && cardContext != null) {
+      Scrollable.ensureVisible(
+        cardContext,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      );
+    }
+    setState(() {
+      if (opening) {
+        _openInterestIds.add(id);
+      } else {
+        _openInterestIds.remove(id);
+      }
+    });
+    _revealCard(id);
+  }
+
+  // Once the card has been laid out at its new size, scrolls it into view
+  // while the rest of the list stays in order above and below it. A card at
+  // least as tall as the screen is pinned to the top so it fills the screen;
+  // a shorter one is scrolled only as far as needed to show it whole.
+  void _revealCard(String id) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final cardContext = _cardKeys[id]?.currentContext;
+      if (cardContext == null || !_listScrollController.hasClients) return;
+      const duration = Duration(milliseconds: 250);
+      final bool fillsScreen =
+          (cardContext.size?.height ?? 0) >=
+          _listScrollController.position.viewportDimension;
+      if (fillsScreen) {
+        await Scrollable.ensureVisible(cardContext, duration: duration);
+        return;
+      }
+      // At most one of these moves: the bottom into view if it's cut off
+      // below, otherwise the top if it's cut off above.
+      await Scrollable.ensureVisible(
+        cardContext,
+        duration: duration,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+      if (!cardContext.mounted) return;
+      await Scrollable.ensureVisible(
+        cardContext,
+        duration: duration,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      );
+    });
   }
 
   // Header row for the pinned Favorites section — a dropdown the owner (or
@@ -357,7 +419,10 @@ mixin _CardListBuildersMixin on _CardListStateBase {
       );
     }
 
+    // Not primary: the outer list owns the scrolling, and on mobile this
+    // would otherwise attach to the Scaffold's PrimaryScrollController.
     return ReorderableListView.builder(
+      primary: false,
       padding: EdgeInsets.zero,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -396,7 +461,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
         _richTextControllers[id] ??
         _createRichTextController(interest.description);
     final linkController = _linkControllers[id] ?? TextEditingController();
-    final bool isFocused = _focusedInterestId == id;
+    final bool isOpen = _openInterestIds.contains(id);
 
     // On desktop, a drag handle is overlaid on the right edge of the card
     // (see the Stack below) — reserve space so the description text wraps
@@ -409,6 +474,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
             platform == TargetPlatform.macOS);
 
     final Widget card = Padding(
+      key: _cardKeys.putIfAbsent(id, () => GlobalKey()),
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
       child: Card(
         color: shouldHighlightFromFeed ? const Color(0xFFFFF3CD) : null,
@@ -421,16 +487,14 @@ mixin _CardListBuildersMixin on _CardListStateBase {
             width: shouldHighlightFromFeed ? 2 : 0,
           ),
         ),
-        // Tapping the card opens it to read in full (hiding the rest of the
-        // list) or, if it's already open, collapses it back. Buttons, links
-        // and fields inside the card take their own taps first.
+        // Tapping the card opens it in place to read in full or, if it's
+        // already open, collapses it back. Buttons, links and fields inside
+        // the card take their own taps first.
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: toggle || isEditingAny || _searchKeyboardActive
               ? null
-              : () => setState(() {
-                  _focusedInterestId = isFocused ? null : id;
-                }),
+              : () => _toggleOpen(id),
           child: Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
@@ -544,7 +608,7 @@ mixin _CardListBuildersMixin on _CardListStateBase {
                             richTextController,
                             canResize: widget.showInputForm,
                             interest: interest,
-                            collapsed: !isFocused,
+                            collapsed: !isOpen,
                           ),
                         ),
                 ],
